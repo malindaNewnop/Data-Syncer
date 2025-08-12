@@ -7,3 +7,4 @@ E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.core\obj\Debug\netstand
 E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.core\obj\Debug\netstandard2.1\syncer.core.csproj.CoreCompileInputs.cache
 E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.core\obj\Debug\netstandard2.1\syncer.core.dll
 E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.core\obj\Debug\netstandard2.1\syncer.core.pdb
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.core\obj\Debug\netstandard2.1\syncer.core.sourcelink.json

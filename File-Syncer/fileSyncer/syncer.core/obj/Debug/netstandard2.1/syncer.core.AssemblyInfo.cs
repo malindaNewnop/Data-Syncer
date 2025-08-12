@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("syncer.core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2b705c386cc11e7a7660277bcb355d922889d1f7")]
 [assembly: System.Reflection.AssemblyProductAttribute("syncer.core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("syncer.core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

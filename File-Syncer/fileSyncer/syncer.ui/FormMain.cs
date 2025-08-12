@@ -1,15 +1,28 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Collections.Generic;
 
 namespace syncer.ui
 {
     public partial class FormMain : Form
     {
+        private ISyncJobService _jobService;
+        private IServiceManager _serviceManager;
+        private IConnectionService _connectionService;
+
         public FormMain()
         {
             InitializeComponent();
+            InitializeServices();
             InitializeCustomComponents();
+        }
+
+        private void InitializeServices()
+        {
+            _jobService = ServiceLocator.SyncJobService;
+            _serviceManager = ServiceLocator.ServiceManager;
+            _connectionService = ServiceLocator.ConnectionService;
         }
 
         private void InitializeCustomComponents()
@@ -23,9 +36,12 @@ namespace syncer.ui
             // Initialize DataGridView columns
             InitializeJobsGrid();
 
-            // Update status
-            UpdateServiceStatus("Stopped");
-            UpdateConnectionStatus("Disconnected");
+            // Update status from services
+            UpdateServiceStatus();
+            UpdateConnectionStatus();
+            
+            // Load actual jobs from service
+            RefreshJobsGrid();
         }
 
         private void InitializeJobsGrid()
@@ -53,34 +69,42 @@ namespace syncer.ui
 
             // Auto-resize the last column
             dgvJobs.Columns["NextRun"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-
-            // Add some sample data
-            AddSampleJobs();
         }
 
-        private void AddSampleJobs()
+        private void UpdateServiceStatus()
         {
-            // Add sample job data for demonstration
-            dgvJobs.Rows.Add("Daily Backup", "Enabled", @"C:\Documents", "/backup/documents", "Every 24 Hours", "2024-08-11 09:00", "2024-08-12 09:00");
-            dgvJobs.Rows.Add("Hourly Sync", "Enabled", @"C:\Projects", "/sync/projects", "Every 1 Hours", "2024-08-12 11:00", "2024-08-12 12:00");
-            dgvJobs.Rows.Add("Weekly Reports", "Disabled", @"C:\Reports", "/archive/reports", "Every 7 Days", "Never", "Not Scheduled");
-        }
-
-        private void UpdateServiceStatus(string status)
-        {
+            string status = _serviceManager.GetServiceStatus();
             if (lblServiceStatus != null)
             {
                 lblServiceStatus.Text = "Service: " + status;
                 lblServiceStatus.ForeColor = status == "Running" ? Color.Green : Color.Red;
+                
+                // Update button state
+                if (btnStartStop != null)
+                {
+                    if (status == "Running")
+                    {
+                        btnStartStop.Text = "Stop Service";
+                        btnStartStop.BackColor = Color.LightCoral;
+                    }
+                    else
+                    {
+                        btnStartStop.Text = "Start Service";
+                        btnStartStop.BackColor = Color.LightGreen;
+                    }
+                }
             }
         }
 
-        private void UpdateConnectionStatus(string status)
+        private void UpdateConnectionStatus()
         {
+            bool isConnected = _connectionService.IsConnected();
+            string status = isConnected ? "Connected" : "Disconnected";
+            
             if (lblConnectionStatus != null)
             {
                 lblConnectionStatus.Text = "Connection: " + status;
-                lblConnectionStatus.ForeColor = status == "Connected" ? Color.Green : Color.Red;
+                lblConnectionStatus.ForeColor = isConnected ? Color.Green : Color.Red;
             }
         }
 
@@ -88,13 +112,19 @@ namespace syncer.ui
         private void connectionSettingsToolStripMenuItem_Click(object sender, EventArgs e)
         {
             FormConnection connForm = new FormConnection();
-            connForm.ShowDialog();
+            if (connForm.ShowDialog() == DialogResult.OK)
+            {
+                UpdateConnectionStatus();
+            }
         }
 
         private void scheduleSettingsToolStripMenuItem_Click(object sender, EventArgs e)
         {
             FormSchedule scheduleForm = new FormSchedule();
-            scheduleForm.ShowDialog();
+            if (scheduleForm.ShowDialog() == DialogResult.OK)
+            {
+                RefreshJobsGrid();
+            }
         }
 
         private void filterSettingsToolStripMenuItem_Click(object sender, EventArgs e)
@@ -126,46 +156,113 @@ namespace syncer.ui
             FormSchedule scheduleForm = new FormSchedule();
             if (scheduleForm.ShowDialog() == DialogResult.OK)
             {
-                // Refresh the jobs grid
                 RefreshJobsGrid();
             }
         }
 
         private void btnStartStop_Click(object sender, EventArgs e)
         {
-            // Toggle service state
-            if (btnStartStop.Text == "Start Service")
+            try
             {
-                btnStartStop.Text = "Stop Service";
-                btnStartStop.BackColor = Color.LightCoral;
-                UpdateServiceStatus("Running");
+                if (_serviceManager.IsServiceRunning())
+                {
+                    if (_serviceManager.StopService())
+                    {
+                        ServiceLocator.LogService.LogInfo("Service stopped by user");
+                    }
+                    else
+                    {
+                        MessageBox.Show("Failed to stop service", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+                else
+                {
+                    if (_serviceManager.StartService())
+                    {
+                        ServiceLocator.LogService.LogInfo("Service started by user");
+                    }
+                    else
+                    {
+                        MessageBox.Show("Failed to start service", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+                
+                UpdateServiceStatus();
             }
-            else
+            catch (Exception ex)
             {
-                btnStartStop.Text = "Start Service";
-                btnStartStop.BackColor = Color.LightGreen;
-                UpdateServiceStatus("Stopped");
+                MessageBox.Show("Error managing service: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error managing service: " + ex.Message);
             }
         }
 
         private void btnRefresh_Click(object sender, EventArgs e)
         {
             RefreshJobsGrid();
+            UpdateServiceStatus();
+            UpdateConnectionStatus();
         }
 
         private void RefreshJobsGrid()
         {
-            // TODO: Implement job refresh logic
-            // This will later load from saved configurations
+            try
+            {
+                dgvJobs.Rows.Clear();
+                
+                var jobs = _jobService.GetAllJobs();
+                foreach (var job in jobs)
+                {
+                    string schedule = $"Every {job.IntervalValue} {job.IntervalType}";
+                    string lastRun = job.LastRun?.ToString("yyyy-MM-dd HH:mm") ?? "Never";
+                    string nextRun = job.GetNextRunTime();
+                    string status = job.IsEnabled ? "Enabled" : "Disabled";
+
+                    dgvJobs.Rows.Add(
+                        job.JobName,
+                        status,
+                        job.SourcePath,
+                        job.DestinationPath,
+                        schedule,
+                        lastRun,
+                        nextRun
+                    );
+                    
+                    // Store job ID in the Tag property for later reference
+                    dgvJobs.Rows[dgvJobs.Rows.Count - 1].Tag = job.Id;
+                }
+                
+                ServiceLocator.LogService.LogInfo($"Jobs grid refreshed. Found {jobs.Count} jobs.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error loading jobs: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error loading jobs: " + ex.Message);
+            }
         }
 
         private void dgvJobs_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex >= 0)
             {
-                // Open edit dialog for selected job
-                FormSchedule scheduleForm = new FormSchedule();
-                scheduleForm.ShowDialog();
+                try
+                {
+                    int jobId = (int)dgvJobs.Rows[e.RowIndex].Tag;
+                    var job = _jobService.GetJobById(jobId);
+                    
+                    if (job != null)
+                    {
+                        FormSchedule scheduleForm = new FormSchedule(job);
+                        if (scheduleForm.ShowDialog() == DialogResult.OK)
+                        {
+                            RefreshJobsGrid();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error opening job for editing: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ServiceLocator.LogService.LogError("Error opening job for editing: " + ex.Message);
+                }
             }
         }
     }

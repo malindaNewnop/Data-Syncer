@@ -7,13 +7,19 @@ namespace syncer.ui
 {
     public partial class FormLogs : Form
     {
-        private DataTable logsDataTable;
+        private ILogService _logService;
+        private DataTable _logsDataTable;
 
         public FormLogs()
         {
             InitializeComponent();
+            InitializeServices();
             InitializeCustomComponents();
-            InitializeLogData();
+        }
+
+        private void InitializeServices()
+        {
+            _logService = ServiceLocator.LogService;
         }
 
         private void InitializeCustomComponents()
@@ -23,83 +29,131 @@ namespace syncer.ui
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.Sizable;
             
+            InitializeLogData();
             LoadLogs();
         }
 
         private void InitializeLogData()
         {
-            // Create the DataTable structure for logs
-            logsDataTable = new DataTable();
-            logsDataTable.Columns.Add("DateTime", typeof(DateTime));
-            logsDataTable.Columns.Add("Level", typeof(string));
-            logsDataTable.Columns.Add("Job", typeof(string));
-            logsDataTable.Columns.Add("File", typeof(string));
-            logsDataTable.Columns.Add("Status", typeof(string));
-            logsDataTable.Columns.Add("Message", typeof(string));
+            // Get logs from service instead of creating hardcoded data
+            _logsDataTable = _logService.GetLogs();
 
             // Bind to DataGridView
-            dgvLogs.DataSource = logsDataTable;
-            
-            // Configure columns
-            dgvLogs.Columns["DateTime"].HeaderText = "Date/Time";
-            dgvLogs.Columns["DateTime"].Width = 130;
-            dgvLogs.Columns["Level"].Width = 70;
-            dgvLogs.Columns["Job"].Width = 100;
-            dgvLogs.Columns["File"].Width = 200;
-            dgvLogs.Columns["Status"].Width = 80;
-            dgvLogs.Columns["Message"].Width = 250;
-            dgvLogs.Columns["Message"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-
-            // Add some sample data
-            AddSampleLogData();
+            if (dgvLogs != null)
+            {
+                dgvLogs.DataSource = _logsDataTable;
+                
+                // Configure columns
+                ConfigureLogColumns();
+            }
         }
 
-        private void AddSampleLogData()
+        private void ConfigureLogColumns()
         {
-            // Add sample log entries for demonstration
-            logsDataTable.Rows.Add(DateTime.Now.AddHours(-2), "INFO", "DailyBackup", "document1.pdf", "Success", "File transferred successfully");
-            logsDataTable.Rows.Add(DateTime.Now.AddHours(-2), "INFO", "DailyBackup", "image1.jpg", "Success", "File transferred successfully");
-            logsDataTable.Rows.Add(DateTime.Now.AddHours(-1), "ERROR", "DailyBackup", "largefile.zip", "Failed", "Connection timeout during transfer");
-            logsDataTable.Rows.Add(DateTime.Now.AddMinutes(-30), "WARNING", "HourlySync", "temp.txt", "Skipped", "File already exists at destination");
-            logsDataTable.Rows.Add(DateTime.Now.AddMinutes(-15), "INFO", "HourlySync", "data.csv", "Success", "File transferred successfully");
-            logsDataTable.Rows.Add(DateTime.Now.AddMinutes(-5), "INFO", "System", "", "Info", "Sync service started");
+            if (dgvLogs?.Columns != null)
+            {
+                if (dgvLogs.Columns["DateTime"] != null)
+                {
+                    dgvLogs.Columns["DateTime"].HeaderText = "Date/Time";
+                    dgvLogs.Columns["DateTime"].Width = 130;
+                }
+                
+                if (dgvLogs.Columns["Level"] != null)
+                    dgvLogs.Columns["Level"].Width = 70;
+                
+                if (dgvLogs.Columns["Job"] != null)
+                    dgvLogs.Columns["Job"].Width = 100;
+                
+                if (dgvLogs.Columns["File"] != null)
+                    dgvLogs.Columns["File"].Width = 200;
+                
+                if (dgvLogs.Columns["Status"] != null)
+                    dgvLogs.Columns["Status"].Width = 80;
+                
+                if (dgvLogs.Columns["Message"] != null)
+                {
+                    dgvLogs.Columns["Message"].Width = 250;
+                    dgvLogs.Columns["Message"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                }
+            }
         }
 
         private void LoadLogs()
         {
-            // TODO: Load actual logs from log files or database
-            // This will be implemented when we add NLog integration
-            UpdateLogCount();
+            try
+            {
+                // Load logs from service
+                _logsDataTable = _logService.GetLogs();
+                
+                if (dgvLogs != null)
+                {
+                    dgvLogs.DataSource = _logsDataTable;
+                    ConfigureLogColumns();
+                }
+                
+                UpdateLogCount();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error loading logs: " + ex.Message, "Error", 
+                              MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error loading logs in FormLogs: " + ex.Message);
+            }
         }
 
         private void UpdateLogCount()
         {
-            lblLogCount.Text = "Total Logs: " + logsDataTable.Rows.Count;
+            if (lblLogCount != null && _logsDataTable != null)
+            {
+                lblLogCount.Text = "Total Logs: " + _logsDataTable.Rows.Count;
+            }
         }
 
         private void btnSearch_Click(object sender, EventArgs e)
         {
-            string searchText = txtSearch.Text.Trim();
-            
-            if (StringExtensions.IsNullOrWhiteSpace(searchText))
+            try
             {
-                // Clear filter
-                (dgvLogs.DataSource as DataTable).DefaultView.RowFilter = string.Empty;
+                string searchText = txtSearch?.Text?.Trim() ?? "";
+                
+                if (StringExtensions.IsNullOrWhiteSpace(searchText))
+                {
+                    // Clear filter
+                    if (dgvLogs?.DataSource is DataTable dt)
+                    {
+                        dt.DefaultView.RowFilter = string.Empty;
+                    }
+                }
+                else
+                {
+                    // Apply filter
+                    string filter = $"Job LIKE '%{searchText}%' OR File LIKE '%{searchText}%' OR Message LIKE '%{searchText}%'";
+                    if (dgvLogs?.DataSource is DataTable dt)
+                    {
+                        dt.DefaultView.RowFilter = filter;
+                    }
+                }
+                
+                UpdateLogCount();
             }
-            else
+            catch (Exception ex)
             {
-                // Apply filter
-                string filter = "Job LIKE '%" + searchText + "%' OR File LIKE '%" + searchText + "%' OR Message LIKE '%" + searchText + "%'";
-                (dgvLogs.DataSource as DataTable).DefaultView.RowFilter = filter;
+                MessageBox.Show("Error searching logs: " + ex.Message, "Error", 
+                              MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            
-            UpdateLogCount();
         }
 
         private void btnClearSearch_Click(object sender, EventArgs e)
         {
-            txtSearch.Text = string.Empty;
-            (dgvLogs.DataSource as DataTable).DefaultView.RowFilter = string.Empty;
+            if (txtSearch != null)
+            {
+                txtSearch.Text = string.Empty;
+            }
+            
+            if (dgvLogs?.DataSource is DataTable dt)
+            {
+                dt.DefaultView.RowFilter = string.Empty;
+            }
+            
             UpdateLogCount();
         }
 
@@ -115,11 +169,26 @@ namespace syncer.ui
             
             if (result == DialogResult.Yes)
             {
-                logsDataTable.Clear();
-                AddSampleLogData(); // Add sample data back for demo
-                UpdateLogCount();
-                MessageBox.Show("Logs cleared successfully.", "Success", 
-                              MessageBoxButtons.OK, MessageBoxIcon.Information);
+                try
+                {
+                    if (_logService.ClearLogs())
+                    {
+                        LoadLogs(); // Refresh the display
+                        MessageBox.Show("Logs cleared successfully.", "Success", 
+                                      MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ServiceLocator.LogService.LogInfo("Log history cleared by user");
+                    }
+                    else
+                    {
+                        MessageBox.Show("Failed to clear logs.", "Error", 
+                                      MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error clearing logs: " + ex.Message, "Error", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
 
@@ -135,102 +204,102 @@ namespace syncer.ui
                 {
                     try
                     {
-                        ExportLogsToFile(dialog.FileName);
-                        MessageBox.Show("Logs exported successfully to:\n" + dialog.FileName, "Export Complete", 
-                                      MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        if (_logService.ExportLogs(dialog.FileName))
+                        {
+                            MessageBox.Show("Logs exported successfully to:\n" + dialog.FileName, "Export Complete", 
+                                          MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ServiceLocator.LogService.LogInfo($"Logs exported to: {dialog.FileName}");
+                        }
+                        else
+                        {
+                            MessageBox.Show("Failed to export logs.", "Export Error", 
+                                          MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
                     }
                     catch (Exception ex)
                     {
                         MessageBox.Show("Error exporting logs: " + ex.Message, "Export Error", 
                                       MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ServiceLocator.LogService.LogError("Error exporting logs: " + ex.Message);
                     }
                 }
             }
         }
 
-        private void ExportLogsToFile(string fileName)
-        {
-            using (var writer = new System.IO.StreamWriter(fileName))
-            {
-                // Write header
-                writer.WriteLine("DateTime,Level,Job,File,Status,Message");
-                
-                // Write data
-                foreach (DataRow row in logsDataTable.Rows)
-                {
-                    string[] fields = new string[] {
-                        row["DateTime"].ToString(),
-                        EscapeCsvField(row["Level"].ToString()),
-                        EscapeCsvField(row["Job"].ToString()),
-                        EscapeCsvField(row["File"].ToString()),
-                        EscapeCsvField(row["Status"].ToString()),
-                        EscapeCsvField(row["Message"].ToString())
-                    };
-                    var line = string.Join(",", fields);
-                    writer.WriteLine(line);
-                }
-            }
-        }
-
-        private string EscapeCsvField(string field)
-        {
-            if (field.Contains(",") || field.Contains("\"") || field.Contains("\n"))
-            {
-                return "\"" + field.Replace("\"", "\"\"") + "\"";
-            }
-            return field;
-        }
-
         private void cmbLogLevel_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (cmbLogLevel.SelectedIndex == 0) // "All"
+            try
             {
-                (dgvLogs.DataSource as DataTable).DefaultView.RowFilter = string.Empty;
+                string selectedLevel = cmbLogLevel?.SelectedItem?.ToString();
+                
+                if (StringExtensions.IsNullOrWhiteSpace(selectedLevel) || selectedLevel == "All")
+                {
+                    // Load all logs
+                    _logsDataTable = _logService.GetLogs();
+                }
+                else
+                {
+                    // Filter by log level
+                    if (dgvLogs?.DataSource is DataTable dt)
+                    {
+                        dt.DefaultView.RowFilter = $"Level = '{selectedLevel}'";
+                    }
+                }
+                
+                if (dgvLogs != null)
+                {
+                    dgvLogs.DataSource = _logsDataTable;
+                    ConfigureLogColumns();
+                }
+                
+                UpdateLogCount();
             }
-            else
+            catch (Exception ex)
             {
-                string selectedLevel = cmbLogLevel.SelectedItem.ToString();
-                (dgvLogs.DataSource as DataTable).DefaultView.RowFilter = "Level = '" + selectedLevel + "'";
+                MessageBox.Show("Error filtering logs: " + ex.Message, "Error", 
+                              MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            UpdateLogCount();
         }
 
         private void dgvLogs_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
-            if (dgvLogs.Columns[e.ColumnIndex].Name == "Level")
+            if (dgvLogs?.Columns != null && e.ColumnIndex >= 0 && e.ColumnIndex < dgvLogs.Columns.Count)
             {
-                string level = e.Value?.ToString();
-                switch (level)
+                if (dgvLogs.Columns[e.ColumnIndex].Name == "Level")
                 {
-                    case "ERROR":
-                        e.CellStyle.ForeColor = Color.Red;
-                        e.CellStyle.Font = new Font(e.CellStyle.Font, FontStyle.Bold);
-                        break;
-                    case "WARNING":
-                        e.CellStyle.ForeColor = Color.Orange;
-                        break;
-                    case "INFO":
-                        e.CellStyle.ForeColor = Color.Blue;
-                        break;
-                    default:
-                        e.CellStyle.ForeColor = Color.Black;
-                        break;
+                    string level = e.Value?.ToString();
+                    switch (level)
+                    {
+                        case "ERROR":
+                            e.CellStyle.ForeColor = Color.Red;
+                            e.CellStyle.Font = new Font(e.CellStyle.Font, FontStyle.Bold);
+                            break;
+                        case "WARNING":
+                            e.CellStyle.ForeColor = Color.Orange;
+                            break;
+                        case "INFO":
+                            e.CellStyle.ForeColor = Color.Blue;
+                            break;
+                        default:
+                            e.CellStyle.ForeColor = Color.Black;
+                            break;
+                    }
                 }
-            }
-            else if (dgvLogs.Columns[e.ColumnIndex].Name == "Status")
-            {
-                string status = e.Value?.ToString();
-                switch (status)
+                else if (dgvLogs.Columns[e.ColumnIndex].Name == "Status")
                 {
-                    case "Success":
-                        e.CellStyle.ForeColor = Color.Green;
-                        break;
-                    case "Failed":
-                        e.CellStyle.ForeColor = Color.Red;
-                        break;
-                    case "Skipped":
-                        e.CellStyle.ForeColor = Color.Orange;
-                        break;
+                    string status = e.Value?.ToString();
+                    switch (status)
+                    {
+                        case "Success":
+                            e.CellStyle.ForeColor = Color.Green;
+                            break;
+                        case "Failed":
+                            e.CellStyle.ForeColor = Color.Red;
+                            break;
+                        case "Skipped":
+                            e.CellStyle.ForeColor = Color.Orange;
+                            break;
+                    }
                 }
             }
         }

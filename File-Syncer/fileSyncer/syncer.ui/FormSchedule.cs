@@ -6,15 +6,33 @@ namespace syncer.ui
 {
     public partial class FormSchedule : Form
     {
-        public FormSchedule()
+        private ISyncJobService _jobService;
+        private IConnectionService _connectionService;
+        private SyncJob _currentJob;
+        private bool _isEditMode;
+
+        public FormSchedule() : this(null)
+        {
+        }
+
+        public FormSchedule(SyncJob jobToEdit)
         {
             InitializeComponent();
+            InitializeServices();
+            _currentJob = jobToEdit;
+            _isEditMode = jobToEdit != null;
             InitializeCustomComponents();
+        }
+
+        private void InitializeServices()
+        {
+            _jobService = ServiceLocator.SyncJobService;
+            _connectionService = ServiceLocator.ConnectionService;
         }
 
         private void InitializeCustomComponents()
         {
-            this.Text = "Schedule Settings";
+            this.Text = _isEditMode ? "Edit Schedule Settings" : "Add Schedule Settings";
             this.Size = new Size(600, 550);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -22,22 +40,54 @@ namespace syncer.ui
             this.MinimizeBox = false;
 
             // Set default values
-            chkEnabled.Checked = true;
-            dtpStartTime.Value = DateTime.Now.Date.AddHours(9); // 9 AM today
-            numInterval.Value = 60; // 60 minutes
-            cmbIntervalType.SelectedIndex = 1; // Minutes
+            SetDefaultValues();
             
-            LoadSettings();
+            // Load settings if editing
+            if (_isEditMode)
+            {
+                LoadJobSettings();
+            }
         }
 
-        private void LoadSettings()
+        private void SetDefaultValues()
         {
-            // TODO: Load settings from configuration
+            if (chkEnabled != null) chkEnabled.Checked = true;
+            if (dtpStartTime != null) dtpStartTime.Value = DateTime.Now.Date.AddHours(9); // 9 AM today
+            if (numInterval != null) numInterval.Value = 60; // 60 minutes
+            if (cmbIntervalType != null) cmbIntervalType.SelectedIndex = 1; // Minutes
         }
 
-        private void SaveSettings()
+        private void LoadJobSettings()
         {
-            // TODO: Save settings to configuration
+            if (_currentJob != null)
+            {
+                if (txtJobName != null) txtJobName.Text = _currentJob.JobName;
+                if (chkEnabled != null) chkEnabled.Checked = _currentJob.IsEnabled;
+                if (txtSourcePath != null) txtSourcePath.Text = _currentJob.SourcePath;
+                if (txtDestinationPath != null) txtDestinationPath.Text = _currentJob.DestinationPath;
+                if (dtpStartTime != null) dtpStartTime.Value = _currentJob.StartTime;
+                if (numInterval != null) numInterval.Value = _currentJob.IntervalValue;
+                
+                // Set interval type
+                if (cmbIntervalType != null)
+                {
+                    var items = new string[] { "Minutes", "Hours", "Days" };
+                    for (int i = 0; i < items.Length; i++)
+                    {
+                        if (items[i] == _currentJob.IntervalType)
+                        {
+                            cmbIntervalType.SelectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+                
+                // Set transfer mode if available
+                if (cmbTransferMode != null && !StringExtensions.IsNullOrWhiteSpace(_currentJob.TransferMode))
+                {
+                    cmbTransferMode.Text = _currentJob.TransferMode;
+                }
+            }
         }
 
         private void btnBrowseSource_Click(object sender, EventArgs e)
@@ -56,22 +106,57 @@ namespace syncer.ui
 
         private void btnBrowseDestination_Click(object sender, EventArgs e)
         {
-            txtDestinationPath.Text = "/remote/destination/"; // Default remote path
-            
-            // TODO: Implement remote folder browser when FTP connection is available
-            MessageBox.Show("Remote folder browsing will be available when FTP connection is configured.", 
-                          "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            // Check if connection is available for remote browsing
+            if (_connectionService.IsConnected())
+            {
+                // TODO: Implement remote folder browser when backend is ready
+                MessageBox.Show("Remote folder browsing will be implemented with backend services.", 
+                              "Feature Coming Soon", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                // Allow manual entry
+                using (var inputForm = new Form())
+                {
+                    inputForm.Text = "Enter Destination Path";
+                    inputForm.Size = new Size(400, 150);
+                    inputForm.StartPosition = FormStartPosition.CenterParent;
+                    inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                    
+                    var label = new Label() { Left = 10, Top = 15, Text = "Destination path:", AutoSize = true };
+                    var textBox = new TextBox() { Left = 10, Top = 40, Width = 360, Text = txtDestinationPath.Text };
+                    var okButton = new Button() { Text = "OK", Left = 205, Width = 75, Top = 70, DialogResult = DialogResult.OK };
+                    var cancelButton = new Button() { Text = "Cancel", Left = 295, Width = 75, Top = 70, DialogResult = DialogResult.Cancel };
+
+                    inputForm.Controls.AddRange(new Control[] { label, textBox, okButton, cancelButton });
+                    inputForm.AcceptButton = okButton;
+                    inputForm.CancelButton = cancelButton;
+
+                    if (inputForm.ShowDialog() == DialogResult.OK)
+                    {
+                        txtDestinationPath.Text = textBox.Text;
+                    }
+                }
+            }
         }
 
         private void btnSave_Click(object sender, EventArgs e)
         {
             if (ValidateInputs())
             {
-                SaveSettings();
-                MessageBox.Show("Schedule saved successfully!", "Success", 
-                              MessageBoxButtons.OK, MessageBoxIcon.Information);
-                this.DialogResult = DialogResult.OK;
-                this.Close();
+                try
+                {
+                    SaveJob();
+                    MessageBox.Show(_isEditMode ? "Job updated successfully!" : "Job created successfully!", 
+                                  "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error saving job: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ServiceLocator.LogService.LogError("Error saving job: " + ex.Message);
+                }
             }
         }
 
@@ -118,29 +203,63 @@ namespace syncer.ui
             return true;
         }
 
+        private void SaveJob()
+        {
+            if (_currentJob == null)
+            {
+                _currentJob = new SyncJob();
+            }
+
+            _currentJob.JobName = txtJobName.Text.Trim();
+            _currentJob.IsEnabled = chkEnabled.Checked;
+            _currentJob.SourcePath = txtSourcePath.Text.Trim();
+            _currentJob.DestinationPath = txtDestinationPath.Text.Trim();
+            _currentJob.StartTime = dtpStartTime.Value;
+            _currentJob.IntervalValue = (int)numInterval.Value;
+            _currentJob.IntervalType = cmbIntervalType.SelectedItem?.ToString() ?? "Minutes";
+            _currentJob.TransferMode = cmbTransferMode.SelectedItem?.ToString() ?? "Copy (Keep both files)";
+
+            if (_isEditMode)
+            {
+                _jobService.UpdateJob(_currentJob);
+                ServiceLocator.LogService.LogInfo($"Job '{_currentJob.JobName}' updated");
+            }
+            else
+            {
+                _currentJob.Id = _jobService.CreateJob(_currentJob);
+                ServiceLocator.LogService.LogInfo($"Job '{_currentJob.JobName}' created");
+            }
+        }
+
         private void chkEnabled_CheckedChanged(object sender, EventArgs e)
         {
             // Enable/disable schedule controls based on checkbox
-            gbScheduleSettings.Enabled = chkEnabled.Checked;
+            if (gbScheduleSettings != null)
+            {
+                gbScheduleSettings.Enabled = chkEnabled.Checked;
+            }
         }
 
         private void cmbIntervalType_SelectedIndexChanged(object sender, EventArgs e)
         {
             // Adjust interval limits based on type
-            switch (cmbIntervalType.SelectedItem.ToString())
+            if (cmbIntervalType.SelectedItem != null)
             {
-                case "Minutes":
-                    numInterval.Minimum = 1;
-                    numInterval.Maximum = 1440; // 24 hours in minutes
-                    break;
-                case "Hours":
-                    numInterval.Minimum = 1;
-                    numInterval.Maximum = 24;
-                    break;
-                case "Days":
-                    numInterval.Minimum = 1;
-                    numInterval.Maximum = 365;
-                    break;
+                switch (cmbIntervalType.SelectedItem.ToString())
+                {
+                    case "Minutes":
+                        numInterval.Minimum = 1;
+                        numInterval.Maximum = 1440; // 24 hours in minutes
+                        break;
+                    case "Hours":
+                        numInterval.Minimum = 1;
+                        numInterval.Maximum = 24;
+                        break;
+                    case "Days":
+                        numInterval.Minimum = 1;
+                        numInterval.Maximum = 365;
+                        break;
+                }
             }
         }
 
@@ -157,7 +276,7 @@ namespace syncer.ui
         private string GenerateSchedulePreview()
         {
             string enabled = chkEnabled.Checked ? "Enabled" : "Disabled";
-            string interval = "Every " + numInterval.Value + " " + cmbIntervalType.SelectedItem;
+            string interval = "Every " + numInterval.Value + " " + (cmbIntervalType.SelectedItem?.ToString() ?? "Minutes");
             string startTime = dtpStartTime.Value.ToString("yyyy-MM-dd HH:mm");
             
             return "Job Name: " + txtJobName.Text + "\n" +
@@ -166,7 +285,7 @@ namespace syncer.ui
                    "Destination: " + txtDestinationPath.Text + "\n" +
                    "Schedule: " + interval + "\n" +
                    "Start Time: " + startTime + "\n" +
-                   "Transfer Mode: " + cmbTransferMode.SelectedItem;
+                   "Transfer Mode: " + (cmbTransferMode.SelectedItem?.ToString() ?? "Copy (Keep both files)");
         }
     }
 }

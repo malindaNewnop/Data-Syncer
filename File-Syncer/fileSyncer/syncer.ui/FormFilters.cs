@@ -7,10 +7,20 @@ namespace syncer.ui
 {
     public partial class FormFilters : Form
     {
+        private IFilterService _filterService;
+        private FilterSettings _currentSettings;
+
         public FormFilters()
         {
             InitializeComponent();
+            InitializeServices();
             InitializeCustomComponents();
+        }
+
+        private void InitializeServices()
+        {
+            _filterService = ServiceLocator.FilterService;
+            _currentSettings = _filterService.GetFilterSettings();
         }
 
         private void InitializeCustomComponents()
@@ -25,68 +35,152 @@ namespace syncer.ui
             // Initialize file type filters
             InitializeFileTypeFilters();
             
-            // Set default values
-            numMinSize.Value = 0;
-            numMaxSize.Value = 100;
-            chkEnableFilters.Checked = true;
-            
             LoadSettings();
         }
 
         private void InitializeFileTypeFilters()
         {
-            // Common file types
-            string[] fileTypes = {
-                ".txt - Text files",
-                ".doc, .docx - Word documents", 
-                ".xls, .xlsx - Excel files",
-                ".pdf - PDF documents",
-                ".jpg, .jpeg - JPEG images",
-                ".png - PNG images",
-                ".gif - GIF images",
-                ".mp4 - Video files",
-                ".mp3 - Audio files",
-                ".zip, .rar - Archive files",
-                ".exe - Executable files",
-                ".dll - Library files",
-                ".log - Log files",
-                ".csv - CSV files",
-                ".xml - XML files",
-                ".json - JSON files"
-            };
-
-            clbFileTypes.Items.AddRange(fileTypes);
-            
-            // Check some common types by default
-            for (int i = 0; i < 6; i++)
+            if (clbFileTypes != null)
             {
-                clbFileTypes.SetItemChecked(i, true);
+                clbFileTypes.Items.Clear();
+                
+                // Load default file types from service
+                string[] fileTypes = _filterService.GetDefaultFileTypes();
+                clbFileTypes.Items.AddRange(fileTypes);
             }
         }
 
         private void LoadSettings()
         {
-            // TODO: Load settings from configuration
+            if (_currentSettings != null)
+            {
+                // Load filter settings
+                if (chkEnableFilters != null) 
+                    chkEnableFilters.Checked = _currentSettings.FiltersEnabled;
+                
+                if (numMinSize != null) 
+                    numMinSize.Value = _currentSettings.MinFileSize;
+                
+                if (numMaxSize != null) 
+                    numMaxSize.Value = _currentSettings.MaxFileSize;
+                
+                if (chkIncludeHidden != null) 
+                    chkIncludeHidden.Checked = _currentSettings.IncludeHiddenFiles;
+                
+                if (chkIncludeSystem != null) 
+                    chkIncludeSystem.Checked = _currentSettings.IncludeSystemFiles;
+                
+                if (chkIncludeReadOnly != null) 
+                    chkIncludeReadOnly.Checked = _currentSettings.IncludeReadOnlyFiles;
+                
+                if (txtExcludePatterns != null) 
+                    txtExcludePatterns.Text = _currentSettings.ExcludePatterns ?? "";
+
+                // Load selected file types
+                if (_currentSettings.AllowedFileTypes != null && clbFileTypes != null)
+                {
+                    for (int i = 0; i < clbFileTypes.Items.Count; i++)
+                    {
+                        string item = clbFileTypes.Items[i].ToString();
+                        bool isSelected = _currentSettings.AllowedFileTypes.Any(fileType => 
+                            item.StartsWith(fileType.Split(' ')[0]));
+                        clbFileTypes.SetItemChecked(i, isSelected);
+                    }
+                }
+                else
+                {
+                    // Set some defaults if no settings exist
+                    SetDefaultFileTypeSelection();
+                }
+            }
+            else
+            {
+                // Set defaults if no settings exist
+                SetDefaultValues();
+            }
+
+            // Update UI state based on filters enabled checkbox
+            UpdateFilterControlsState();
+        }
+
+        private void SetDefaultValues()
+        {
+            if (chkEnableFilters != null) chkEnableFilters.Checked = true;
+            if (numMinSize != null) numMinSize.Value = 0;
+            if (numMaxSize != null) numMaxSize.Value = 100;
+            if (chkIncludeReadOnly != null) chkIncludeReadOnly.Checked = true;
+            
+            SetDefaultFileTypeSelection();
+        }
+
+        private void SetDefaultFileTypeSelection()
+        {
+            // Check some common types by default
+            if (clbFileTypes != null)
+            {
+                int itemsToCheck = Math.Min(6, clbFileTypes.Items.Count);
+                for (int i = 0; i < itemsToCheck; i++)
+                {
+                    clbFileTypes.SetItemChecked(i, true);
+                }
+            }
         }
 
         private void SaveSettings()
         {
-            // TODO: Save settings to configuration
+            try
+            {
+                if (_currentSettings == null)
+                    _currentSettings = new FilterSettings();
+
+                _currentSettings.FiltersEnabled = chkEnableFilters?.Checked ?? true;
+                _currentSettings.MinFileSize = numMinSize?.Value ?? 0;
+                _currentSettings.MaxFileSize = numMaxSize?.Value ?? 100;
+                _currentSettings.IncludeHiddenFiles = chkIncludeHidden?.Checked ?? false;
+                _currentSettings.IncludeSystemFiles = chkIncludeSystem?.Checked ?? false;
+                _currentSettings.IncludeReadOnlyFiles = chkIncludeReadOnly?.Checked ?? true;
+                _currentSettings.ExcludePatterns = txtExcludePatterns?.Text?.Trim() ?? "";
+
+                // Save selected file types
+                if (clbFileTypes != null)
+                {
+                    var selectedTypes = new System.Collections.Generic.List<string>();
+                    foreach (var item in clbFileTypes.CheckedItems)
+                    {
+                        selectedTypes.Add(item.ToString());
+                    }
+                    _currentSettings.AllowedFileTypes = selectedTypes.ToArray();
+                }
+
+                _filterService.SaveFilterSettings(_currentSettings);
+                ServiceLocator.LogService.LogInfo("Filter settings saved");
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Error saving filter settings: " + ex.Message);
+                throw;
+            }
         }
 
         private void btnSelectAll_Click(object sender, EventArgs e)
         {
-            for (int i = 0; i < clbFileTypes.Items.Count; i++)
+            if (clbFileTypes != null)
             {
-                clbFileTypes.SetItemChecked(i, true);
+                for (int i = 0; i < clbFileTypes.Items.Count; i++)
+                {
+                    clbFileTypes.SetItemChecked(i, true);
+                }
             }
         }
 
         private void btnSelectNone_Click(object sender, EventArgs e)
         {
-            for (int i = 0; i < clbFileTypes.Items.Count; i++)
+            if (clbFileTypes != null)
             {
-                clbFileTypes.SetItemChecked(i, false);
+                for (int i = 0; i < clbFileTypes.Items.Count; i++)
+                {
+                    clbFileTypes.SetItemChecked(i, false);
+                }
             }
         }
 
@@ -122,8 +216,14 @@ namespace syncer.ui
                             customExtension = "." + customExtension;
                         
                         string customItem = customExtension + " - Custom extension";
-                        clbFileTypes.Items.Add(customItem);
-                        clbFileTypes.SetItemChecked(clbFileTypes.Items.Count - 1, true);
+                        
+                        if (clbFileTypes != null)
+                        {
+                            clbFileTypes.Items.Add(customItem);
+                            clbFileTypes.SetItemChecked(clbFileTypes.Items.Count - 1, true);
+                        }
+                        
+                        ServiceLocator.LogService.LogInfo($"Custom file extension added: {customExtension}");
                     }
                 }
             }
@@ -131,12 +231,13 @@ namespace syncer.ui
 
         private void btnRemoveSelected_Click(object sender, EventArgs e)
         {
-            if (clbFileTypes.SelectedIndex >= 0)
+            if (clbFileTypes != null && clbFileTypes.SelectedIndex >= 0)
             {
                 string item = clbFileTypes.SelectedItem.ToString();
                 if (item.Contains("Custom extension"))
                 {
                     clbFileTypes.Items.RemoveAt(clbFileTypes.SelectedIndex);
+                    ServiceLocator.LogService.LogInfo($"Custom file extension removed: {item}");
                 }
                 else
                 {
@@ -155,11 +256,19 @@ namespace syncer.ui
         {
             if (ValidateInputs())
             {
-                SaveSettings();
-                MessageBox.Show("Filter settings saved successfully!", "Success", 
-                              MessageBoxButtons.OK, MessageBoxIcon.Information);
-                this.DialogResult = DialogResult.OK;
-                this.Close();
+                try
+                {
+                    SaveSettings();
+                    MessageBox.Show("Filter settings saved successfully!", "Success", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error saving settings: " + ex.Message, "Error", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
 
@@ -171,17 +280,17 @@ namespace syncer.ui
 
         private bool ValidateInputs()
         {
-            if (chkEnableFilters.Checked)
+            if (chkEnableFilters?.Checked ?? false)
             {
-                if (numMinSize.Value > numMaxSize.Value)
+                if ((numMinSize?.Value ?? 0) > (numMaxSize?.Value ?? 100))
                 {
                     MessageBox.Show("Minimum size cannot be greater than maximum size.", 
                                   "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    numMinSize.Focus();
+                    numMinSize?.Focus();
                     return false;
                 }
 
-                if (clbFileTypes.CheckedItems.Count == 0)
+                if (clbFileTypes?.CheckedItems.Count == 0)
                 {
                     var result = MessageBox.Show("No file types are selected. This will exclude all files. Continue?", 
                                                 "Warning", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
@@ -195,9 +304,16 @@ namespace syncer.ui
 
         private void chkEnableFilters_CheckedChanged(object sender, EventArgs e)
         {
-            gbFileTypes.Enabled = chkEnableFilters.Checked;
-            gbSizeFilters.Enabled = chkEnableFilters.Checked;
-            gbAdvancedFilters.Enabled = chkEnableFilters.Checked;
+            UpdateFilterControlsState();
+        }
+
+        private void UpdateFilterControlsState()
+        {
+            bool enabled = chkEnableFilters?.Checked ?? false;
+            
+            if (gbFileTypes != null) gbFileTypes.Enabled = enabled;
+            if (gbSizeFilters != null) gbSizeFilters.Enabled = enabled;
+            if (gbAdvancedFilters != null) gbAdvancedFilters.Enabled = enabled;
         }
 
         private void btnPreview_Click(object sender, EventArgs e)
@@ -214,7 +330,7 @@ namespace syncer.ui
         {
             string preview = "Filter Settings Preview:\n\n";
             
-            if (!chkEnableFilters.Checked)
+            if (!(chkEnableFilters?.Checked ?? false))
             {
                 preview += "Filters are disabled - all files will be processed.";
                 return preview;
@@ -224,7 +340,7 @@ namespace syncer.ui
             
             // File types
             preview += "Included file types:\n";
-            if (clbFileTypes.CheckedItems.Count > 0)
+            if (clbFileTypes?.CheckedItems.Count > 0)
             {
                 foreach (string item in clbFileTypes.CheckedItems)
                 {
@@ -238,16 +354,16 @@ namespace syncer.ui
             
             // Size filters
             preview += "\nSize filters:\n";
-            preview += "  • Minimum size: " + numMinSize.Value + " MB\n";
-            preview += "  • Maximum size: " + numMaxSize.Value + " MB\n";
+            preview += "  • Minimum size: " + (numMinSize?.Value ?? 0) + " MB\n";
+            preview += "  • Maximum size: " + (numMaxSize?.Value ?? 100) + " MB\n";
             
             // Advanced filters
             preview += "\nAdvanced options:\n";
-            preview += "  • Include hidden files: " + (chkIncludeHidden.Checked ? "Yes" : "No") + "\n";
-            preview += "  • Include system files: " + (chkIncludeSystem.Checked ? "Yes" : "No") + "\n";
-            preview += "  • Include read-only files: " + (chkIncludeReadOnly.Checked ? "Yes" : "No") + "\n";
+            preview += "  • Include hidden files: " + ((chkIncludeHidden?.Checked ?? false) ? "Yes" : "No") + "\n";
+            preview += "  • Include system files: " + ((chkIncludeSystem?.Checked ?? false) ? "Yes" : "No") + "\n";
+            preview += "  • Include read-only files: " + ((chkIncludeReadOnly?.Checked ?? true) ? "Yes" : "No") + "\n";
             
-            if (!StringExtensions.IsNullOrWhiteSpace(txtExcludePatterns.Text))
+            if (!StringExtensions.IsNullOrWhiteSpace(txtExcludePatterns?.Text))
             {
                 preview += "  • Exclude patterns: " + txtExcludePatterns.Text + "\n";
             }

@@ -7,6 +7,7 @@ namespace syncer.ui
     /// </summary>
     public class SyncJob
     {
+        public int Id { get; set; }
         public string JobName { get; set; }
         public bool IsEnabled { get; set; }
         public string SourcePath { get; set; }

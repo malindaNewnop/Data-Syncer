@@ -6,10 +6,20 @@ namespace syncer.ui
 {
     public partial class FormConnection : Form
     {
+        private IConnectionService _connectionService;
+        private ConnectionSettings _currentSettings;
+
         public FormConnection()
         {
             InitializeComponent();
+            InitializeServices();
             InitializeCustomComponents();
+        }
+
+        private void InitializeServices()
+        {
+            _connectionService = ServiceLocator.ConnectionService;
+            _currentSettings = _connectionService.GetConnectionSettings();
         }
 
         private void InitializeCustomComponents()
@@ -21,23 +31,62 @@ namespace syncer.ui
             this.MaximizeBox = false;
             this.MinimizeBox = false;
 
-            // Set default values
-            cmbProtocol.SelectedIndex = 0; // FTP
-            txtPort.Text = "21";
-            
             LoadSettings();
         }
 
         private void LoadSettings()
         {
-            // TODO: Load settings from configuration file
-            // This will be implemented when we add JSON configuration
+            if (_currentSettings != null)
+            {
+                if (cmbProtocol != null)
+                {
+                    cmbProtocol.Text = _currentSettings.Protocol;
+                }
+                else
+                {
+                    // Fallback to default if control not available
+                    if (cmbProtocol != null) cmbProtocol.SelectedIndex = 0; // FTP
+                }
+
+                if (txtHost != null) txtHost.Text = _currentSettings.Host ?? "";
+                if (txtPort != null) txtPort.Text = _currentSettings.Port.ToString();
+                if (txtUsername != null) txtUsername.Text = _currentSettings.Username ?? "";
+                if (txtPassword != null) txtPassword.Text = _currentSettings.Password ?? "";
+            }
+            else
+            {
+                // Set defaults if no settings exist
+                if (cmbProtocol != null) cmbProtocol.SelectedIndex = 0; // FTP
+                if (txtPort != null) txtPort.Text = "21";
+            }
         }
 
         private void SaveSettings()
         {
-            // TODO: Save settings to configuration file
-            // This will be implemented when we add JSON configuration
+            try
+            {
+                if (_currentSettings == null)
+                    _currentSettings = new ConnectionSettings();
+
+                _currentSettings.Protocol = cmbProtocol?.SelectedItem?.ToString() ?? "FTP";
+                _currentSettings.Host = txtHost?.Text?.Trim() ?? "";
+                
+                if (int.TryParse(txtPort?.Text ?? "21", out int port))
+                    _currentSettings.Port = port;
+                else
+                    _currentSettings.Port = 21;
+
+                _currentSettings.Username = txtUsername?.Text?.Trim() ?? "";
+                _currentSettings.Password = txtPassword?.Text ?? "";
+
+                _connectionService.SaveConnectionSettings(_currentSettings);
+                ServiceLocator.LogService.LogInfo("Connection settings saved");
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Error saving connection settings: " + ex.Message);
+                throw;
+            }
         }
 
         private void btnTestConnection_Click(object sender, EventArgs e)
@@ -50,17 +99,36 @@ namespace syncer.ui
                 
                 try
                 {
-                    // TODO: Implement actual connection test using FluentFTP or SSH.NET
-                    // For now, simulate a test
-                    System.Threading.Thread.Sleep(2000); // Simulate delay
+                    // Create temporary settings for testing
+                    var testSettings = new ConnectionSettings
+                    {
+                        Protocol = cmbProtocol?.SelectedItem?.ToString() ?? "FTP",
+                        Host = txtHost?.Text?.Trim() ?? "",
+                        Port = int.TryParse(txtPort?.Text ?? "21", out int port) ? port : 21,
+                        Username = txtUsername?.Text?.Trim() ?? "",
+                        Password = txtPassword?.Text ?? ""
+                    };
+
+                    bool success = _connectionService.TestConnection(testSettings);
                     
-                    MessageBox.Show("Connection test successful!", "Test Result", 
-                                  MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    if (success)
+                    {
+                        MessageBox.Show("Connection test successful!", "Test Result", 
+                                      MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ServiceLocator.LogService.LogInfo($"Connection test successful to {testSettings.Host}:{testSettings.Port}");
+                    }
+                    else
+                    {
+                        MessageBox.Show("Connection test failed. Please check your settings.", "Test Failed", 
+                                      MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ServiceLocator.LogService.LogWarning($"Connection test failed to {testSettings.Host}:{testSettings.Port}");
+                    }
                 }
                 catch (Exception ex)
                 {
                     MessageBox.Show("Connection test failed: " + ex.Message, "Test Failed", 
                                   MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ServiceLocator.LogService.LogError("Connection test error: " + ex.Message);
                 }
                 finally
                 {
@@ -74,11 +142,19 @@ namespace syncer.ui
         {
             if (ValidateInputs())
             {
-                SaveSettings();
-                MessageBox.Show("Settings saved successfully!", "Success", 
-                              MessageBoxButtons.OK, MessageBoxIcon.Information);
-                this.DialogResult = DialogResult.OK;
-                this.Close();
+                try
+                {
+                    SaveSettings();
+                    MessageBox.Show("Settings saved successfully!", "Success", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error saving settings: " + ex.Message, "Error", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
 
@@ -90,35 +166,35 @@ namespace syncer.ui
 
         private bool ValidateInputs()
         {
-            if (StringExtensions.IsNullOrWhiteSpace(txtHost.Text))
+            if (StringExtensions.IsNullOrWhiteSpace(txtHost?.Text))
             {
                 MessageBox.Show("Please enter a host address.", "Validation Error", 
                               MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtHost.Focus();
+                txtHost?.Focus();
                 return false;
             }
 
-            if (StringExtensions.IsNullOrWhiteSpace(txtPort.Text))
+            if (StringExtensions.IsNullOrWhiteSpace(txtPort?.Text))
             {
                 MessageBox.Show("Please enter a port number.", "Validation Error", 
                               MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtPort.Focus();
+                txtPort?.Focus();
                 return false;
             }
 
-            if (!int.TryParse(txtPort.Text, out int port) || port < 1 || port > 65535)
+            if (!int.TryParse(txtPort?.Text, out int port) || port < 1 || port > 65535)
             {
                 MessageBox.Show("Please enter a valid port number (1-65535).", "Validation Error", 
                               MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtPort.Focus();
+                txtPort?.Focus();
                 return false;
             }
 
-            if (StringExtensions.IsNullOrWhiteSpace(txtUsername.Text))
+            if (StringExtensions.IsNullOrWhiteSpace(txtUsername?.Text))
             {
                 MessageBox.Show("Please enter a username.", "Validation Error", 
                               MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtUsername.Focus();
+                txtUsername?.Focus();
                 return false;
             }
 
@@ -128,19 +204,29 @@ namespace syncer.ui
         private void cmbProtocol_SelectedIndexChanged(object sender, EventArgs e)
         {
             // Update default port based on protocol
-            if (cmbProtocol.SelectedItem.ToString() == "FTP")
+            if (cmbProtocol?.SelectedItem != null)
             {
-                txtPort.Text = "21";
-            }
-            else if (cmbProtocol.SelectedItem.ToString() == "SFTP")
-            {
-                txtPort.Text = "22";
+                string protocol = cmbProtocol.SelectedItem.ToString();
+                if (txtPort != null)
+                {
+                    if (protocol == "FTP")
+                    {
+                        txtPort.Text = "21";
+                    }
+                    else if (protocol == "SFTP")
+                    {
+                        txtPort.Text = "22";
+                    }
+                }
             }
         }
 
         private void chkShowPassword_CheckedChanged(object sender, EventArgs e)
         {
-            txtPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
+            if (txtPassword != null && chkShowPassword != null)
+            {
+                txtPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
+            }
         }
     }
 }
