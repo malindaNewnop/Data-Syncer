@@ -1,0 +1,6 @@
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\seyncer.service\bin\Debug\seyncer.service.exe
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\seyncer.service\bin\Debug\seyncer.service.pdb
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\seyncer.service\obj\Debug\seyncer.service.csproj.AssemblyReference.cache
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\seyncer.service\obj\Debug\seyncer.service.csproj.CoreCompileInputs.cache
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\seyncer.service\obj\Debug\seyncer.service.exe
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\seyncer.service\obj\Debug\seyncer.service.pdb

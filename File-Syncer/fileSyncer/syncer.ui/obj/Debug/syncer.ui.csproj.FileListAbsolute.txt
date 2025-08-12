@@ -1,0 +1,8 @@
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.ui\obj\Debug\syncer.ui.csproj.AssemblyReference.cache
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.ui\obj\Debug\syncer.ui.Properties.Resources.resources
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.ui\obj\Debug\syncer.ui.csproj.GenerateResource.cache
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.ui\obj\Debug\syncer.ui.csproj.CoreCompileInputs.cache
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.ui\bin\Debug\syncer.ui.exe
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.ui\bin\Debug\syncer.ui.pdb
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.ui\obj\Debug\syncer.ui.exe
+E:\Data_Syncer\Data-Syncer\File-Syncer\fileSyncer\syncer.ui\obj\Debug\syncer.ui.pdb

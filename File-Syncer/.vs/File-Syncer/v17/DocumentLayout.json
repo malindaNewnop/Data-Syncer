@@ -1,0 +1,192 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{86E05710-9723-430E-8EE0-ED8CC4539AFA}|Syncer.ui\\Syncer.ui.csproj|e:\\data_syncer\\data-syncer\\file-syncer\\syncer.ui\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{86E05710-9723-430E-8EE0-ED8CC4539AFA}|Syncer.ui\\Syncer.ui.csproj|solutionrelative:syncer.ui\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\DataSyncer.sln||{8B382828-6202-11D1-8870-0000F87579D2}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:DataSyncer.sln||{8B382828-6202-11D1-8870-0000F87579D2}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Syncer.Core.csproj||{8B382828-6202-11D1-8870-0000F87579D2}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Syncer.Core\\Syncer.Core.csproj||{8B382828-6202-11D1-8870-0000F87579D2}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\Enums.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Syncer.Core\\Models\\Enums.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\ConnectionSettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Syncer.Core\\Models\\ConnectionSettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\FilterSettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Syncer.Core\\Models\\FilterSettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\ScheduleSettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Syncer.Core\\Models\\ScheduleSettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\TransferJob.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Syncer.Core\\Models\\TransferJob.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\TransferLog.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Syncer.Core\\Models\\TransferLog.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Properties\\AssemblyInfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Syncer.Core\\Properties\\AssemblyInfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 110,
+          "SelectedChildIndex": 12,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:639845889:0:{83107a3e-496a-485e-b455-16ddb978e55e}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "AssemblyInfo.cs",
+              "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Properties\\AssemblyInfo.cs",
+              "RelativeDocumentMoniker": "Syncer.Core\\Properties\\AssemblyInfo.cs",
+              "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Properties\\AssemblyInfo.cs",
+              "RelativeToolTip": "Syncer.Core\\Properties\\AssemblyInfo.cs",
+              "ViewState": "AgIAAB8AAAAAAAAAAABOwCEAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-12T08:52:58.365Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "TransferLog.cs",
+              "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\TransferLog.cs",
+              "RelativeDocumentMoniker": "Syncer.Core\\Models\\TransferLog.cs",
+              "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\TransferLog.cs",
+              "RelativeToolTip": "Syncer.Core\\Models\\TransferLog.cs",
+              "ViewState": "AgIAAPcAAAAAAAAAAABZwPsAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-12T08:52:15.363Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "TransferJob.cs",
+              "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\TransferJob.cs",
+              "RelativeDocumentMoniker": "Syncer.Core\\Models\\TransferJob.cs",
+              "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\TransferJob.cs",
+              "RelativeToolTip": "Syncer.Core\\Models\\TransferJob.cs",
+              "ViewState": "AgIAANEAAAAAAAAAAABewNYAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-12T08:51:25.688Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "ScheduleSettings.cs",
+              "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\ScheduleSettings.cs",
+              "RelativeDocumentMoniker": "Syncer.Core\\Models\\ScheduleSettings.cs",
+              "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\ScheduleSettings.cs",
+              "RelativeToolTip": "Syncer.Core\\Models\\ScheduleSettings.cs",
+              "ViewState": "AgIAAKgAAAAAAAAAAABZwKwAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-12T08:50:45.552Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "FilterSettings.cs",
+              "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\FilterSettings.cs",
+              "RelativeDocumentMoniker": "Syncer.Core\\Models\\FilterSettings.cs",
+              "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\FilterSettings.cs",
+              "RelativeToolTip": "Syncer.Core\\Models\\FilterSettings.cs",
+              "ViewState": "AgIAAJkAAAAAAAAAAABZwJ0AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-12T08:50:08.379Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "ConnectionSettings.cs",
+              "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\ConnectionSettings.cs",
+              "RelativeDocumentMoniker": "Syncer.Core\\Models\\ConnectionSettings.cs",
+              "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\ConnectionSettings.cs",
+              "RelativeToolTip": "Syncer.Core\\Models\\ConnectionSettings.cs",
+              "ViewState": "AgIAAHgAAAAAAAAAAABUwHsAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-12T08:49:35.676Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Enums.cs",
+              "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\Enums.cs",
+              "RelativeDocumentMoniker": "Syncer.Core\\Models\\Enums.cs",
+              "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Models\\Enums.cs",
+              "RelativeToolTip": "Syncer.Core\\Models\\Enums.cs",
+              "ViewState": "AgIAACsAAAAAAAAAAABZwC8AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-12T08:48:20.925Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Syncer.Core.csproj",
+              "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Syncer.Core.csproj",
+              "RelativeDocumentMoniker": "Syncer.Core\\Syncer.Core.csproj",
+              "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.Core\\Syncer.Core.csproj",
+              "RelativeToolTip": "Syncer.Core\\Syncer.Core.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAADgAAAAKAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2025-08-12T08:28:18.09Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "DataSyncer.sln",
+              "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\DataSyncer.sln",
+              "RelativeDocumentMoniker": "DataSyncer.sln",
+              "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\DataSyncer.sln",
+              "RelativeToolTip": "DataSyncer.sln",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAB4AAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002855|",
+              "WhenOpened": "2025-08-12T08:28:00.313Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Form1.cs [Design]",
+              "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.ui\\Form1.cs",
+              "RelativeDocumentMoniker": "Syncer.ui\\Form1.cs",
+              "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\Syncer.ui\\Form1.cs [Design]",
+              "RelativeToolTip": "Syncer.ui\\Form1.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-12T08:20:22.427Z",
+              "EditorCaption": " [Design]"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

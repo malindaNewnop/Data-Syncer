@@ -1,0 +1,172 @@
+﻿using System;
+
+namespace Syncer.Core.Models
+{
+    /// <summary>
+    /// Represents scheduling settings for automated file transfers
+    /// </summary>
+    [Serializable]
+    public class ScheduleSettings
+    {
+        #region Properties
+
+        /// <summary>
+        /// Gets or sets whether scheduling is enabled
+        /// </summary>
+        public bool IsEnabled { get; set; }
+
+        /// <summary>
+        /// Gets or sets the interval in minutes between transfers
+        /// </summary>
+        public int IntervalMinutes { get; set; }
+
+        /// <summary>
+        /// Gets or sets the start time for the first scheduled transfer
+        /// </summary>
+        public DateTime StartTime { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether the schedule runs only once or repeats
+        /// </summary>
+        public bool IsRecurring { get; set; }
+
+        /// <summary>
+        /// Gets or sets the days of the week when transfers should run (for weekly schedules)
+        /// </summary>
+        public DayOfWeek[] DaysOfWeek { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether the schedule is active only on weekdays
+        /// </summary>
+        public bool WeekdaysOnly { get; set; }
+
+        /// <summary>
+        /// Gets or sets the end time after which no more transfers should occur
+        /// </summary>
+        public DateTime? EndTime { get; set; }
+
+        #endregion
+
+        #region Constructors
+
+        /// <summary>
+        /// Initializes a new instance of the ScheduleSettings class with default values
+        /// </summary>
+        public ScheduleSettings()
+        {
+            IsEnabled = false;
+            IntervalMinutes = 30; // Default to 30 minutes
+            StartTime = DateTime.Now;
+            IsRecurring = true;
+            DaysOfWeek = new DayOfWeek[0];
+            WeekdaysOnly = false;
+            EndTime = null;
+        }
+
+        #endregion
+
+        #region Methods
+
+        /// <summary>
+        /// Calculates the next scheduled run time
+        /// </summary>
+        /// <returns>The next scheduled DateTime, or null if no more runs are scheduled</returns>
+        public DateTime? GetNextRunTime()
+        {
+            if (!IsEnabled)
+                return null;
+
+            DateTime now = DateTime.Now;
+            DateTime nextRun = StartTime;
+
+            // If start time is in the past and this is recurring, calculate next interval
+            if (IsRecurring && nextRun < now)
+            {
+                TimeSpan timeSinceStart = now - nextRun;
+                long intervalsPassed = (long)(timeSinceStart.TotalMinutes / IntervalMinutes);
+                nextRun = nextRun.AddMinutes((intervalsPassed + 1) * IntervalMinutes);
+            }
+
+            // Check if we've passed the end time
+            if (EndTime.HasValue && nextRun > EndTime.Value)
+                return null;
+
+            // Check weekdays only constraint
+            if (WeekdaysOnly)
+            {
+                while (nextRun.DayOfWeek == DayOfWeek.Saturday || nextRun.DayOfWeek == DayOfWeek.Sunday)
+                {
+                    nextRun = nextRun.AddDays(1);
+                    // Reset time to start time for new day
+                    nextRun = new DateTime(nextRun.Year, nextRun.Month, nextRun.Day, 
+                                         StartTime.Hour, StartTime.Minute, StartTime.Second);
+                }
+            }
+
+            // Check specific days of week constraint
+            if (DaysOfWeek.Length > 0)
+            {
+                bool found = false;
+                int attempts = 0;
+                while (!found && attempts < 7) // Don't loop forever
+                {
+                    foreach (DayOfWeek day in DaysOfWeek)
+                    {
+                        if (nextRun.DayOfWeek == day)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found)
+                    {
+                        nextRun = nextRun.AddDays(1);
+                        nextRun = new DateTime(nextRun.Year, nextRun.Month, nextRun.Day,
+                                             StartTime.Hour, StartTime.Minute, StartTime.Second);
+                        attempts++;
+                    }
+                }
+            }
+
+            return nextRun;
+        }
+
+        /// <summary>
+        /// Validates the schedule settings
+        /// </summary>
+        /// <returns>True if settings are valid, false otherwise</returns>
+        public bool IsValid()
+        {
+            if (IntervalMinutes <= 0)
+                return false;
+
+            if (EndTime.HasValue && EndTime.Value <= StartTime)
+                return false;
+
+            return true;
+        }
+
+        /// <summary>
+        /// Creates a copy of the current schedule settings
+        /// </summary>
+        /// <returns>A new ScheduleSettings instance with copied values</returns>
+        public ScheduleSettings Clone()
+        {
+            DayOfWeek[] clonedDays = new DayOfWeek[DaysOfWeek.Length];
+            Array.Copy(DaysOfWeek, clonedDays, DaysOfWeek.Length);
+
+            return new ScheduleSettings
+            {
+                IsEnabled = this.IsEnabled,
+                IntervalMinutes = this.IntervalMinutes,
+                StartTime = this.StartTime,
+                IsRecurring = this.IsRecurring,
+                DaysOfWeek = clonedDays,
+                WeekdaysOnly = this.WeekdaysOnly,
+                EndTime = this.EndTime
+            };
+        }
+
+        #endregion
+    }
+}

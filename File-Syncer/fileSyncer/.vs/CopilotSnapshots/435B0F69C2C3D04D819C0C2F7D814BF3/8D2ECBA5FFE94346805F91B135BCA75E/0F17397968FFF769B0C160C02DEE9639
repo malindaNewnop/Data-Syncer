@@ -1,0 +1,146 @@
+﻿using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+namespace syncer.ui
+{
+    public partial class FormConnection : Form
+    {
+        public FormConnection()
+        {
+            InitializeComponent();
+            InitializeCustomComponents();
+        }
+
+        private void InitializeCustomComponents()
+        {
+            this.Text = "Connection Settings";
+            this.Size = new Size(500, 450);
+            this.StartPosition = FormStartPosition.CenterParent;
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+
+            // Set default values
+            cmbProtocol.SelectedIndex = 0; // FTP
+            txtPort.Text = "21";
+            
+            LoadSettings();
+        }
+
+        private void LoadSettings()
+        {
+            // TODO: Load settings from configuration file
+            // This will be implemented when we add JSON configuration
+        }
+
+        private void SaveSettings()
+        {
+            // TODO: Save settings to configuration file
+            // This will be implemented when we add JSON configuration
+        }
+
+        private void btnTestConnection_Click(object sender, EventArgs e)
+        {
+            if (ValidateInputs())
+            {
+                // Disable the button during test
+                btnTestConnection.Enabled = false;
+                btnTestConnection.Text = "Testing...";
+                
+                try
+                {
+                    // TODO: Implement actual connection test using FluentFTP or SSH.NET
+                    // For now, simulate a test
+                    System.Threading.Thread.Sleep(2000); // Simulate delay
+                    
+                    MessageBox.Show("Connection test successful!", "Test Result", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Connection test failed: " + ex.Message, "Test Failed", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                finally
+                {
+                    btnTestConnection.Enabled = true;
+                    btnTestConnection.Text = "Test Connection";
+                }
+            }
+        }
+
+        private void btnSave_Click(object sender, EventArgs e)
+        {
+            if (ValidateInputs())
+            {
+                SaveSettings();
+                MessageBox.Show("Settings saved successfully!", "Success", 
+                              MessageBoxButtons.OK, MessageBoxIcon.Information);
+                this.DialogResult = DialogResult.OK;
+                this.Close();
+            }
+        }
+
+        private void btnCancel_Click(object sender, EventArgs e)
+        {
+            this.DialogResult = DialogResult.Cancel;
+            this.Close();
+        }
+
+        private bool ValidateInputs()
+        {
+            if (string.IsNullOrWhiteSpace(txtHost.Text))
+            {
+                MessageBox.Show("Please enter a host address.", "Validation Error", 
+                              MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtHost.Focus();
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(txtPort.Text))
+            {
+                MessageBox.Show("Please enter a port number.", "Validation Error", 
+                              MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtPort.Focus();
+                return false;
+            }
+
+            if (!int.TryParse(txtPort.Text, out int port) || port < 1 || port > 65535)
+            {
+                MessageBox.Show("Please enter a valid port number (1-65535).", "Validation Error", 
+                              MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtPort.Focus();
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(txtUsername.Text))
+            {
+                MessageBox.Show("Please enter a username.", "Validation Error", 
+                              MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtUsername.Focus();
+                return false;
+            }
+
+            return true;
+        }
+
+        private void cmbProtocol_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            // Update default port based on protocol
+            if (cmbProtocol.SelectedItem.ToString() == "FTP")
+            {
+                txtPort.Text = "21";
+            }
+            else if (cmbProtocol.SelectedItem.ToString() == "SFTP")
+            {
+                txtPort.Text = "22";
+            }
+        }
+
+        private void chkShowPassword_CheckedChanged(object sender, EventArgs e)
+        {
+            txtPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
+        }
+    }
+}
