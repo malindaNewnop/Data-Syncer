@@ -14,6 +14,7 @@ namespace syncer.service
         private Core.IJobRepository _repo;
         private Core.ILogService _log;
         private Core.ITransferClientFactory _factory;
+        private Core.IFileEnumerator _fileEnumerator;
         private Core.IJobRunner _runner;
 
         public Service1()
@@ -23,10 +24,12 @@ namespace syncer.service
 
         protected override void OnStart(string[] args)
         {
-            _repo = new Core.XmlJobRepository();
-            _log = new Core.FileLogService();
-            _factory = new Core.TransferClientFactory();
-            _runner = new Core.JobRunner(_log, _factory);
+            // Using static factory methods instead of direct instantiation
+            _repo = Core.ServiceFactory.CreateJobRepository();
+            _log = Core.ServiceFactory.CreateLogService();
+            _factory = Core.ServiceFactory.CreateTransferClientFactory();
+            _fileEnumerator = Core.ServiceFactory.CreateFileEnumerator();
+            _runner = Core.ServiceFactory.CreateJobRunner(_factory, _log, _fileEnumerator);
 
             _timer = new Timer();
             _timer.Interval = 60 * 1000;
@@ -46,7 +49,7 @@ namespace syncer.service
                 _timer.Dispose();
                 _timer = null;
             }
-            if (_log != null) _log.Info("Service stopped", "Service");
+            if (_log != null) _log.LogInfo(null, "Service stopped");
         }
 
         private void OnTick(object sender, ElapsedEventArgs e)
@@ -65,22 +68,21 @@ namespace syncer.service
 
                     try
                     {
-                        int count; string error;
-                        bool ok = _runner.RunJob(job, out count, out error);
+                        _runner.RunJob(job);
                         job.LastRun = now;
-                        if (ok) _log.Info("Job completed, files transferred: " + count, job.Name);
-                        else _log.Warning("Job finished with errors: " + error, job.Name);
+                        // Note: We now rely on JobRunner events for tracking progress and completion
+                        // Results are logged automatically by the JobRunner
                     }
                     catch (Exception ex)
                     {
-                        _log.Error("Job execution failed: " + ex.Message, job.Name, ex);
+                        _log.LogError(job.Id, "Job execution failed: " + ex.Message);
                     }
                 }
                 _repo.SaveAll(jobs);
             }
             catch (Exception ex)
             {
-                if (_log != null) _log.Error("Tick error: " + ex.Message, "Service", ex);
+                if (_log != null) _log.LogError(null, "Tick error: " + ex.Message);
             }
             finally
             {

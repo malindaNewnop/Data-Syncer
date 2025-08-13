@@ -31,6 +31,12 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.12.0.3\lib\net35\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="Renci.SshNet, Version=2020.0.1.0, Culture=neutral, PublicKeyToken=1cee9f8bde3db106, processorArchitecture=MSIL">
+      <HintPath>..\packages\SSH.NET.2020.0.1\lib\net35\Renci.SshNet.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
@@ -42,25 +48,25 @@
     <Compile Include="Core\Models.cs" />
     <Compile Include="Core\Interfaces.cs" />
     <Compile Include="Core\Paths.cs" />
+    <Compile Include="Core\ServiceFactory.cs" />
     <Compile Include="Core\StringExtensions.cs" />
-    <Compile Include="Services\XmlJobRepository.cs" />
-    <Compile Include="Services\FileLogService.cs" />
-    <Compile Include="Services\FileEnumerator.cs" />
     <Compile Include="Services\PreviewService.cs" />
     <Compile Include="Services\JobRunner.cs" />
     <Compile Include="Services\JobScheduler.cs" />
     <Compile Include="Services\PipeServer.cs" />
     <Compile Include="Services\PipeClient.cs" />
     <Compile Include="Services\SettingsService.cs" />
+    <Compile Include="Services\FileEnumerator.cs" />
+    <Compile Include="Services\FileLogService.cs" />
+    <Compile Include="Services\XmlJobRepository.cs" />
+    <Compile Include="StringExtensions.cs" />
     <Compile Include="Transfers\LocalTransferClient.cs" />
     <Compile Include="Transfers\FtpTransferClient.cs" />
     <Compile Include="Transfers\SftpTransferClient.cs" />
     <Compile Include="Transfers\TransferClientFactory.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Core\" />
-    <Folder Include="Services\" />
-    <Folder Include="Transfers\" />
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
