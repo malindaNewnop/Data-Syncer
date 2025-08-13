@@ -2,9 +2,9 @@ using System;
 
 namespace syncer.ui
 {
-    /// <summary>
+
     /// Extension methods for string to provide .NET 4.0+ functionality in .NET 3.5
-    /// </summary>
+
     public static class StringExtensions
     {
         /// <summary>

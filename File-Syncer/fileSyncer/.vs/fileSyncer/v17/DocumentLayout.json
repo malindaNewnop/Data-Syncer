@@ -3,11 +3,19 @@
   "WorkspaceRootPath": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\formlogs.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\stringextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|solutionrelative:syncer.ui\\stringextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\servicelocator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|solutionrelative:syncer.ui\\servicelocator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|e:\\data_syncer\\data-syncer\\file-syncer\\filesyncer\\syncer.ui\\formlogs.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|solutionrelative:syncer.ui\\formlogs.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|e:\\data_syncer\\data-syncer\\file-syncer\\filesyncer\\syncer.ui\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|solutionrelative:syncer.ui\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
@@ -21,10 +29,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
       "RelativeMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|solutionrelative:syncer.ui\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\stringextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|solutionrelative:syncer.ui\\stringextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\formconnection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -47,10 +51,6 @@
       "RelativeMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|solutionrelative:syncer.ui\\services\\serviceimplementations.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\servicelocator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|solutionrelative:syncer.ui\\servicelocator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{87DF0119-B827-4EED-A650-71B3B7AC15AB}|syncer.ui\\syncer.ui.csproj|solutionrelative:syncer.ui\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -70,7 +70,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 110,
-          "SelectedChildIndex": 10,
+          "SelectedChildIndex": 14,
           "Children": [
             {
               "$type": "Bookmark",
@@ -122,19 +122,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 1,
               "Title": "ServiceLocator.cs",
               "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\ServiceLocator.cs",
               "RelativeDocumentMoniker": "syncer.ui\\ServiceLocator.cs",
               "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\ServiceLocator.cs",
               "RelativeToolTip": "syncer.ui\\ServiceLocator.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAF0AAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-08-12T10:30:05.045Z"
+              "WhenOpened": "2025-08-12T10:30:05.045Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 11,
               "Title": "ServiceImplementations.cs",
               "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\Services\\ServiceImplementations.cs",
               "RelativeDocumentMoniker": "syncer.ui\\Services\\ServiceImplementations.cs",
@@ -146,7 +147,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 10,
               "Title": "IServices.cs",
               "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\Interfaces\\IServices.cs",
               "RelativeDocumentMoniker": "syncer.ui\\Interfaces\\IServices.cs",
@@ -158,7 +159,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 3,
               "Title": "Models.cs",
               "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\Models.cs",
               "RelativeDocumentMoniker": "syncer.ui\\Models.cs",
@@ -166,25 +167,24 @@
               "RelativeToolTip": "syncer.ui\\Models.cs",
               "ViewState": "AgIAAFkAAAAAAAAAAAAAAFkAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-08-12T10:26:07.998Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-08-12T10:26:07.998Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "FormLogs.cs",
               "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\FormLogs.cs",
               "RelativeDocumentMoniker": "syncer.ui\\FormLogs.cs",
               "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\FormLogs.cs",
               "RelativeToolTip": "syncer.ui\\FormLogs.cs",
-              "ViewState": "AgIAAC0BAAAAAAAAAAAYwEoAAAAUAAAAAAAAAA==",
+              "ViewState": "AgIAAGAAAAAAAAAAAAAkwEoAAAAUAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-08-12T09:28:04.678Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 9,
               "Title": "FormFilters.cs",
               "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\FormFilters.cs",
               "RelativeDocumentMoniker": "syncer.ui\\FormFilters.cs",
@@ -196,7 +196,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 8,
               "Title": "FormSchedule.cs",
               "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\FormSchedule.cs",
               "RelativeDocumentMoniker": "syncer.ui\\FormSchedule.cs",
@@ -208,7 +208,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 7,
               "Title": "FormConnection.cs",
               "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\FormConnection.cs",
               "RelativeDocumentMoniker": "syncer.ui\\FormConnection.cs",
@@ -220,19 +220,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 0,
               "Title": "StringExtensions.cs",
               "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\StringExtensions.cs",
               "RelativeDocumentMoniker": "syncer.ui\\StringExtensions.cs",
               "ToolTip": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\StringExtensions.cs",
               "RelativeToolTip": "syncer.ui\\StringExtensions.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAACAAAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAMAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-08-12T09:26:42.45Z"
+              "WhenOpened": "2025-08-12T09:26:42.45Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 4,
               "Title": "Service1.cs [Design]",
               "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\seyncer.service\\Service1.cs",
               "RelativeDocumentMoniker": "seyncer.service\\Service1.cs",
@@ -243,7 +244,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 5,
               "Title": "Class1.cs",
               "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.core\\Class1.cs",
               "RelativeDocumentMoniker": "syncer.core\\Class1.cs",
@@ -255,7 +256,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 6,
               "Title": "Form1.cs [Design]",
               "DocumentMoniker": "E:\\Data_Syncer\\Data-Syncer\\File-Syncer\\fileSyncer\\syncer.ui\\Form1.cs",
               "RelativeDocumentMoniker": "syncer.ui\\Form1.cs",

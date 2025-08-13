@@ -70,6 +70,43 @@ namespace syncer.ui
         public string Password { get; set; }
         public bool IsConnected { get; set; }
         public DateTime? LastConnectionTest { get; set; }
+
+        /// <summary>
+        /// Returns true if this is a local file system connection
+        /// </summary>
+        public bool IsLocalConnection
+        {
+            get { return Protocol != null && Protocol.Equals("LOCAL", StringComparison.OrdinalIgnoreCase); }
+        }
+
+        /// <summary>
+        /// Returns true if this is a remote connection (FTP/SFTP)
+        /// </summary>
+        public bool IsRemoteConnection
+        {
+            get { return !IsLocalConnection; }
+        }
+
+        /// <summary>
+        /// Gets the display name for the connection type
+        /// </summary>
+        public string ConnectionTypeDisplay
+        {
+            get
+            {
+                switch (Protocol?.ToUpper())
+                {
+                    case "LOCAL":
+                        return "Local File System";
+                    case "FTP":
+                        return "FTP Server";
+                    case "SFTP":
+                        return "SFTP Server";
+                    default:
+                        return "Unknown";
+                }
+            }
+        }
     }
 
     /// <summary>

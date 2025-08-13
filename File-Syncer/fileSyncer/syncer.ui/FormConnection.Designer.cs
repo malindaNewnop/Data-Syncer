@@ -78,7 +78,8 @@ namespace syncer.ui
             this.cmbProtocol.FormattingEnabled = true;
             this.cmbProtocol.Items.AddRange(new object[] {
             "FTP",
-            "SFTP"});
+            "SFTP",
+            "LOCAL"});
             this.cmbProtocol.Location = new System.Drawing.Point(100, 27);
             this.cmbProtocol.Name = "cmbProtocol";
             this.cmbProtocol.Size = new System.Drawing.Size(120, 23);

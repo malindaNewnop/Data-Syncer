@@ -166,6 +166,32 @@ namespace syncer.ui
 
         private bool ValidateInputs()
         {
+            string protocol = cmbProtocol?.SelectedItem?.ToString() ?? "";
+            
+            // For LOCAL protocol, minimal validation needed
+            if (protocol == "LOCAL")
+            {
+                // Just check if we can access local file system
+                try
+                {
+                    string tempPath = System.IO.Path.GetTempPath();
+                    if (!System.IO.Directory.Exists(tempPath))
+                    {
+                        MessageBox.Show("Cannot access local file system.", "Local Access Error", 
+                                      MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Local file system access error: " + ex.Message, "Local Access Error", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return false;
+                }
+                return true;
+            }
+
+            // For FTP/SFTP protocols, validate remote connection fields
             if (StringExtensions.IsNullOrWhiteSpace(txtHost?.Text))
             {
                 MessageBox.Show("Please enter a host address.", "Validation Error", 
@@ -203,22 +229,49 @@ namespace syncer.ui
 
         private void cmbProtocol_SelectedIndexChanged(object sender, EventArgs e)
         {
-            // Update default port based on protocol
+            // Update default port and enable/disable fields based on protocol
             if (cmbProtocol?.SelectedItem != null)
             {
                 string protocol = cmbProtocol.SelectedItem.ToString();
-                if (txtPort != null)
+                
+                if (protocol == "LOCAL")
                 {
-                    if (protocol == "FTP")
+                    // For LOCAL, disable remote connection fields
+                    EnableRemoteFields(false);
+                    if (txtHost != null) txtHost.Text = "localhost";
+                    if (txtPort != null) txtPort.Text = "0";
+                    if (txtUsername != null) txtUsername.Text = "local";
+                    if (txtPassword != null) txtPassword.Text = "";
+                }
+                else
+                {
+                    // For FTP/SFTP, enable remote connection fields
+                    EnableRemoteFields(true);
+                    if (txtPort != null)
                     {
-                        txtPort.Text = "21";
+                        if (protocol == "FTP")
+                        {
+                            txtPort.Text = "21";
+                        }
+                        else if (protocol == "SFTP")
+                        {
+                            txtPort.Text = "22";
+                        }
                     }
-                    else if (protocol == "SFTP")
-                    {
-                        txtPort.Text = "22";
-                    }
+                    if (txtHost != null && txtHost.Text == "localhost") txtHost.Text = "";
+                    if (txtUsername != null && txtUsername.Text == "local") txtUsername.Text = "";
                 }
             }
+        }
+
+        private void EnableRemoteFields(bool enabled)
+        {
+            if (txtHost != null) txtHost.Enabled = enabled;
+            if (txtPort != null) txtPort.Enabled = enabled;
+            if (txtUsername != null) txtUsername.Enabled = enabled;
+            if (txtPassword != null) txtPassword.Enabled = enabled;
+            if (chkShowPassword != null) chkShowPassword.Enabled = enabled;
+            if (btnTestConnection != null) btnTestConnection.Text = enabled ? "Test Connection" : "Test Local Access";
         }
 
         private void chkShowPassword_CheckedChanged(object sender, EventArgs e)

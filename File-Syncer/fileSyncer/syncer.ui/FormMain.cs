@@ -99,7 +99,21 @@ namespace syncer.ui
         private void UpdateConnectionStatus()
         {
             bool isConnected = _connectionService.IsConnected();
-            string status = isConnected ? "Connected" : "Disconnected";
+            var connectionSettings = _connectionService.GetConnectionSettings();
+            
+            string status;
+            if (isConnected)
+            {
+                status = "Connected (" + (connectionSettings?.ConnectionTypeDisplay ?? "Unknown") + ")";
+            }
+            else
+            {
+                status = "Disconnected";
+                if (connectionSettings != null)
+                {
+                    status += " (" + connectionSettings.ConnectionTypeDisplay + ")";
+                }
+            }
             
             if (lblConnectionStatus != null)
             {

@@ -2,10 +2,10 @@ using syncer.ui.Services;
 
 namespace syncer.ui
 {
-    /// <summary>
+
     /// Simple service locator for dependency injection
     /// This will be replaced with proper DI container when backend is implemented
-    /// </summary>
+
     public static class ServiceLocator
     {
         private static ISyncJobService _syncJobService;
@@ -15,9 +15,9 @@ namespace syncer.ui
         private static IServiceManager _serviceManager;
         private static IConfigurationService _configurationService;
 
-        /// <summary>
+
         /// Initialize all services - call this at application startup
-        /// </summary>
+
         public static void Initialize()
         {
             _syncJobService = new SyncJobService();
@@ -58,9 +58,9 @@ namespace syncer.ui
             get { return _configurationService ?? (_configurationService = new ConfigurationService()); }
         }
 
-        /// <summary>
+
         /// Replace services with actual backend implementations
-        /// </summary>
+
         public static void SetSyncJobService(ISyncJobService service)
         {
             _syncJobService = service;

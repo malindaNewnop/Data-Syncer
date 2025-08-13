@@ -106,36 +106,79 @@ namespace syncer.ui
 
         private void btnBrowseDestination_Click(object sender, EventArgs e)
         {
-            // Check if connection is available for remote browsing
-            if (_connectionService.IsConnected())
+            // Get current connection settings to determine protocol
+            var connectionSettings = _connectionService.GetConnectionSettings();
+            
+            if (connectionSettings != null && connectionSettings.Protocol == "LOCAL")
             {
-                // TODO: Implement remote folder browser when backend is ready
-                MessageBox.Show("Remote folder browsing will be implemented with backend services.", 
-                              "Feature Coming Soon", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                // For LOCAL protocol, use folder browser dialog
+                using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+                {
+                    dialog.Description = "Select destination folder for local sync";
+                    dialog.ShowNewFolderButton = true;
+                    
+                    if (!StringExtensions.IsNullOrWhiteSpace(txtDestinationPath?.Text))
+                    {
+                        dialog.SelectedPath = txtDestinationPath.Text;
+                    }
+                    
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        if (txtDestinationPath != null)
+                        {
+                            txtDestinationPath.Text = dialog.SelectedPath;
+                        }
+                    }
+                }
+            }
+            else if (connectionSettings != null && (connectionSettings.Protocol == "FTP" || connectionSettings.Protocol == "SFTP"))
+            {
+                // For remote protocols, check if connection is available for remote browsing
+                if (_connectionService.IsConnected())
+                {
+                    // TODO: Implement remote folder browser when backend is ready
+                    MessageBox.Show("Remote folder browsing will be implemented with backend services.", 
+                                  "Feature Coming Soon", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    // Allow manual entry for remote paths
+                    ShowRemotePathInputDialog();
+                }
             }
             else
             {
-                // Allow manual entry
-                using (var inputForm = new Form())
+                // Default to manual entry
+                ShowRemotePathInputDialog();
+            }
+        }
+
+        private void ShowRemotePathInputDialog()
+        {
+            using (var inputForm = new Form())
+            {
+                inputForm.Text = "Enter Destination Path";
+                inputForm.Size = new Size(400, 150);
+                inputForm.StartPosition = FormStartPosition.CenterParent;
+                inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                inputForm.MaximizeBox = false;
+                inputForm.MinimizeBox = false;
+                
+                var label = new Label() { Left = 10, Top = 15, Text = "Remote destination path (e.g., /remote/folder):", AutoSize = true };
+                var textBox = new TextBox() { Left = 10, Top = 40, Width = 360, Text = txtDestinationPath?.Text ?? "" };
+                var okButton = new Button() { Text = "OK", Left = 205, Width = 75, Top = 70, DialogResult = DialogResult.OK };
+                var cancelButton = new Button() { Text = "Cancel", Left = 295, Width = 75, Top = 70, DialogResult = DialogResult.Cancel };
+
+                inputForm.Controls.Add(label);
+                inputForm.Controls.Add(textBox);
+                inputForm.Controls.Add(okButton);
+                inputForm.Controls.Add(cancelButton);
+                inputForm.AcceptButton = okButton;
+                inputForm.CancelButton = cancelButton;
+
+                if (inputForm.ShowDialog() == DialogResult.OK && txtDestinationPath != null)
                 {
-                    inputForm.Text = "Enter Destination Path";
-                    inputForm.Size = new Size(400, 150);
-                    inputForm.StartPosition = FormStartPosition.CenterParent;
-                    inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
-                    
-                    var label = new Label() { Left = 10, Top = 15, Text = "Destination path:", AutoSize = true };
-                    var textBox = new TextBox() { Left = 10, Top = 40, Width = 360, Text = txtDestinationPath.Text };
-                    var okButton = new Button() { Text = "OK", Left = 205, Width = 75, Top = 70, DialogResult = DialogResult.OK };
-                    var cancelButton = new Button() { Text = "Cancel", Left = 295, Width = 75, Top = 70, DialogResult = DialogResult.Cancel };
-
-                    inputForm.Controls.AddRange(new Control[] { label, textBox, okButton, cancelButton });
-                    inputForm.AcceptButton = okButton;
-                    inputForm.CancelButton = cancelButton;
-
-                    if (inputForm.ShowDialog() == DialogResult.OK)
-                    {
-                        txtDestinationPath.Text = textBox.Text;
-                    }
+                    txtDestinationPath.Text = textBox.Text.Trim();
                 }
             }
         }
