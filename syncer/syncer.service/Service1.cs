@@ -4,7 +4,7 @@ using System.ServiceProcess;
 using System.Timers;
 using Core = syncer.core;
 
-namespace syncer.services
+namespace syncer.service
 {
     public partial class Service1 : ServiceBase
     {
@@ -23,19 +23,17 @@ namespace syncer.services
 
         protected override void OnStart(string[] args)
         {
-            // initialize core services
             _repo = new Core.XmlJobRepository();
             _log = new Core.FileLogService();
             _factory = new Core.TransferClientFactory();
             _runner = new Core.JobRunner(_log, _factory);
 
             _timer = new Timer();
-            _timer.Interval = 60 * 1000; // 1 minute
+            _timer.Interval = 60 * 1000;
             _timer.AutoReset = true;
             _timer.Elapsed += OnTick;
             _timer.Start();
 
-            // run once immediately
             OnTick(this, null);
         }
 

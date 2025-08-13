@@ -4,16 +4,16 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>7c947708-102e-486e-8c63-933c6b215fd3</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>syncer.core</RootNamespace>
-    <AssemblyName>syncer.core</AssemblyName>
+    <ProjectGuid>{60CDDADB-591B-4A87-82C6-2B49E6A04528}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>syncer.service</RootNamespace>
+    <AssemblyName>syncer.service</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -23,6 +23,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
@@ -33,22 +34,27 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data" />
+    <Reference Include="System.ServiceProcess" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Core\Interfaces.cs" />
-    <Compile Include="Core\Models.cs" />
-    <Compile Include="Core\Paths.cs" />
-    <Compile Include="Services\FileEnumerator.cs" />
-    <Compile Include="Services\FileLogService.cs" />
-    <Compile Include="Services\JobRunner.cs" />
-    <Compile Include="Services\PreviewService.cs" />
-    <Compile Include="Services\XmlJobRepository.cs" />
-    <Compile Include="Transfers\FtpTransferClient.cs" />
-    <Compile Include="Transfers\LocalTransferClient.cs" />
-    <Compile Include="Transfers\TransferClientFactory.cs" />
+    <ProjectReference Include="..\syncer.core\syncer.core.csproj">
+      <Project>{7C947708-102E-486E-8C63-933C6B215FD3}</Project>
+      <Name>syncer.core</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Service1.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Service1.Designer.cs">
+      <DependentUpon>Service1.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
- </Project>
+</Project>
