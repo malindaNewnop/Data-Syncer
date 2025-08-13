@@ -1,0 +1,32 @@
+﻿using System.Collections.Generic;
+using syncer.core.Models;
+
+namespace syncer.core.Interfaces
+{
+    /// <summary>
+    /// Interface for data persistence operations
+    /// </summary>
+    public interface IDataRepository
+    {
+        // Sync Jobs
+        List<SyncJobModel> GetAllJobs();
+        SyncJobModel? GetJobById(int id);
+        int SaveJob(SyncJobModel job);
+        bool DeleteJob(int id);
+        
+        // Configuration
+        ConnectionSettingsModel GetConnectionSettings();
+        bool SaveConnectionSettings(ConnectionSettingsModel settings);
+        FilterSettingsModel GetFilterSettings();
+        bool SaveFilterSettings(FilterSettingsModel settings);
+        
+        // Settings
+        T GetSetting<T>(string key, T defaultValue = default(T));
+        bool SaveSetting<T>(string key, T value);
+        bool DeleteSetting(string key);
+
+        // Backup and restore
+        bool BackupData(string backupPath);
+        bool RestoreData(string backupPath);
+    }
+}

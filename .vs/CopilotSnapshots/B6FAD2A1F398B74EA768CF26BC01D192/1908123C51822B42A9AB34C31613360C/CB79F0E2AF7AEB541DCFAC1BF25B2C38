@@ -1,0 +1,146 @@
+﻿using System;
+using System.ServiceProcess;
+using syncer.core.Data;
+using syncer.core.Services;
+using syncer.core.Interfaces;
+
+namespace syncer.services
+{
+    public partial class DataSyncerService : ServiceBase
+    {
+        private IDataRepository _dataRepository;
+        private IFileTransferService _fileTransferService;
+        private ILoggingService _loggingService;
+        private ISyncEngine _syncEngine;
+        private JobSchedulerService _jobScheduler;
+
+        public DataSyncerService()
+        {
+            InitializeComponent();
+            this.ServiceName = "DataSyncerService";
+            this.CanStop = true;
+            this.CanPauseAndContinue = false;
+        }
+
+        protected override void OnStart(string[] args)
+        {
+            try
+            {
+                // Initialize services
+                _loggingService = new FileLoggingService();
+                _dataRepository = new JsonDataRepository();
+                _fileTransferService = new LocalFileTransferService();
+                _syncEngine = new SyncEngine(_fileTransferService, _loggingService, _dataRepository);
+                _jobScheduler = new JobSchedulerService(_dataRepository, _syncEngine, _loggingService);
+
+                // Connect to file transfer service for local operations
+                var connectionSettings = _dataRepository.GetConnectionSettings();
+                if (connectionSettings.IsLocalConnection)
+                {
+                    _fileTransferService.Connect(connectionSettings);
+                }
+
+                // Start the job scheduler
+                _jobScheduler.Start();
+
+                _loggingService.LogInfo("DataSyncer service started successfully");
+            }
+            catch (Exception ex)
+            {
+                if (_loggingService != null)
+                    _loggingService.LogError("Failed to start DataSyncer service: " + ex.Message);
+                
+                // Write to Windows Event Log as fallback
+                try
+                {
+                    using (var eventLog = new System.Diagnostics.EventLog("Application"))
+                    {
+                        eventLog.Source = "DataSyncerService";
+                        eventLog.WriteEntry("Failed to start DataSyncer service: " + ex.Message, 
+                            System.Diagnostics.EventLogEntryType.Error);
+                    }
+                }
+                catch
+                {
+                    // If we can't write to event log either, just throw the original exception
+                }
+                
+                throw;
+            }
+        }
+
+        protected override void OnStop()
+        {
+            try
+            {
+                if (_loggingService != null)
+                    _loggingService.LogInfo("DataSyncer service stopping...");
+
+                // Stop the job scheduler
+                if (_jobScheduler != null)
+                    _jobScheduler.Stop();
+
+                // Stop any running jobs
+                if (_syncEngine != null && _dataRepository != null)
+                {
+                    var jobs = _dataRepository.GetAllJobs();
+                    foreach (var job in jobs)
+                    {
+                        if (_syncEngine.IsJobRunning(job.Id))
+                        {
+                            _syncEngine.StopJob(job.Id);
+                            if (_loggingService != null)
+                                _loggingService.LogInfo("Stopped running job: " + job.JobName);
+                        }
+                    }
+                }
+
+                // Cleanup
+                if (_jobScheduler != null)
+                    _jobScheduler.Dispose();
+                
+                if (_fileTransferService != null)
+                    _fileTransferService.Disconnect();
+
+                if (_loggingService != null)
+                    _loggingService.LogInfo("DataSyncer service stopped successfully");
+            }
+            catch (Exception ex)
+            {
+                if (_loggingService != null)
+                    _loggingService.LogError("Error stopping DataSyncer service: " + ex.Message);
+                
+                // Write to Windows Event Log as fallback
+                try
+                {
+                    using (var eventLog = new System.Diagnostics.EventLog("Application"))
+                    {
+                        eventLog.Source = "DataSyncerService";
+                        eventLog.WriteEntry("Error stopping DataSyncer service: " + ex.Message, 
+                            System.Diagnostics.EventLogEntryType.Error);
+                    }
+                }
+                catch
+                {
+                    // Ignore event log errors during shutdown
+                }
+            }
+        }
+
+        protected override void OnShutdown()
+        {
+            OnStop();
+        }
+
+        // Method for console mode debugging
+        public void StartConsole(string[] args)
+        {
+            OnStart(args);
+        }
+
+        public void StopConsole()
+        {
+            OnStop();
+        }
+    }
+}

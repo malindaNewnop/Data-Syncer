@@ -1,0 +1,101 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using syncer.core.Interfaces;
+
+namespace syncer.core.Services
+{
+    /// <summary>
+    /// Service for scheduling and managing sync job execution
+    /// </summary>
+    public class JobSchedulerService
+    {
+        private readonly IDataRepository _dataRepository;
+        private readonly ISyncEngine _syncEngine;
+        private readonly ILoggingService _loggingService;
+        private readonly Timer _schedulerTimer;
+        private readonly object _lockObject = new object();
+        private bool _isRunning = false;
+
+        public bool IsRunning { get { return _isRunning; } }
+
+        public JobSchedulerService(IDataRepository dataRepository, ISyncEngine syncEngine, ILoggingService loggingService)
+        {
+            _dataRepository = dataRepository;
+            _syncEngine = syncEngine;
+            _loggingService = loggingService;
+
+            // Check for jobs to run every minute
+            _schedulerTimer = new Timer(CheckScheduledJobs, null, Timeout.Infinite, Timeout.Infinite);
+        }
+
+        public void Start()
+        {
+            lock (_lockObject)
+            {
+                if (!_isRunning)
+                {
+                    _isRunning = true;
+                    _schedulerTimer.Change(TimeSpan.Zero, TimeSpan.FromMinutes(1));
+                    _loggingService.LogInfo("Job scheduler started");
+                }
+            }
+        }
+
+        public void Stop()
+        {
+            lock (_lockObject)
+            {
+                if (_isRunning)
+                {
+                    _isRunning = false;
+                    _schedulerTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                    _loggingService.LogInfo("Job scheduler stopped");
+                }
+            }
+        }
+
+        private void CheckScheduledJobs(object state)
+        {
+            if (!_isRunning) return;
+
+            try
+            {
+                var jobs = _dataRepository.GetAllJobs();
+                var jobsToRun = jobs.Where(job => job.ShouldRunNow() && !_syncEngine.IsJobRunning(job.Id)).ToList();
+
+                foreach (var job in jobsToRun)
+                {
+                    try
+                    {
+                        _loggingService.LogInfo("Starting scheduled job: " + job.JobName, job.JobName);
+                        
+                        // Execute job
+                        _syncEngine.ExecuteJob(job);
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError("Error starting scheduled job '" + job.JobName + "': " + ex.Message, job.JobName);
+                    }
+                }
+
+                if (jobsToRun.Count > 0)
+                {
+                    _loggingService.LogInfo("Scheduler started " + jobsToRun.Count + " job(s)");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError("Error in job scheduler: " + ex.Message);
+            }
+        }
+
+        public void Dispose()
+        {
+            Stop();
+            if (_schedulerTimer != null)
+                _schedulerTimer.Dispose();
+        }
+    }
+}

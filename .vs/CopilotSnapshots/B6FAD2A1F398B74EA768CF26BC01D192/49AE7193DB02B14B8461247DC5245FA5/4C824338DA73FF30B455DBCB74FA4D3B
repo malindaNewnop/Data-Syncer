@@ -1,0 +1,432 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Data;
+using System.IO;
+using System.Linq;
+using System.Text;
+using syncer.core.Interfaces;
+
+namespace syncer.core.Services
+{
+    /// <summary>
+    /// File-based logging service implementation
+    /// </summary>
+    public class FileLoggingService : ILoggingService
+    {
+        private readonly string _logDirectory;
+        private readonly object _lockObject = new object();
+        private LogLevel _currentLogLevel = LogLevel.Info;
+        private long _maxLogSizeBytes = 10 * 1024 * 1024; // 10MB
+        private int _logRetentionDays = 30;
+
+        public FileLoggingService(string logDirectory = null)
+        {
+            _logDirectory = logDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataSyncer", "Logs");
+            EnsureDirectoryExists();
+            CleanupOldLogs();
+        }
+
+        private void EnsureDirectoryExists()
+        {
+            if (!Directory.Exists(_logDirectory))
+                Directory.CreateDirectory(_logDirectory);
+        }
+
+        private string GetLogFileName(DateTime date)
+        {
+            return Path.Combine(_logDirectory, "DataSyncer_" + date.ToString("yyyyMMdd") + ".log");
+        }
+
+        #region Logging Methods
+
+        public void LogInfo(string message, string jobName = null, string category = null)
+        {
+            WriteLog(LogLevel.Info, message, jobName, category);
+        }
+
+        public void LogWarning(string message, string jobName = null, string category = null)
+        {
+            WriteLog(LogLevel.Warning, message, jobName, category);
+        }
+
+        public void LogError(string message, string jobName = null, string category = null)
+        {
+            WriteLog(LogLevel.Error, message, jobName, category);
+        }
+
+        public void LogDebug(string message, string jobName = null, string category = null)
+        {
+            WriteLog(LogLevel.Debug, message, jobName, category);
+        }
+
+        private void WriteLog(LogLevel level, string message, string jobName, string category)
+        {
+            if (level < _currentLogLevel) return;
+
+            lock (_lockObject)
+            {
+                try
+                {
+                    var logEntry = new LogEntry
+                    {
+                        Timestamp = DateTime.Now,
+                        Level = level,
+                        Message = message,
+                        JobName = jobName,
+                        Category = category,
+                        Source = "DataSyncer"
+                    };
+
+                    var logLine = FormatLogEntry(logEntry);
+                    var logFile = GetLogFileName(DateTime.Now);
+
+                    File.AppendAllText(logFile, logLine + Environment.NewLine, Encoding.UTF8);
+
+                    // Check if we need to rotate the log
+                    CheckLogRotation(logFile);
+                }
+                catch (Exception ex)
+                {
+                    // Fail silently for logging errors to avoid infinite loops
+                    System.Diagnostics.Debug.WriteLine("Logging error: " + ex.Message);
+                }
+            }
+        }
+
+        private string FormatLogEntry(LogEntry entry)
+        {
+            var parts = new List<string>
+            {
+                entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff"),
+                entry.Level.ToString().ToUpper(),
+                entry.JobName ?? "",
+                entry.Category ?? "",
+                entry.Message.Replace('\t', ' ').Replace('\n', ' ').Replace('\r', ' ')
+            };
+
+            return string.Join("\t", parts.ToArray());
+        }
+
+        #endregion
+
+        #region Log Retrieval
+
+        public DataTable GetLogs(DateTime? fromDate = null, DateTime? toDate = null, string logLevel = null, string jobName = null)
+        {
+            var table = new DataTable();
+            table.Columns.Add("DateTime", typeof(DateTime));
+            table.Columns.Add("Level", typeof(string));
+            table.Columns.Add("Job", typeof(string));
+            table.Columns.Add("File", typeof(string));
+            table.Columns.Add("Status", typeof(string));
+            table.Columns.Add("Message", typeof(string));
+
+            try
+            {
+                var logFiles = Directory.GetFiles(_logDirectory, "DataSyncer_*.log").OrderByDescending(f => f);
+
+                foreach (var logFile in logFiles)
+                {
+                    var lines = File.ReadAllLines(logFile);
+                    foreach (var line in lines)
+                    {
+                        LogEntry logEntry;
+                        if (TryParseLogLine(line, out logEntry))
+                        {
+                            // Apply filters
+                            if (fromDate.HasValue && logEntry.Timestamp < fromDate.Value) continue;
+                            if (toDate.HasValue && logEntry.Timestamp > toDate.Value) continue;
+                            if (!string.IsNullOrEmpty(logLevel) && logLevel != "All" && 
+                                !string.Equals(logEntry.Level.ToString(), logLevel, StringComparison.OrdinalIgnoreCase)) continue;
+                            if (!string.IsNullOrEmpty(jobName) && 
+                                !string.Equals(logEntry.JobName, jobName, StringComparison.OrdinalIgnoreCase)) continue;
+
+                            table.Rows.Add(
+                                logEntry.Timestamp,
+                                logEntry.Level.ToString(),
+                                logEntry.JobName ?? "",
+                                "", // File column for compatibility
+                                "", // Status column for compatibility
+                                logEntry.Message
+                            );
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error retrieving logs: " + ex.Message);
+            }
+
+            return table;
+        }
+
+        private bool TryParseLogLine(string line, out LogEntry logEntry)
+        {
+            logEntry = new LogEntry();
+            try
+            {
+                var parts = line.Split('\t');
+                if (parts.Length >= 5)
+                {
+                    logEntry.Timestamp = DateTime.Parse(parts[0]);
+                    LogLevel level;
+                    if (Enum.TryParse(parts[1], true, out level))
+                        logEntry.Level = level;
+                    logEntry.JobName = string.IsNullOrEmpty(parts[2]) ? null : parts[2];
+                    logEntry.Category = string.IsNullOrEmpty(parts[3]) ? null : parts[3];
+                    logEntry.Message = parts[4];
+                    return true;
+                }
+            }
+            catch
+            {
+                // Failed to parse line
+            }
+
+            return false;
+        }
+
+        public string[] GetLogLevels()
+        {
+            return new[] { "All", "Debug", "Info", "Warning", "Error" };
+        }
+
+        public string[] GetJobNames()
+        {
+            try
+            {
+                var jobNames = new HashSet<string>();
+                var logFiles = Directory.GetFiles(_logDirectory, "DataSyncer_*.log");
+
+                foreach (var logFile in logFiles)
+                {
+                    var lines = File.ReadAllLines(logFile);
+                    foreach (var line in lines)
+                    {
+                        LogEntry logEntry;
+                        if (TryParseLogLine(line, out logEntry) && !string.IsNullOrEmpty(logEntry.JobName))
+                        {
+                            jobNames.Add(logEntry.JobName);
+                        }
+                    }
+                }
+
+                return jobNames.OrderBy(name => name).ToArray();
+            }
+            catch
+            {
+                return new string[0];
+            }
+        }
+
+        public string[] GetCategories()
+        {
+            try
+            {
+                var categories = new HashSet<string>();
+                var logFiles = Directory.GetFiles(_logDirectory, "DataSyncer_*.log");
+
+                foreach (var logFile in logFiles)
+                {
+                    var lines = File.ReadAllLines(logFile);
+                    foreach (var line in lines)
+                    {
+                        LogEntry logEntry;
+                        if (TryParseLogLine(line, out logEntry) && !string.IsNullOrEmpty(logEntry.Category))
+                        {
+                            categories.Add(logEntry.Category);
+                        }
+                    }
+                }
+
+                return categories.OrderBy(cat => cat).ToArray();
+            }
+            catch
+            {
+                return new string[0];
+            }
+        }
+
+        #endregion
+
+        #region Log Management
+
+        public bool ClearLogs(DateTime? olderThan = null)
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    var logFiles = Directory.GetFiles(_logDirectory, "DataSyncer_*.log");
+                    var cutoffDate = olderThan ?? DateTime.MinValue;
+
+                    foreach (var logFile in logFiles)
+                    {
+                        var fileInfo = new FileInfo(logFile);
+                        if (fileInfo.CreationTime <= cutoffDate || olderThan == null)
+                        {
+                            File.Delete(logFile);
+                        }
+                    }
+
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Error clearing logs: " + ex.Message);
+                    return false;
+                }
+            }
+        }
+
+        public bool ExportLogs(string filePath, DateTime? fromDate = null, DateTime? toDate = null, string format = "CSV")
+        {
+            try
+            {
+                var logs = GetLogs(fromDate, toDate);
+                
+                using (var writer = new StreamWriter(filePath, false, Encoding.UTF8))
+                {
+                    if (format != null && format.ToUpper() == "CSV")
+                    {
+                        // CSV format
+                        writer.WriteLine("DateTime,Level,Job,Message");
+                        
+                        foreach (DataRow row in logs.Rows)
+                        {
+                            var line = string.Format("{0},{1},\"{2}\",\"{3}\"", 
+                                row["DateTime"], row["Level"], 
+                                EscapeCsvField(row["Job"].ToString()),
+                                EscapeCsvField(row["Message"].ToString()));
+                            writer.WriteLine(line);
+                        }
+                    }
+                    else
+                    {
+                        // Plain text format
+                        foreach (DataRow row in logs.Rows)
+                        {
+                            var line = string.Format("{0} [{1}] {2} - {3}", 
+                                row["DateTime"], row["Level"], row["Job"], row["Message"]);
+                            writer.WriteLine(line);
+                        }
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error exporting logs: " + ex.Message);
+                return false;
+            }
+        }
+
+        private string EscapeCsvField(string field)
+        {
+            if (string.IsNullOrEmpty(field)) return "";
+            
+            if (field.Contains(",") || field.Contains("\"") || field.Contains("\n"))
+            {
+                return field.Replace("\"", "\"\"");
+            }
+            return field;
+        }
+
+        public long GetLogSize()
+        {
+            try
+            {
+                var logFiles = Directory.GetFiles(_logDirectory, "DataSyncer_*.log");
+                return logFiles.Sum(file => new FileInfo(file).Length);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        public int GetLogCount()
+        {
+            try
+            {
+                var logFiles = Directory.GetFiles(_logDirectory, "DataSyncer_*.log");
+                int totalLines = 0;
+
+                foreach (var logFile in logFiles)
+                {
+                    totalLines += File.ReadAllLines(logFile).Length;
+                }
+
+                return totalLines;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        #endregion
+
+        #region Configuration
+
+        public void SetLogLevel(LogLevel level)
+        {
+            _currentLogLevel = level;
+        }
+
+        public LogLevel GetLogLevel()
+        {
+            return _currentLogLevel;
+        }
+
+        public void SetMaxLogSize(long maxSizeBytes)
+        {
+            _maxLogSizeBytes = maxSizeBytes;
+        }
+
+        public void SetLogRetentionDays(int days)
+        {
+            _logRetentionDays = days;
+        }
+
+        #endregion
+
+        #region Maintenance
+
+        private void CheckLogRotation(string logFile)
+        {
+            try
+            {
+                var fileInfo = new FileInfo(logFile);
+                if (fileInfo.Length > _maxLogSizeBytes)
+                {
+                    // Archive current log
+                    var archiveName = Path.Combine(_logDirectory, 
+                        "DataSyncer_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + "_archived.log");
+                    File.Move(logFile, archiveName);
+                }
+            }
+            catch
+            {
+                // Rotation failed, continue anyway
+            }
+        }
+
+        private void CleanupOldLogs()
+        {
+            try
+            {
+                var cutoffDate = DateTime.Now.AddDays(-_logRetentionDays);
+                ClearLogs(cutoffDate);
+            }
+            catch
+            {
+                // Cleanup failed, continue anyway
+            }
+        }
+
+        #endregion
+    }
+}

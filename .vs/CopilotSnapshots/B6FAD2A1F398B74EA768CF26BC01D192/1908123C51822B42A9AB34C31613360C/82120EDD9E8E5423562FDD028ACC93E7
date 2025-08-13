@@ -1,0 +1,311 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using syncer.core.Interfaces;
+using syncer.core.Models;
+
+namespace syncer.core.Services
+{
+    /// <summary>
+    /// Local file system transfer service implementation
+    /// </summary>
+    public class LocalFileTransferService : IFileTransferService
+    {
+        public bool IsConnected { get; private set; }
+
+        public bool TestConnection(ConnectionSettingsModel settings)
+        {
+            return settings.IsLocalConnection;
+        }
+
+        public bool Connect(ConnectionSettingsModel settings)
+        {
+            if (settings.IsLocalConnection)
+            {
+                IsConnected = true;
+                return true;
+            }
+            return false;
+        }
+
+        public void Disconnect()
+        {
+            IsConnected = false;
+        }
+
+        public List<string> ListFiles(string path, bool recursive = true)
+        {
+            try
+            {
+                if (Directory.Exists(path))
+                {
+                    var searchOption = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+                    return Directory.GetFiles(path, "*", searchOption).ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error listing files in {path}: {ex.Message}");
+            }
+            
+            return new List<string>();
+        }
+
+        public List<string> ListDirectories(string path)
+        {
+            try
+            {
+                if (Directory.Exists(path))
+                {
+                    return Directory.GetDirectories(path).ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error listing directories in {path}: {ex.Message}");
+            }
+            
+            return new List<string>();
+        }
+
+        public bool UploadFile(string localPath, string remotePath, IProgress<TransferProgress> progress = null)
+        {
+            try
+            {
+                var remoteDir = Path.GetDirectoryName(remotePath);
+                if (remoteDir != null && !Directory.Exists(remoteDir))
+                    Directory.CreateDirectory(remoteDir);
+
+                if (progress != null)
+                {
+                    var fileInfo = new FileInfo(localPath);
+                    var totalBytes = fileInfo.Length;
+                    var buffer = new byte[8192];
+                    long bytesTransferred = 0;
+                    var startTime = DateTime.Now;
+
+                    using (var source = new FileStream(localPath, FileMode.Open, FileAccess.Read))
+                    using (var destination = new FileStream(remotePath, FileMode.Create, FileAccess.Write))
+                    {
+                        int bytesRead;
+                        while ((bytesRead = source.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            destination.Write(buffer, 0, bytesRead);
+                            bytesTransferred += bytesRead;
+
+                            var elapsed = DateTime.Now - startTime;
+                            var rate = elapsed.TotalSeconds > 0 ? bytesTransferred / elapsed.TotalSeconds : 0;
+
+                            progress.Report(new TransferProgress
+                            {
+                                FileName = Path.GetFileName(localPath),
+                                BytesTransferred = bytesTransferred,
+                                TotalBytes = totalBytes,
+                                ElapsedTime = elapsed,
+                                TransferRate = rate
+                            });
+                        }
+                    }
+                }
+                else
+                {
+                    File.Copy(localPath, remotePath, true);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error uploading file {localPath} to {remotePath}: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool DownloadFile(string remotePath, string localPath, IProgress<TransferProgress> progress = null)
+        {
+            return UploadFile(remotePath, localPath, progress);
+        }
+
+        public bool DeleteFile(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error deleting file {path}: {ex.Message}");
+            }
+            
+            return false;
+        }
+
+        public bool CreateDirectory(string path)
+        {
+            try
+            {
+                Directory.CreateDirectory(path);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error creating directory {path}: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool DirectoryExists(string path)
+        {
+            return Directory.Exists(path);
+        }
+
+        public bool FileExists(string path)
+        {
+            return File.Exists(path);
+        }
+
+        public long GetFileSize(string path)
+        {
+            try
+            {
+                return new FileInfo(path).Length;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        public DateTime GetFileModifiedTime(string path)
+        {
+            try
+            {
+                return File.GetLastWriteTime(path);
+            }
+            catch
+            {
+                return DateTime.MinValue;
+            }
+        }
+
+        public Interfaces.FileAttributes GetFileAttributes(string path)
+        {
+            try
+            {
+                var fileInfo = new FileInfo(path);
+                var sysAttributes = File.GetAttributes(path);
+
+                return new Interfaces.FileAttributes
+                {
+                    IsHidden = sysAttributes.HasFlag(System.IO.FileAttributes.Hidden),
+                    IsSystem = sysAttributes.HasFlag(System.IO.FileAttributes.System),
+                    IsReadOnly = sysAttributes.HasFlag(System.IO.FileAttributes.ReadOnly),
+                    IsDirectory = sysAttributes.HasFlag(System.IO.FileAttributes.Directory),
+                    Size = fileInfo.Length,
+                    LastModified = fileInfo.LastWriteTime,
+                    Created = fileInfo.CreationTime
+                };
+            }
+            catch
+            {
+                return new Interfaces.FileAttributes();
+            }
+        }
+
+        public bool SyncDirectory(string sourcePath, string destinationPath, FilterSettingsModel filters = null, IProgress<SyncProgress> progress = null)
+        {
+            try
+            {
+                var startTime = DateTime.Now;
+                var syncProgress = new SyncProgress { ElapsedTime = TimeSpan.Zero };
+
+                // Get all source files
+                var sourceFiles = ListFiles(sourcePath, true);
+                syncProgress.TotalFiles = sourceFiles.Count;
+
+                if (progress != null)
+                {
+                    syncProgress.CurrentFile = "Scanning files...";
+                    progress.Report(syncProgress);
+                }
+
+                // Create destination directory if it doesn't exist
+                if (!Directory.Exists(destinationPath))
+                    Directory.CreateDirectory(destinationPath);
+
+                foreach (var sourceFile in sourceFiles)
+                {
+                    try
+                    {
+                        var relativePath = GetRelativePath(sourcePath, sourceFile);
+                        var destinationFile = Path.Combine(destinationPath, relativePath);
+
+                        syncProgress.CurrentFile = relativePath;
+                        syncProgress.ElapsedTime = DateTime.Now - startTime;
+
+                        // Apply filters if provided
+                        if (filters != null && filters.FiltersEnabled)
+                        {
+                            var fileInfo = new FileInfo(sourceFile);
+                            var attributes = GetFileAttributes(sourceFile);
+
+                            if (!filters.ShouldIncludeFile(sourceFile, attributes.Size, 
+                                attributes.IsHidden, attributes.IsSystem, attributes.IsReadOnly))
+                            {
+                                continue; // Skip this file
+                            }
+                        }
+
+                        // Check if file needs to be copied
+                        bool shouldCopy = !File.Exists(destinationFile) ||
+                                        File.GetLastWriteTime(sourceFile) > File.GetLastWriteTime(destinationFile);
+
+                        if (shouldCopy)
+                        {
+                            var fileSize = GetFileSize(sourceFile);
+                            if (UploadFile(sourceFile, destinationFile))
+                            {
+                                syncProgress.BytesTransferred += fileSize;
+                            }
+                            else
+                            {
+                                syncProgress.Errors.Add($"Failed to copy: {relativePath}");
+                            }
+                        }
+
+                        syncProgress.FilesProcessed++;
+                        
+                        if (progress != null)
+                            progress.Report(syncProgress);
+                    }
+                    catch (Exception ex)
+                    {
+                        syncProgress.Errors.Add($"Error processing {sourceFile}: {ex.Message}");
+                    }
+                }
+
+                return syncProgress.Errors.Count == 0;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error syncing directory {sourcePath} to {destinationPath}: {ex.Message}");
+                return false;
+            }
+        }
+
+        private string GetRelativePath(string fromPath, string toPath)
+        {
+            // Simple implementation for .NET Framework compatibility
+            if (toPath.StartsWith(fromPath))
+            {
+                return toPath.Substring(fromPath.Length).TrimStart('\\', '/');
+            }
+            return toPath;
+        }
+    }
+}

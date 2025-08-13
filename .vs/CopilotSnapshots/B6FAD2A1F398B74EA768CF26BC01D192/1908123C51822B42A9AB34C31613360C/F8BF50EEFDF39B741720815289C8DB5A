@@ -1,0 +1,38 @@
+﻿using System.ComponentModel;
+using System.Configuration.Install;
+using System.ServiceProcess;
+
+namespace syncer.services
+{
+    [RunInstaller(true)]
+    public partial class ProjectInstaller : Installer
+    {
+        private ServiceProcessInstaller serviceProcessInstaller;
+        private ServiceInstaller serviceInstaller;
+
+        public ProjectInstaller()
+        {
+            InitializeComponent();
+        }
+
+        private void InitializeComponent()
+        {
+            this.serviceProcessInstaller = new ServiceProcessInstaller();
+            this.serviceInstaller = new ServiceInstaller();
+
+            // serviceProcessInstaller
+            this.serviceProcessInstaller.Account = ServiceAccount.LocalSystem;
+
+            // serviceInstaller
+            this.serviceInstaller.Description = "DataSyncer Background Service for automated file synchronization";
+            this.serviceInstaller.DisplayName = "DataSyncer Service";
+            this.serviceInstaller.ServiceName = "DataSyncerService";
+            this.serviceInstaller.StartType = ServiceStartMode.Automatic;
+
+            // ProjectInstaller
+            this.Installers.AddRange(new Installer[] {
+                this.serviceProcessInstaller,
+                this.serviceInstaller});
+        }
+    }
+}

@@ -1,0 +1,77 @@
+﻿using System;
+using System.Collections.Generic;
+using syncer.core.Models;
+
+namespace syncer.core.Interfaces
+{
+    /// <summary>
+    /// Interface for file transfer operations
+    /// </summary>
+    public interface IFileTransferService
+    {
+        bool TestConnection(ConnectionSettingsModel settings);
+        bool Connect(ConnectionSettingsModel settings);
+        void Disconnect();
+        bool IsConnected { get; }
+        
+        // File operations
+        List<string> ListFiles(string remotePath, bool recursive = true);
+        List<string> ListDirectories(string remotePath);
+        bool UploadFile(string localPath, string remotePath, IProgress<TransferProgress>? progress = null);
+        bool DownloadFile(string remotePath, string localPath, IProgress<TransferProgress>? progress = null);
+        bool DeleteFile(string remotePath);
+        bool CreateDirectory(string remotePath);
+        bool DirectoryExists(string remotePath);
+        bool FileExists(string remotePath);
+        
+        // File information
+        long GetFileSize(string path);
+        DateTime GetFileModifiedTime(string path);
+        FileAttributes GetFileAttributes(string path);
+        
+        // Bulk operations
+        bool SyncDirectory(string sourcePath, string destinationPath, FilterSettingsModel? filters = null, IProgress<SyncProgress>? progress = null);
+    }
+
+    /// <summary>
+    /// File attributes for cross-platform compatibility
+    /// </summary>
+    public struct FileAttributes
+    {
+        public bool IsHidden { get; set; }
+        public bool IsSystem { get; set; }
+        public bool IsReadOnly { get; set; }
+        public bool IsDirectory { get; set; }
+        public long Size { get; set; }
+        public DateTime LastModified { get; set; }
+        public DateTime Created { get; set; }
+    }
+
+    /// <summary>
+    /// Progress information for file transfers
+    /// </summary>
+    public class TransferProgress
+    {
+        public string FileName { get; set; } = string.Empty;
+        public long BytesTransferred { get; set; }
+        public long TotalBytes { get; set; }
+        public double PercentComplete => TotalBytes > 0 ? (double)BytesTransferred / TotalBytes * 100 : 0;
+        public TimeSpan ElapsedTime { get; set; }
+        public double TransferRate { get; set; } // bytes per second
+    }
+
+    /// <summary>
+    /// Progress information for directory synchronization
+    /// </summary>
+    public class SyncProgress
+    {
+        public string CurrentFile { get; set; } = string.Empty;
+        public int FilesProcessed { get; set; }
+        public int TotalFiles { get; set; }
+        public long BytesTransferred { get; set; }
+        public long TotalBytes { get; set; }
+        public double PercentComplete => TotalFiles > 0 ? (double)FilesProcessed / TotalFiles * 100 : 0;
+        public TimeSpan ElapsedTime { get; set; }
+        public List<string> Errors { get; set; } = new List<string>();
+    }
+}

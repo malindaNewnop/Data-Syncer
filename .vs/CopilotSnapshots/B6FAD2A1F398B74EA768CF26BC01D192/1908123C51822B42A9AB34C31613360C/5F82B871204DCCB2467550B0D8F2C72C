@@ -1,0 +1,42 @@
+﻿using System;
+using System.ServiceProcess;
+
+namespace syncer.services
+{
+    internal static class Program
+    {
+        /// <summary>
+        /// The main entry point for the application.
+        /// </summary>
+        static void Main(string[] args)
+        {
+            // Check if running in console mode (for debugging)
+            if (Environment.UserInteractive)
+            {
+                Console.WriteLine("Starting DataSyncer Service in console mode...");
+                Console.WriteLine("Press 'q' to quit");
+                
+                var service = new DataSyncerService();
+                service.StartConsole(args);
+                
+                ConsoleKeyInfo key;
+                do
+                {
+                    key = Console.ReadKey(true);
+                } while (key.KeyChar != 'q');
+                
+                service.StopConsole();
+                Console.WriteLine("Service stopped.");
+            }
+            else
+            {
+                // Running as Windows Service
+                ServiceBase[] ServicesToRun = new ServiceBase[]
+                {
+                    new DataSyncerService()
+                };
+                ServiceBase.Run(ServicesToRun);
+            }
+        }
+    }
+}

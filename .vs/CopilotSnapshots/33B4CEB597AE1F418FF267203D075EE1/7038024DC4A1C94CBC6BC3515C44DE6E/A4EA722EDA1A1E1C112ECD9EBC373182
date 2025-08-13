@@ -1,0 +1,748 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using syncer.core.Interfaces;
+using syncer.core.Models;
+using syncer.core.Utilities;
+
+namespace syncer.core.Services
+{
+    /// <summary>
+    /// Implementation of the file sync service
+    /// </summary>
+    public class FileSyncService : IFileSyncService
+    {
+        private readonly ISyncJobRepository _jobRepository;
+        private readonly ILogger _logger;
+        private readonly IConfigurationManager _configManager;
+        private readonly IConnectionManager _connectionManager;
+        private readonly Dictionary<int, SyncJobStatus> _jobStatuses;
+        private readonly Dictionary<int, CancellationTokenSource> _jobCancellationTokens;
+        private readonly Dictionary<int, List<TransferOperation>> _jobOperations;
+        private readonly object _lockObject = new object();
+
+        public event EventHandler<SyncProgressEventArgs> ProgressChanged;
+        public event EventHandler<SyncCompletedEventArgs> SyncCompleted;
+
+        public FileSyncService(
+            ISyncJobRepository jobRepository,
+            ILogger logger,
+            IConfigurationManager configManager,
+            IConnectionManager connectionManager)
+        {
+            _jobRepository = jobRepository;
+            _logger = logger;
+            _configManager = configManager;
+            _connectionManager = connectionManager;
+            _jobStatuses = new Dictionary<int, SyncJobStatus>();
+            _jobCancellationTokens = new Dictionary<int, CancellationTokenSource>();
+            _jobOperations = new Dictionary<int, List<TransferOperation>>();
+        }
+
+        public bool StartSync(int jobId)
+        {
+            try
+            {
+                var job = _jobRepository.GetJobById(jobId);
+                if (job == null)
+                {
+                    _logger.LogWarning($"Cannot start sync job: Job with ID {jobId} not found");
+                    return false;
+                }
+
+                lock (_lockObject)
+                {
+                    // Cancel any existing sync for this job
+                    if (_jobCancellationTokens.TryGetValue(jobId, out var existingCts) && 
+                        !existingCts.IsCancellationRequested)
+                    {
+                        existingCts.Cancel();
+                    }
+
+                    // Create a new cancellation token for this job
+                    var cts = new CancellationTokenSource();
+                    _jobCancellationTokens[jobId] = cts;
+
+                    // Initialize or reset status
+                    var status = new SyncJobStatus
+                    {
+                        JobId = job.Id,
+                        JobName = job.JobName,
+                        Status = "Running",
+                        StartTime = DateTime.Now,
+                        TotalFiles = 0,
+                        ProcessedFiles = 0,
+                        SuccessfulFiles = 0,
+                        FailedFiles = 0,
+                        SkippedFiles = 0,
+                        TotalBytes = 0,
+                        ProcessedBytes = 0,
+                        ProgressPercentage = 0,
+                        CurrentFile = "Initializing...",
+                        CurrentOperation = "Starting"
+                    };
+                    _jobStatuses[jobId] = status;
+
+                    // Initialize operations list
+                    _jobOperations[jobId] = new List<TransferOperation>();
+                }
+
+                // Update job status in repository
+                _jobRepository.UpdateJobStatus(jobId, "Running");
+                _jobRepository.UpdateJobRuntime(jobId, DateTime.Now);
+
+                _logger.LogInfo($"Starting sync job: {job.JobName} (ID: {jobId})");
+
+                // Start the sync task
+                Task.Run(() => ExecuteSyncJob(job, _jobCancellationTokens[jobId].Token));
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error starting sync job {jobId}: {ex.Message}", exception: ex);
+                return false;
+            }
+        }
+
+        public bool StopSync(int jobId)
+        {
+            try
+            {
+                lock (_lockObject)
+                {
+                    if (_jobCancellationTokens.TryGetValue(jobId, out var cts) && !cts.IsCancellationRequested)
+                    {
+                        cts.Cancel();
+                        _logger.LogInfo($"Stopping sync job: {jobId}");
+
+                        if (_jobStatuses.TryGetValue(jobId, out var status))
+                        {
+                            status.Status = "Stopping";
+                            status.CurrentOperation = "Cancelling...";
+                        }
+
+                        return true;
+                    }
+                }
+
+                _logger.LogWarning($"Cannot stop sync job: Job with ID {jobId} is not running");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error stopping sync job {jobId}: {ex.Message}", exception: ex);
+                return false;
+            }
+        }
+
+        public bool PauseSync(int jobId)
+        {
+            // Implement pause functionality
+            _logger.LogWarning("Pause functionality not implemented yet");
+            return false;
+        }
+
+        public bool ResumeSync(int jobId)
+        {
+            // Implement resume functionality
+            _logger.LogWarning("Resume functionality not implemented yet");
+            return false;
+        }
+
+        public SyncJobStatus GetSyncStatus(int jobId)
+        {
+            lock (_lockObject)
+            {
+                if (_jobStatuses.TryGetValue(jobId, out var status))
+                {
+                    return status;
+                }
+            }
+
+            // Return default status if job not found or not running
+            var job = _jobRepository.GetJobById(jobId);
+            if (job != null)
+            {
+                return new SyncJobStatus
+                {
+                    JobId = job.Id,
+                    JobName = job.JobName,
+                    Status = "Idle",
+                    TotalFiles = 0,
+                    ProcessedFiles = 0,
+                    SuccessfulFiles = 0,
+                    FailedFiles = 0,
+                    SkippedFiles = 0
+                };
+            }
+
+            return null;
+        }
+
+        public List<TransferOperation> GetOperations(int jobId)
+        {
+            lock (_lockObject)
+            {
+                if (_jobOperations.TryGetValue(jobId, out var operations))
+                {
+                    return operations.ToList();
+                }
+            }
+
+            return new List<TransferOperation>();
+        }
+
+        private async Task ExecuteSyncJob(SyncJob job, CancellationToken cancellationToken)
+        {
+            var status = _jobStatuses[job.Id];
+            var operations = _jobOperations[job.Id];
+            var startTime = DateTime.Now;
+            bool successful = false;
+            string errorMessage = null;
+
+            try
+            {
+                _logger.LogInfo($"Executing sync job: {job.JobName} (ID: {job.Id})");
+
+                // Get filter settings
+                var filterSettings = _configManager.GetFilterSettings();
+
+                // Connect to source and destination if needed
+                if (!_connectionManager.IsConnected)
+                {
+                    var connectionSettings = _configManager.GetConnectionSettings();
+                    if (!_connectionManager.Connect(connectionSettings))
+                    {
+                        throw new Exception("Failed to connect to file system");
+                    }
+                }
+
+                // Update status
+                status.CurrentOperation = "Scanning files";
+                status.CurrentFile = job.SourcePath;
+                RaiseProgressEvent(status);
+
+                // Get list of files to transfer
+                var sourceFiles = GetFilesToSync(job.SourcePath, filterSettings);
+                
+                // Update status with total files
+                status.TotalFiles = sourceFiles.Count;
+                if (status.TotalFiles > 0)
+                {
+                    status.TotalBytes = sourceFiles.Sum(f => f.Size);
+                }
+                RaiseProgressEvent(status);
+
+                // Create operations for each file
+                foreach (var sourceFile in sourceFiles)
+                {
+                    var relativePath = sourceFile.FullPath.Substring(job.SourcePath.Length)
+                        .TrimStart(Path.DirectorySeparatorChar);
+                    var destPath = Path.Combine(job.DestinationPath, relativePath);
+
+                    var operation = new TransferOperation
+                    {
+                        JobId = job.Id,
+                        SourcePath = sourceFile.FullPath,
+                        DestinationPath = destPath,
+                        Type = ParseTransferMode(job.TransferMode),
+                        FileSize = sourceFile.Size,
+                        Status = TransferStatus.Pending
+                    };
+
+                    operations.Add(operation);
+                }
+
+                // Process each file
+                foreach (var operation in operations)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        status.Status = "Cancelled";
+                        break;
+                    }
+
+                    try
+                    {
+                        status.CurrentFile = Path.GetFileName(operation.SourcePath);
+                        status.CurrentOperation = GetOperationName(operation.Type);
+                        operation.Status = TransferStatus.InProgress;
+                        operation.StartTime = DateTime.Now;
+                        RaiseProgressEvent(status);
+
+                        // Create destination directory if it doesn't exist
+                        var destDir = Path.GetDirectoryName(operation.DestinationPath);
+                        if (!Directory.Exists(destDir))
+                        {
+                            Directory.CreateDirectory(destDir);
+                        }
+
+                        // Perform the operation based on transfer mode
+                        switch (operation.Type)
+                        {
+                            case TransferType.Copy:
+                                await FileUtility.CopyFileAsync(
+                                    operation.SourcePath, 
+                                    operation.DestinationPath, 
+                                    true, 
+                                    new Progress<(long BytesTransferred, long TotalBytes)>(p => 
+                                    {
+                                        // Update progress
+                                        lock (_lockObject)
+                                        {
+                                            status.ProcessedBytes += p.BytesTransferred - status.ProcessedBytes;
+                                            if (status.TotalBytes > 0)
+                                            {
+                                                status.ProgressPercentage = (int)((double)status.ProcessedBytes / status.TotalBytes * 100);
+                                            }
+                                            RaiseProgressEvent(status);
+                                        }
+                                    }), 
+                                    cancellationToken);
+                                break;
+
+                            case TransferType.Move:
+                                await FileUtility.CopyFileAsync(
+                                    operation.SourcePath, 
+                                    operation.DestinationPath, 
+                                    true, 
+                                    new Progress<(long BytesTransferred, long TotalBytes)>(p => 
+                                    {
+                                        // Update progress
+                                        lock (_lockObject)
+                                        {
+                                            status.ProcessedBytes += p.BytesTransferred - status.ProcessedBytes;
+                                            if (status.TotalBytes > 0)
+                                            {
+                                                status.ProgressPercentage = (int)((double)status.ProcessedBytes / status.TotalBytes * 100);
+                                            }
+                                            RaiseProgressEvent(status);
+                                        }
+                                    }), 
+                                    cancellationToken);
+                                
+                                // Delete source file after copy
+                                File.Delete(operation.SourcePath);
+                                break;
+
+                            case TransferType.Sync:
+                                // Only copy if the file doesn't exist or is different
+                                bool shouldCopy = true;
+                                if (File.Exists(operation.DestinationPath))
+                                {
+                                    var sourceInfo = new System.IO.FileInfo(operation.SourcePath);
+                                    var destInfo = new System.IO.FileInfo(operation.DestinationPath);
+                                    
+                                    if (sourceInfo.Length == destInfo.Length && 
+                                        sourceInfo.LastWriteTime == destInfo.LastWriteTime)
+                                    {
+                                        shouldCopy = false;
+                                        operation.Status = TransferStatus.Skipped;
+                                        status.SkippedFiles++;
+                                    }
+                                }
+                                
+                                if (shouldCopy)
+                                {
+                                    await FileUtility.CopyFileAsync(
+                                        operation.SourcePath, 
+                                        operation.DestinationPath, 
+                                        true, 
+                                        new Progress<(long BytesTransferred, long TotalBytes)>(p => 
+                                        {
+                                            // Update progress
+                                            lock (_lockObject)
+                                            {
+                                                status.ProcessedBytes += p.BytesTransferred - status.ProcessedBytes;
+                                                if (status.TotalBytes > 0)
+                                                {
+                                                    status.ProgressPercentage = (int)((double)status.ProcessedBytes / status.TotalBytes * 100);
+                                                }
+                                                RaiseProgressEvent(status);
+                                            }
+                                        }), 
+                                        cancellationToken);
+                                }
+                                break;
+                        }
+
+                        // Update operation status
+                        operation.Status = TransferStatus.Completed;
+                        operation.EndTime = DateTime.Now;
+                        status.SuccessfulFiles++;
+                        status.ProcessedFiles++;
+                        
+                        _logger.LogInfo($"Transferred file: {operation.SourcePath} to {operation.DestinationPath}", job.JobName);
+                    }
+                    catch (Exception ex)
+                    {
+                        operation.Status = TransferStatus.Failed;
+                        operation.EndTime = DateTime.Now;
+                        operation.ErrorMessage = ex.Message;
+                        status.FailedFiles++;
+                        status.ProcessedFiles++;
+                        status.LastError = ex.Message;
+                        
+                        _logger.LogError($"Failed to transfer file: {operation.SourcePath} - {ex.Message}", job.JobName, ex);
+                    }
+
+                    // Update progress
+                    RaiseProgressEvent(status);
+                }
+
+                // Update final status
+                status.EndTime = DateTime.Now;
+                status.CurrentFile = "";
+                status.CurrentOperation = "Completed";
+                
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    status.Status = "Cancelled";
+                    _logger.LogWarning($"Sync job cancelled: {job.JobName}", job.JobName);
+                }
+                else
+                {
+                    status.Status = "Completed";
+                    status.ProgressPercentage = 100;
+                    _logger.LogInfo($"Sync job completed: {job.JobName}", job.JobName);
+                    successful = true;
+                }
+
+                // Update job status in repository
+                _jobRepository.UpdateJobStatus(job.Id, status.Status);
+                
+                if (successful)
+                {
+                    _jobRepository.IncrementSuccessCount(job.Id);
+                }
+                else
+                {
+                    _jobRepository.IncrementFailureCount(job.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                status.Status = "Failed";
+                status.LastError = ex.Message;
+                status.EndTime = DateTime.Now;
+                
+                _logger.LogError($"Error executing sync job {job.JobName}: {ex.Message}", job.JobName, ex);
+                _jobRepository.UpdateJobStatus(job.Id, "Failed");
+                _jobRepository.IncrementFailureCount(job.Id);
+                
+                errorMessage = ex.Message;
+            }
+            finally
+            {
+                var endTime = DateTime.Now;
+                
+                // Raise completion event
+                RaiseSyncCompletedEvent(job.Id, job.JobName, successful, errorMessage, startTime, endTime, 
+                    status.TotalFiles, status.SuccessfulFiles, status.FailedFiles, status.SkippedFiles, status.TotalBytes);
+            }
+        }
+
+        private List<syncer.core.Interfaces.FileInfo> GetFilesToSync(string sourcePath, FilterSettings filterSettings)
+        {
+            var result = new List<syncer.core.Interfaces.FileInfo>();
+            
+            if (!Directory.Exists(sourcePath))
+            {
+                _logger.LogWarning($"Source path does not exist: {sourcePath}");
+                return result;
+            }
+            
+            try
+            {
+                // Get all files in the source directory
+                var searchOption = filterSettings.IncludeSubdirectories 
+                    ? SearchOption.AllDirectories 
+                    : SearchOption.TopDirectoryOnly;
+                    
+                var files = Directory.GetFiles(sourcePath, "*", searchOption);
+                
+                foreach (var file in files)
+                {
+                    var fileInfo = new System.IO.FileInfo(file);
+                    
+                    // Apply filters
+                    if (filterSettings.FiltersEnabled)
+                    {
+                        // Skip hidden files if configured
+                        if (!filterSettings.IncludeHiddenFiles && 
+                            (fileInfo.Attributes & FileAttributes.Hidden) == FileAttributes.Hidden)
+                        {
+                            continue;
+                        }
+                        
+                        // Skip system files if configured
+                        if (!filterSettings.IncludeSystemFiles && 
+                            (fileInfo.Attributes & FileAttributes.System) == FileAttributes.System)
+                        {
+                            continue;
+                        }
+                        
+                        // Skip read-only files if configured
+                        if (!filterSettings.IncludeReadOnlyFiles && 
+                            (fileInfo.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+                        {
+                            continue;
+                        }
+                        
+                        // Check file size
+                        var fileSizeMB = (decimal)fileInfo.Length / (1024 * 1024);
+                        if (fileSizeMB < filterSettings.MinFileSize || 
+                            (filterSettings.MaxFileSize > 0 && fileSizeMB > filterSettings.MaxFileSize))
+                        {
+                            continue;
+                        }
+                        
+                        // Check allowed file types
+                        if (filterSettings.AllowedFileTypes != null && filterSettings.AllowedFileTypes.Length > 0)
+                        {
+                            bool matched = false;
+                            foreach (var fileType in filterSettings.AllowedFileTypes)
+                            {
+                                string[] extensions = fileType.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                                
+                                foreach (var ext in extensions)
+                                {
+                                    var cleanExt = ext.Trim();
+                                    if (cleanExt.StartsWith("."))
+                                    {
+                                        if (fileInfo.Extension.Equals(cleanExt, StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            matched = true;
+                                            break;
+                                        }
+                                    }
+                                    else if (cleanExt.StartsWith("*."))
+                                    {
+                                        cleanExt = cleanExt.Substring(1);
+                                        if (fileInfo.Extension.Equals(cleanExt, StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            matched = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                if (matched) break;
+                            }
+                            
+                            if (!matched) continue;
+                        }
+                        
+                        // Check exclude patterns
+                        var excludePatterns = filterSettings.GetExcludePatternArray();
+                        if (excludePatterns.Length > 0)
+                        {
+                            bool excluded = false;
+                            foreach (var pattern in excludePatterns)
+                            {
+                                if (FileMatchesPattern(fileInfo.FullName, pattern.Trim()))
+                                {
+                                    excluded = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (excluded) continue;
+                        }
+                        
+                        // Check modified date filters
+                        if (filterSettings.ModifiedAfter.HasValue && 
+                            fileInfo.LastWriteTime < filterSettings.ModifiedAfter.Value)
+                        {
+                            continue;
+                        }
+                        
+                        if (filterSettings.ModifiedBefore.HasValue && 
+                            fileInfo.LastWriteTime > filterSettings.ModifiedBefore.Value)
+                        {
+                            continue;
+                        }
+                        
+                        // Check created date filters
+                        if (filterSettings.CreatedAfter.HasValue && 
+                            fileInfo.CreationTime < filterSettings.CreatedAfter.Value)
+                        {
+                            continue;
+                        }
+                        
+                        if (filterSettings.CreatedBefore.HasValue && 
+                            fileInfo.CreationTime > filterSettings.CreatedBefore.Value)
+                        {
+                            continue;
+                        }
+                    }
+                    
+                    // Add file to result
+                    result.Add(new syncer.core.Interfaces.FileInfo
+                    {
+                        Name = fileInfo.Name,
+                        FullPath = fileInfo.FullName,
+                        Size = fileInfo.Length,
+                        CreationTime = fileInfo.CreationTime,
+                        LastWriteTime = fileInfo.LastWriteTime,
+                        LastAccessTime = fileInfo.LastAccessTime,
+                        IsDirectory = false,
+                        IsHidden = (fileInfo.Attributes & FileAttributes.Hidden) == FileAttributes.Hidden,
+                        IsReadOnly = (fileInfo.Attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly,
+                        IsSystem = (fileInfo.Attributes & FileAttributes.System) == FileAttributes.System
+                    });
+                    
+                    // Check max files limit
+                    if (filterSettings.MaxFilesToSync > 0 && result.Count >= filterSettings.MaxFilesToSync)
+                    {
+                        _logger.LogInfo($"Reached max files limit of {filterSettings.MaxFilesToSync}");
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error getting files to sync: {ex.Message}", exception: ex);
+            }
+            
+            return result;
+        }
+
+        private bool FileMatchesPattern(string filePath, string pattern)
+        {
+            // Simple wildcard matching for file paths
+            if (pattern.Contains("*") || pattern.Contains("?"))
+            {
+                var filename = Path.GetFileName(filePath);
+                
+                // Convert the pattern to a regex pattern
+                var regexPattern = "^" + 
+                    System.Text.RegularExpressions.Regex.Escape(pattern)
+                    .Replace("\\*", ".*")
+                    .Replace("\\?", ".") + 
+                    "$";
+                    
+                return System.Text.RegularExpressions.Regex.IsMatch(
+                    filename, 
+                    regexPattern, 
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            }
+            
+            // Exact matching
+            return filePath.EndsWith(pattern, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private TransferType ParseTransferMode(string transferMode)
+        {
+            if (string.IsNullOrEmpty(transferMode))
+                return TransferType.Copy;
+                
+            if (transferMode.Contains("Move"))
+                return TransferType.Move;
+                
+            if (transferMode.Contains("Sync"))
+                return TransferType.Sync;
+                
+            return TransferType.Copy;
+        }
+
+        private string GetOperationName(TransferType type)
+        {
+            switch (type)
+            {
+                case TransferType.Copy:
+                    return "Copying";
+                case TransferType.Move:
+                    return "Moving";
+                case TransferType.Delete:
+                    return "Deleting";
+                case TransferType.Sync:
+                    return "Synchronizing";
+                default:
+                    return "Processing";
+            }
+        }
+
+        private void RaiseProgressEvent(SyncJobStatus status)
+        {
+            try
+            {
+                ProgressChanged?.Invoke(this, new SyncProgressEventArgs
+                {
+                    JobId = status.JobId,
+                    JobName = status.JobName,
+                    ProgressPercentage = status.ProgressPercentage,
+                    CurrentFile = status.CurrentFile,
+                    CurrentOperation = status.CurrentOperation,
+                    ProcessedFiles = status.ProcessedFiles,
+                    TotalFiles = status.TotalFiles,
+                    ProcessedBytes = status.ProcessedBytes,
+                    TotalBytes = status.TotalBytes,
+                    EstimatedTimeRemaining = CalculateEstimatedTimeRemaining(status)
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error raising progress event: " + ex.Message, exception: ex);
+            }
+        }
+
+        private void RaiseSyncCompletedEvent(
+            int jobId, 
+            string jobName, 
+            bool successful, 
+            string errorMessage, 
+            DateTime startTime, 
+            DateTime endTime,
+            int totalFiles,
+            int successfulFiles,
+            int failedFiles,
+            int skippedFiles,
+            long totalBytes)
+        {
+            try
+            {
+                SyncCompleted?.Invoke(this, new SyncCompletedEventArgs
+                {
+                    JobId = jobId,
+                    JobName = jobName,
+                    Successful = successful,
+                    ErrorMessage = errorMessage,
+                    StartTime = startTime,
+                    EndTime = endTime,
+                    Duration = endTime - startTime,
+                    TotalFiles = totalFiles,
+                    SuccessfulFiles = successfulFiles,
+                    FailedFiles = failedFiles,
+                    SkippedFiles = skippedFiles,
+                    TotalBytes = totalBytes
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error raising sync completed event: " + ex.Message, exception: ex);
+            }
+        }
+
+        private TimeSpan? CalculateEstimatedTimeRemaining(SyncJobStatus status)
+        {
+            if (status.StartTime == null || status.ProcessedBytes <= 0 || status.TotalBytes <= 0)
+                return null;
+                
+            var elapsedTime = DateTime.Now - status.StartTime.Value;
+            var bytesPerSecond = status.ProcessedBytes / elapsedTime.TotalSeconds;
+            
+            if (bytesPerSecond <= 0)
+                return null;
+                
+            var remainingBytes = status.TotalBytes - status.ProcessedBytes;
+            var remainingSeconds = remainingBytes / bytesPerSecond;
+            
+            return TimeSpan.FromSeconds(remainingSeconds);
+        }
+    }
+}

@@ -1,0 +1,238 @@
+﻿using System;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+using syncer.core.Interfaces;
+using syncer.core.Models;
+
+namespace syncer.core.Services
+{
+    /// <summary>
+    /// Sync engine for executing sync jobs
+    /// </summary>
+    public class SyncEngine : ISyncEngine
+    {
+        private readonly IFileTransferService _fileTransferService;
+        private readonly ILoggingService _loggingService;
+        private readonly IDataRepository _dataRepository;
+        private readonly ConcurrentDictionary<int, JobExecution> _runningJobs;
+
+        public event EventHandler<SyncProgressEventArgs>? ProgressUpdated;
+        public event EventHandler<SyncCompletedEventArgs>? JobCompleted;
+        public event EventHandler<SyncStartedEventArgs>? JobStarted;
+
+        public SyncEngine(IFileTransferService fileTransferService, ILoggingService loggingService, IDataRepository dataRepository)
+        {
+            _fileTransferService = fileTransferService;
+            _loggingService = loggingService;
+            _dataRepository = dataRepository;
+            _runningJobs = new ConcurrentDictionary<int, JobExecution>();
+        }
+
+        public async Task<bool> ExecuteJobAsync(SyncJobModel job)
+        {
+            if (_runningJobs.ContainsKey(job.Id))
+            {
+                _loggingService.LogWarning($"Job '{job.JobName}' is already running", job.JobName);
+                return false;
+            }
+
+            var cancellationTokenSource = new CancellationTokenSource();
+            var jobExecution = new JobExecution
+            {
+                Job = job,
+                CancellationTokenSource = cancellationTokenSource,
+                Status = SyncJobStatus.Starting,
+                StartTime = DateTime.Now
+            };
+
+            _runningJobs[job.Id] = jobExecution;
+
+            try
+            {
+                await Task.Run(() => ExecuteJobInternal(jobExecution, cancellationTokenSource.Token));
+                return jobExecution.Status == SyncJobStatus.Completed;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Unexpected error executing job '{job.JobName}': {ex.Message}", job.JobName);
+                return false;
+            }
+            finally
+            {
+                _runningJobs.TryRemove(job.Id, out _);
+            }
+        }
+
+        public void StopJob(int jobId)
+        {
+            if (_runningJobs.TryGetValue(jobId, out var jobExecution))
+            {
+                jobExecution.Status = SyncJobStatus.Stopping;
+                jobExecution.CancellationTokenSource.Cancel();
+                _loggingService.LogInfo($"Job '{jobExecution.Job.JobName}' stop requested", jobExecution.Job.JobName);
+            }
+        }
+
+        public bool IsJobRunning(int jobId)
+        {
+            return _runningJobs.ContainsKey(jobId);
+        }
+
+        public SyncJobStatus GetJobExecutionStatus(int jobId)
+        {
+            if (_runningJobs.TryGetValue(jobId, out var jobExecution))
+            {
+                return jobExecution.Status;
+            }
+            return SyncJobStatus.NotRunning;
+        }
+
+        private void ExecuteJobInternal(JobExecution jobExecution, CancellationToken cancellationToken)
+        {
+            var job = jobExecution.Job;
+            var stopwatch = Stopwatch.StartNew();
+            
+            try
+            {
+                // Update job status to running
+                jobExecution.Status = SyncJobStatus.Running;
+                job.LastRun = jobExecution.StartTime;
+                job.LastStatus = "Running";
+
+                // Fire job started event
+                OnJobStarted(new SyncStartedEventArgs
+                {
+                    JobId = job.Id,
+                    JobName = job.JobName,
+                    StartTime = jobExecution.StartTime,
+                    SourcePath = job.SourcePath,
+                    DestinationPath = job.DestinationPath
+                });
+
+                _loggingService.LogInfo($"Starting sync job '{job.JobName}' from '{job.SourcePath}' to '{job.DestinationPath}'", job.JobName);
+
+                // Get filter settings
+                var filterSettings = _dataRepository.GetFilterSettings();
+
+                // Create progress reporter
+                var progress = new Progress<SyncProgress>(syncProgress =>
+                {
+                    OnProgressUpdated(new SyncProgressEventArgs
+                    {
+                        JobId = job.Id,
+                        JobName = job.JobName,
+                        CurrentFile = syncProgress.CurrentFile,
+                        FilesProcessed = syncProgress.FilesProcessed,
+                        TotalFiles = syncProgress.TotalFiles,
+                        BytesTransferred = syncProgress.BytesTransferred,
+                        TotalBytes = syncProgress.TotalBytes,
+                        ProgressPercentage = syncProgress.PercentComplete,
+                        ElapsedTime = stopwatch.Elapsed,
+                        TransferRate = syncProgress.BytesTransferred / Math.Max(stopwatch.Elapsed.TotalSeconds, 1),
+                        Phase = DeterminePhase(syncProgress)
+                    });
+                });
+
+                // Execute the sync operation
+                bool success = _fileTransferService.SyncDirectory(
+                    job.SourcePath, 
+                    job.DestinationPath, 
+                    filterSettings, 
+                    progress);
+
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    jobExecution.Status = SyncJobStatus.Cancelled;
+                    job.LastStatus = "Cancelled";
+                    _loggingService.LogWarning($"Job '{job.JobName}' was cancelled", job.JobName);
+                }
+                else if (success)
+                {
+                    jobExecution.Status = SyncJobStatus.Completed;
+                    job.LastStatus = "Completed";
+                    _loggingService.LogInfo($"Job '{job.JobName}' completed successfully", job.JobName);
+                }
+                else
+                {
+                    jobExecution.Status = SyncJobStatus.Failed;
+                    job.LastStatus = "Failed";
+                    _loggingService.LogError($"Job '{job.JobName}' failed", job.JobName);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                jobExecution.Status = SyncJobStatus.Cancelled;
+                job.LastStatus = "Cancelled";
+                _loggingService.LogWarning($"Job '{job.JobName}' was cancelled", job.JobName);
+            }
+            catch (Exception ex)
+            {
+                jobExecution.Status = SyncJobStatus.Failed;
+                job.LastStatus = "Failed";
+                job.LastError = ex.Message;
+                _loggingService.LogError($"Job '{job.JobName}' failed with error: {ex.Message}", job.JobName);
+            }
+            finally
+            {
+                stopwatch.Stop();
+                jobExecution.EndTime = DateTime.Now;
+
+                // Update job in repository
+                _dataRepository.SaveJob(job);
+
+                // Fire completion event
+                OnJobCompleted(new SyncCompletedEventArgs
+                {
+                    JobId = job.Id,
+                    JobName = job.JobName,
+                    Success = jobExecution.Status == SyncJobStatus.Completed,
+                    ErrorMessage = job.LastError,
+                    FilesTransferred = job.FilesTransferred,
+                    FilesSkipped = 0, // TODO: Track skipped files
+                    FilesDeleted = 0, // TODO: Track deleted files
+                    BytesTransferred = job.BytesTransferred,
+                    Duration = stopwatch.Elapsed,
+                    StartTime = jobExecution.StartTime,
+                    EndTime = jobExecution.EndTime,
+                    FinalStatus = jobExecution.Status
+                });
+            }
+        }
+
+        private string DeterminePhase(SyncProgress syncProgress)
+        {
+            if (syncProgress.FilesProcessed == 0)
+                return "Scanning";
+            else if (syncProgress.FilesProcessed < syncProgress.TotalFiles)
+                return "Transferring";
+            else
+                return "Finalizing";
+        }
+
+        protected virtual void OnProgressUpdated(SyncProgressEventArgs e)
+        {
+            ProgressUpdated?.Invoke(this, e);
+        }
+
+        protected virtual void OnJobCompleted(SyncCompletedEventArgs e)
+        {
+            JobCompleted?.Invoke(this, e);
+        }
+
+        protected virtual void OnJobStarted(SyncStartedEventArgs e)
+        {
+            JobStarted?.Invoke(this, e);
+        }
+
+        private class JobExecution
+        {
+            public SyncJobModel Job { get; set; } = null!;
+            public CancellationTokenSource CancellationTokenSource { get; set; } = null!;
+            public SyncJobStatus Status { get; set; }
+            public DateTime StartTime { get; set; }
+            public DateTime EndTime { get; set; }
+        }
+    }
+}

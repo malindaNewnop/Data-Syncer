@@ -1,0 +1,61 @@
+﻿using System;
+using System.Data;
+
+namespace syncer.core.Interfaces
+{
+    /// <summary>
+    /// Interface for logging operations
+    /// </summary>
+    public interface ILoggingService
+    {
+        // Logging methods
+        void LogInfo(string message, string? jobName = null, string? category = null);
+        void LogWarning(string message, string? jobName = null, string? category = null);
+        void LogError(string message, string? jobName = null, string? category = null);
+        void LogDebug(string message, string? jobName = null, string? category = null);
+
+        // Log retrieval
+        DataTable GetLogs(DateTime? fromDate = null, DateTime? toDate = null, string? logLevel = null, string? jobName = null);
+        string[] GetLogLevels();
+        string[] GetJobNames();
+        string[] GetCategories();
+
+        // Log management
+        bool ClearLogs(DateTime? olderThan = null);
+        bool ExportLogs(string filePath, DateTime? fromDate = null, DateTime? toDate = null, string? format = "CSV");
+        long GetLogSize();
+        int GetLogCount();
+
+        // Configuration
+        void SetLogLevel(LogLevel level);
+        LogLevel GetLogLevel();
+        void SetMaxLogSize(long maxSizeBytes);
+        void SetLogRetentionDays(int days);
+    }
+
+    /// <summary>
+    /// Log levels for filtering
+    /// </summary>
+    public enum LogLevel
+    {
+        Debug = 0,
+        Info = 1,
+        Warning = 2,
+        Error = 3,
+        None = 4
+    }
+
+    /// <summary>
+    /// Log entry model
+    /// </summary>
+    public class LogEntry
+    {
+        public DateTime Timestamp { get; set; }
+        public LogLevel Level { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string? JobName { get; set; }
+        public string? Category { get; set; }
+        public string? Source { get; set; }
+        public Exception? Exception { get; set; }
+    }
+}

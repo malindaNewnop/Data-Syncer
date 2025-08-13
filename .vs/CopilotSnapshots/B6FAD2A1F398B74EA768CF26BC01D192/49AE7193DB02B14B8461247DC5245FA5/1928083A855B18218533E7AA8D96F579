@@ -1,0 +1,129 @@
+﻿using syncer.ui.Services;
+using syncer.core.UI;
+
+namespace syncer.ui
+{
+    /// <summary>
+    /// Service locator for dependency injection - now using backend implementations
+    /// </summary>
+    public static class ServiceLocator
+    {
+        private static ISyncJobService? _syncJobService;
+        private static IConnectionService? _connectionService;
+        private static IFilterService? _filterService;
+        private static ILogService? _logService;
+        private static IServiceManager? _serviceManager;
+        private static IConfigurationService? _configurationService;
+
+        /// <summary>
+        /// Initialize all services - call this at application startup
+        /// </summary>
+        public static void Initialize()
+        {
+            // Use backend implementations
+            var backendSyncJobService = new BackendSyncJobService();
+            var backendConnectionService = new BackendConnectionService();
+            var backendFilterService = new BackendFilterService();
+            var backendLogService = new BackendLogService();
+            var backendConfigService = new BackendConfigurationService();
+
+            _syncJobService = new SyncJobServiceAdapter(backendSyncJobService);
+            _connectionService = new ConnectionServiceAdapter(backendConnectionService);
+            _filterService = new FilterServiceAdapter(backendFilterService);
+            _logService = new LogServiceAdapter(backendLogService);
+            _serviceManager = new ServiceManager(); // Keep existing implementation
+            _configurationService = new ConfigurationServiceAdapter(backendConfigService);
+        }
+
+        public static ISyncJobService SyncJobService
+        {
+            get { return _syncJobService ?? (_syncJobService = CreateSyncJobService()); }
+        }
+
+        public static IConnectionService ConnectionService
+        {
+            get { return _connectionService ?? (_connectionService = CreateConnectionService()); }
+        }
+
+        public static IFilterService FilterService
+        {
+            get { return _filterService ?? (_filterService = CreateFilterService()); }
+        }
+
+        public static ILogService LogService
+        {
+            get { return _logService ?? (_logService = CreateLogService()); }
+        }
+
+        public static IServiceManager ServiceManager
+        {
+            get { return _serviceManager ?? (_serviceManager = new ServiceManager()); }
+        }
+
+        public static IConfigurationService ConfigurationService
+        {
+            get { return _configurationService ?? (_configurationService = CreateConfigurationService()); }
+        }
+
+        private static ISyncJobService CreateSyncJobService()
+        {
+            var backendService = new BackendSyncJobService();
+            return new SyncJobServiceAdapter(backendService);
+        }
+
+        private static IConnectionService CreateConnectionService()
+        {
+            var backendService = new BackendConnectionService();
+            return new ConnectionServiceAdapter(backendService);
+        }
+
+        private static IFilterService CreateFilterService()
+        {
+            var backendService = new BackendFilterService();
+            return new FilterServiceAdapter(backendService);
+        }
+
+        private static ILogService CreateLogService()
+        {
+            var backendService = new BackendLogService();
+            return new LogServiceAdapter(backendService);
+        }
+
+        private static IConfigurationService CreateConfigurationService()
+        {
+            var backendService = new BackendConfigurationService();
+            return new ConfigurationServiceAdapter(backendService);
+        }
+
+        // Methods to replace services with different implementations if needed
+        public static void SetSyncJobService(ISyncJobService service)
+        {
+            _syncJobService = service;
+        }
+
+        public static void SetConnectionService(IConnectionService service)
+        {
+            _connectionService = service;
+        }
+
+        public static void SetFilterService(IFilterService service)
+        {
+            _filterService = service;
+        }
+
+        public static void SetLogService(ILogService service)
+        {
+            _logService = service;
+        }
+
+        public static void SetServiceManager(IServiceManager service)
+        {
+            _serviceManager = service;
+        }
+
+        public static void SetConfigurationService(IConfigurationService service)
+        {
+            _configurationService = service;
+        }
+    }
+}

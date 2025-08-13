@@ -1,0 +1,22 @@
+{
+  "MultipleStartup": {
+    "Projects": {
+      "syncer.ui": {
+        "ProfileName": "syncer.ui",
+        "StartProject": true,
+        "StartExternalProgram": false,
+        "StartAction": "Project",
+        "StartArguments": "",
+        "StartWorkingDirectory": ""
+      },
+      "syncer.services": {
+        "ProfileName": "syncer.services",
+        "StartProject": false,
+        "StartExternalProgram": false,
+        "StartAction": "Project",
+        "StartArguments": "",
+        "StartWorkingDirectory": ""
+      }
+    }
+  }
+}

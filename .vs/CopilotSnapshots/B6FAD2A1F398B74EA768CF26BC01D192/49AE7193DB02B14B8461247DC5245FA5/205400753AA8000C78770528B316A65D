@@ -1,0 +1,398 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using syncer.core.Data;
+using syncer.core.Interfaces;
+using syncer.core.Models;
+using syncer.core.Services;
+
+namespace syncer.core.UI
+{
+    /// <summary>
+    /// Backend implementation of sync job service for UI integration
+    /// </summary>
+    public class BackendSyncJobService
+    {
+        private readonly IDataRepository _repository;
+        private readonly ILoggingService _loggingService;
+        private readonly ISyncEngine? _syncEngine;
+
+        public BackendSyncJobService(IDataRepository? repository = null, ILoggingService? loggingService = null, ISyncEngine? syncEngine = null)
+        {
+            _repository = repository ?? new JsonDataRepository();
+            _loggingService = loggingService ?? new FileLoggingService();
+            _syncEngine = syncEngine;
+        }
+
+        public List<SyncJob> GetAllJobs()
+        {
+            var jobs = _repository.GetAllJobs();
+            return jobs.Select(ConvertToUIModel).ToList();
+        }
+
+        public SyncJob? GetJobById(int id)
+        {
+            var job = _repository.GetJobById(id);
+            return job != null ? ConvertToUIModel(job) : null;
+        }
+
+        public int CreateJob(SyncJob job)
+        {
+            var backendJob = ConvertToBackendModel(job);
+            var id = _repository.SaveJob(backendJob);
+            _loggingService.LogInfo($"Job '{job.JobName}' created", job.JobName);
+            return id;
+        }
+
+        public bool UpdateJob(SyncJob job)
+        {
+            var backendJob = ConvertToBackendModel(job);
+            var success = _repository.SaveJob(backendJob) > 0;
+            if (success)
+                _loggingService.LogInfo($"Job '{job.JobName}' updated", job.JobName);
+            return success;
+        }
+
+        public bool DeleteJob(int id)
+        {
+            var job = GetJobById(id);
+            if (job != null)
+            {
+                var success = _repository.DeleteJob(id);
+                if (success)
+                    _loggingService.LogInfo($"Job '{job.JobName}' deleted", job.JobName);
+                return success;
+            }
+            return false;
+        }
+
+        public bool StartJob(int id)
+        {
+            var backendJob = _repository.GetJobById(id);
+            if (backendJob != null)
+            {
+                if (_syncEngine != null)
+                {
+                    // Use sync engine if available
+                    var task = _syncEngine.ExecuteJobAsync(backendJob);
+                    _loggingService.LogInfo($"Job '{backendJob.JobName}' execution started", backendJob.JobName);
+                    return true;
+                }
+                else
+                {
+                    // Just enable the job if no sync engine
+                    backendJob.IsEnabled = true;
+                    _repository.SaveJob(backendJob);
+                    _loggingService.LogInfo($"Job '{backendJob.JobName}' enabled", backendJob.JobName);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public bool StopJob(int id)
+        {
+            var backendJob = _repository.GetJobById(id);
+            if (backendJob != null)
+            {
+                if (_syncEngine != null && _syncEngine.IsJobRunning(id))
+                {
+                    _syncEngine.StopJob(id);
+                }
+                
+                backendJob.IsEnabled = false;
+                _repository.SaveJob(backendJob);
+                _loggingService.LogInfo($"Job '{backendJob.JobName}' stopped/disabled", backendJob.JobName);
+                return true;
+            }
+            return false;
+        }
+
+        public string GetJobStatus(int id)
+        {
+            if (_syncEngine != null && _syncEngine.IsJobRunning(id))
+            {
+                return _syncEngine.GetJobExecutionStatus(id).ToString();
+            }
+
+            var job = _repository.GetJobById(id);
+            return job?.IsEnabled == true ? "Enabled" : "Disabled";
+        }
+
+        private SyncJob ConvertToUIModel(SyncJobModel backendJob)
+        {
+            return new SyncJob
+            {
+                Id = backendJob.Id,
+                JobName = backendJob.JobName,
+                IsEnabled = backendJob.IsEnabled,
+                SourcePath = backendJob.SourcePath,
+                DestinationPath = backendJob.DestinationPath,
+                StartTime = backendJob.StartTime,
+                IntervalValue = backendJob.IntervalValue,
+                IntervalType = backendJob.IntervalType,
+                TransferMode = backendJob.TransferMode,
+                LastRun = backendJob.LastRun,
+                LastStatus = backendJob.LastStatus,
+                CreatedDate = backendJob.CreatedDate
+            };
+        }
+
+        private SyncJobModel ConvertToBackendModel(SyncJob uiJob)
+        {
+            return new SyncJobModel
+            {
+                Id = uiJob.Id,
+                JobName = uiJob.JobName,
+                IsEnabled = uiJob.IsEnabled,
+                SourcePath = uiJob.SourcePath,
+                DestinationPath = uiJob.DestinationPath,
+                StartTime = uiJob.StartTime,
+                IntervalValue = uiJob.IntervalValue,
+                IntervalType = uiJob.IntervalType,
+                TransferMode = uiJob.TransferMode,
+                LastRun = uiJob.LastRun,
+                LastStatus = uiJob.LastStatus,
+                CreatedDate = uiJob.CreatedDate
+            };
+        }
+    }
+
+    /// <summary>
+    /// Backend implementation of connection service for UI integration
+    /// </summary>
+    public class BackendConnectionService
+    {
+        private readonly IDataRepository _repository;
+        private readonly IFileTransferService _fileTransferService;
+        private readonly ILoggingService _loggingService;
+
+        public BackendConnectionService(IDataRepository? repository = null, IFileTransferService? fileTransferService = null, ILoggingService? loggingService = null)
+        {
+            _repository = repository ?? new JsonDataRepository();
+            _fileTransferService = fileTransferService ?? new LocalFileTransferService();
+            _loggingService = loggingService ?? new FileLoggingService();
+        }
+
+        public ConnectionSettings GetConnectionSettings()
+        {
+            var settings = _repository.GetConnectionSettings();
+            return ConvertToUIModel(settings);
+        }
+
+        public bool SaveConnectionSettings(ConnectionSettings settings)
+        {
+            var backendSettings = ConvertToBackendModel(settings);
+            var success = _repository.SaveConnectionSettings(backendSettings);
+            if (success)
+                _loggingService.LogInfo("Connection settings saved");
+            return success;
+        }
+
+        public bool TestConnection(ConnectionSettings settings)
+        {
+            var backendSettings = ConvertToBackendModel(settings);
+            var success = _fileTransferService.TestConnection(backendSettings);
+            _loggingService.LogInfo($"Connection test {(success ? "successful" : "failed")} for {settings.Protocol}");
+            return success;
+        }
+
+        public bool IsConnected()
+        {
+            return _fileTransferService.IsConnected;
+        }
+
+        private ConnectionSettings ConvertToUIModel(ConnectionSettingsModel backend)
+        {
+            return new ConnectionSettings
+            {
+                Protocol = backend.Protocol,
+                Host = backend.Host,
+                Port = backend.Port,
+                Username = backend.Username,
+                Password = backend.Password,
+                IsConnected = backend.IsConnected,
+                LastConnectionTest = backend.LastConnectionTest
+            };
+        }
+
+        private ConnectionSettingsModel ConvertToBackendModel(ConnectionSettings ui)
+        {
+            return new ConnectionSettingsModel
+            {
+                Protocol = ui.Protocol,
+                Host = ui.Host,
+                Port = ui.Port,
+                Username = ui.Username,
+                Password = ui.Password,
+                IsConnected = ui.IsConnected,
+                LastConnectionTest = ui.LastConnectionTest
+            };
+        }
+    }
+
+    /// <summary>
+    /// Backend implementation of filter service for UI integration
+    /// </summary>
+    public class BackendFilterService
+    {
+        private readonly IDataRepository _repository;
+        private readonly ILoggingService _loggingService;
+
+        public BackendFilterService(IDataRepository? repository = null, ILoggingService? loggingService = null)
+        {
+            _repository = repository ?? new JsonDataRepository();
+            _loggingService = loggingService ?? new FileLoggingService();
+        }
+
+        public FilterSettings GetFilterSettings()
+        {
+            var settings = _repository.GetFilterSettings();
+            return ConvertToUIModel(settings);
+        }
+
+        public bool SaveFilterSettings(FilterSettings settings)
+        {
+            var backendSettings = ConvertToBackendModel(settings);
+            var success = _repository.SaveFilterSettings(backendSettings);
+            if (success)
+                _loggingService.LogInfo("Filter settings saved");
+            return success;
+        }
+
+        public string[] GetDefaultFileTypes()
+        {
+            return new string[]
+            {
+                ".txt - Text files",
+                ".doc, .docx - Word documents",
+                ".xls, .xlsx - Excel files",
+                ".pdf - PDF documents",
+                ".jpg, .jpeg - JPEG images",
+                ".png - PNG images",
+                ".gif - GIF images",
+                ".mp4 - Video files",
+                ".mp3 - Audio files",
+                ".zip, .rar - Archive files",
+                ".exe - Executable files",
+                ".dll - Library files",
+                ".log - Log files",
+                ".csv - CSV files",
+                ".xml - XML files",
+                ".json - JSON files"
+            };
+        }
+
+        private FilterSettings ConvertToUIModel(FilterSettingsModel backend)
+        {
+            return new FilterSettings
+            {
+                FiltersEnabled = backend.FiltersEnabled,
+                AllowedFileTypes = backend.AllowedFileTypes,
+                MinFileSize = backend.MinFileSize,
+                MaxFileSize = backend.MaxFileSize,
+                IncludeHiddenFiles = backend.IncludeHiddenFiles,
+                IncludeSystemFiles = backend.IncludeSystemFiles,
+                IncludeReadOnlyFiles = backend.IncludeReadOnlyFiles,
+                ExcludePatterns = backend.ExcludePatterns
+            };
+        }
+
+        private FilterSettingsModel ConvertToBackendModel(FilterSettings ui)
+        {
+            return new FilterSettingsModel
+            {
+                FiltersEnabled = ui.FiltersEnabled,
+                AllowedFileTypes = ui.AllowedFileTypes,
+                MinFileSize = ui.MinFileSize,
+                MaxFileSize = ui.MaxFileSize,
+                IncludeHiddenFiles = ui.IncludeHiddenFiles,
+                IncludeSystemFiles = ui.IncludeSystemFiles,
+                IncludeReadOnlyFiles = ui.IncludeReadOnlyFiles,
+                ExcludePatterns = ui.ExcludePatterns
+            };
+        }
+    }
+
+    /// <summary>
+    /// Backend implementation of log service for UI integration
+    /// </summary>
+    public class BackendLogService
+    {
+        private readonly ILoggingService _loggingService;
+
+        public BackendLogService(ILoggingService? loggingService = null)
+        {
+            _loggingService = loggingService ?? new FileLoggingService();
+        }
+
+        public DataTable GetLogs(DateTime? fromDate = null, DateTime? toDate = null, string? logLevel = null)
+        {
+            return _loggingService.GetLogs(fromDate, toDate, logLevel);
+        }
+
+        public bool ClearLogs()
+        {
+            return _loggingService.ClearLogs();
+        }
+
+        public bool ExportLogs(string filePath, DateTime? fromDate = null, DateTime? toDate = null)
+        {
+            return _loggingService.ExportLogs(filePath, fromDate, toDate);
+        }
+
+        public void LogInfo(string message, string jobName = "")
+        {
+            _loggingService.LogInfo(message, jobName);
+        }
+
+        public void LogWarning(string message, string jobName = "")
+        {
+            _loggingService.LogWarning(message, jobName);
+        }
+
+        public void LogError(string message, string jobName = "")
+        {
+            _loggingService.LogError(message, jobName);
+        }
+    }
+
+    /// <summary>
+    /// Backend implementation of configuration service for UI integration
+    /// </summary>
+    public class BackendConfigurationService
+    {
+        private readonly IDataRepository _repository;
+
+        public BackendConfigurationService(IDataRepository? repository = null)
+        {
+            _repository = repository ?? new JsonDataRepository();
+        }
+
+        public T GetSetting<T>(string key, T defaultValue = default(T))
+        {
+            return _repository.GetSetting(key, defaultValue);
+        }
+
+        public bool SaveSetting<T>(string key, T value)
+        {
+            return _repository.SaveSetting(key, value);
+        }
+
+        public bool DeleteSetting(string key)
+        {
+            return _repository.DeleteSetting(key);
+        }
+
+        public void SaveAllSettings()
+        {
+            // Settings are saved immediately in the JSON repository
+        }
+
+        public void LoadAllSettings()
+        {
+            // Settings are loaded on-demand in the JSON repository
+        }
+    }
+}

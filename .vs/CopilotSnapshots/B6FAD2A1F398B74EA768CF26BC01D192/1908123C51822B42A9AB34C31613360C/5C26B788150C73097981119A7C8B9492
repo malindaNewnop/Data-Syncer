@@ -1,0 +1,148 @@
+﻿using System;
+using System.ServiceProcess;
+using System.Timers;
+using System.IO;
+
+namespace syncer.services
+{
+    public partial class DataSyncerService : ServiceBase
+    {
+        private Timer _schedulerTimer;
+        private string _logPath;
+
+        public DataSyncerService()
+        {
+            InitializeComponent();
+            this.ServiceName = "DataSyncerService";
+            this.CanStop = true;
+            this.CanPauseAndContinue = false;
+            
+            // Set up logging path
+            _logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
+                "DataSyncer", "Logs", "service.log");
+        }
+
+        protected override void OnStart(string[] args)
+        {
+            try
+            {
+                // Create log directory if it doesn't exist
+                Directory.CreateDirectory(Path.GetDirectoryName(_logPath));
+                
+                // Set up timer to check for sync jobs every minute
+                _schedulerTimer = new Timer(60000); // 1 minute
+                _schedulerTimer.Elapsed += OnSchedulerTimer;
+                _schedulerTimer.Start();
+
+                LogMessage("DataSyncer service started successfully");
+            }
+            catch (Exception ex)
+            {
+                LogMessage("Failed to start DataSyncer service: " + ex.Message);
+                
+                // Write to Windows Event Log as fallback
+                try
+                {
+                    using (var eventLog = new System.Diagnostics.EventLog("Application"))
+                    {
+                        eventLog.Source = "DataSyncerService";
+                        eventLog.WriteEntry("Failed to start DataSyncer service: " + ex.Message, 
+                            System.Diagnostics.EventLogEntryType.Error);
+                    }
+                }
+                catch
+                {
+                    // If we can't write to event log either, just throw the original exception
+                }
+                
+                throw;
+            }
+        }
+
+        protected override void OnStop()
+        {
+            try
+            {
+                LogMessage("DataSyncer service stopping...");
+
+                // Stop the timer
+                if (_schedulerTimer != null)
+                {
+                    _schedulerTimer.Stop();
+                    _schedulerTimer.Dispose();
+                    _schedulerTimer = null;
+                }
+
+                LogMessage("DataSyncer service stopped successfully");
+            }
+            catch (Exception ex)
+            {
+                LogMessage("Error stopping DataSyncer service: " + ex.Message);
+                
+                // Write to Windows Event Log as fallback
+                try
+                {
+                    using (var eventLog = new System.Diagnostics.EventLog("Application"))
+                    {
+                        eventLog.Source = "DataSyncerService";
+                        eventLog.WriteEntry("Error stopping DataSyncer service: " + ex.Message, 
+                            System.Diagnostics.EventLogEntryType.Error);
+                    }
+                }
+                catch
+                {
+                    // Ignore event log errors during shutdown
+                }
+            }
+        }
+
+        protected override void OnShutdown()
+        {
+            OnStop();
+        }
+
+        private void OnSchedulerTimer(object sender, ElapsedEventArgs e)
+        {
+            try
+            {
+                // TODO: This is where we'll check for scheduled jobs and execute them
+                // For now, just log that the scheduler is running
+                LogMessage("Scheduler tick - checking for jobs to run");
+                
+                // Here you would:
+                // 1. Load job configurations from JSON files
+                // 2. Check which jobs need to run
+                // 3. Execute sync operations
+                // 4. Update job status
+            }
+            catch (Exception ex)
+            {
+                LogMessage("Error in scheduler: " + ex.Message);
+            }
+        }
+
+        private void LogMessage(string message)
+        {
+            try
+            {
+                var logEntry = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " - " + message;
+                File.AppendAllText(_logPath, logEntry + Environment.NewLine);
+            }
+            catch
+            {
+                // Fail silently - logging should not break the service
+            }
+        }
+
+        // Method for console mode debugging
+        public void StartConsole(string[] args)
+        {
+            OnStart(args);
+        }
+
+        public void StopConsole()
+        {
+            OnStop();
+        }
+    }
+}

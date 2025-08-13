@@ -1,0 +1,410 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Newtonsoft.Json;
+using syncer.core.Interfaces;
+using syncer.core.Models;
+
+namespace syncer.core.Data
+{
+    /// <summary>
+    /// JSON-based data repository implementation
+    /// </summary>
+    public class JsonDataRepository : IDataRepository
+    {
+        private readonly string _dataDirectory;
+        private readonly string _jobsFile;
+        private readonly string _connectionFile;
+        private readonly string _filtersFile;
+        private readonly string _settingsFile;
+        private readonly object _lockObject = new object();
+
+        public JsonDataRepository(string? dataDirectory = null)
+        {
+            _dataDirectory = dataDirectory ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
+                "DataSyncer", "Data");
+            
+            _jobsFile = Path.Combine(_dataDirectory, "jobs.json");
+            _connectionFile = Path.Combine(_dataDirectory, "connection.json");
+            _filtersFile = Path.Combine(_dataDirectory, "filters.json");
+            _settingsFile = Path.Combine(_dataDirectory, "settings.json");
+
+            EnsureDirectoryExists();
+        }
+
+        private void EnsureDirectoryExists()
+        {
+            if (!Directory.Exists(_dataDirectory))
+                Directory.CreateDirectory(_dataDirectory);
+        }
+
+        #region Sync Jobs
+
+        public List<SyncJobModel> GetAllJobs()
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    if (!File.Exists(_jobsFile))
+                        return new List<SyncJobModel>();
+
+                    var json = File.ReadAllText(_jobsFile);
+                    var jobs = JsonConvert.DeserializeObject<List<SyncJobModel>>(json);
+                    return jobs ?? new List<SyncJobModel>();
+                }
+                catch (Exception ex)
+                {
+                    // Log error if logging service is available
+                    System.Diagnostics.Debug.WriteLine($"Error loading jobs: {ex.Message}");
+                    return new List<SyncJobModel>();
+                }
+            }
+        }
+
+        public SyncJobModel? GetJobById(int id)
+        {
+            return GetAllJobs().FirstOrDefault(j => j.Id == id);
+        }
+
+        public int SaveJob(SyncJobModel job)
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    var jobs = GetAllJobs();
+                    
+                    if (job.Id == 0)
+                    {
+                        // New job - assign ID
+                        job.Id = jobs.Count > 0 ? jobs.Max(j => j.Id) + 1 : 1;
+                        job.CreatedDate = DateTime.Now;
+                        jobs.Add(job);
+                    }
+                    else
+                    {
+                        // Update existing job
+                        var existingIndex = jobs.FindIndex(j => j.Id == job.Id);
+                        if (existingIndex >= 0)
+                        {
+                            // Preserve creation date
+                            job.CreatedDate = jobs[existingIndex].CreatedDate;
+                            jobs[existingIndex] = job;
+                        }
+                        else
+                        {
+                            jobs.Add(job);
+                        }
+                    }
+
+                    SaveJobsToFile(jobs);
+                    return job.Id;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error saving job: {ex.Message}");
+                    return 0;
+                }
+            }
+        }
+
+        public bool DeleteJob(int id)
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    var jobs = GetAllJobs();
+                    var jobToRemove = jobs.FirstOrDefault(j => j.Id == id);
+                    
+                    if (jobToRemove != null)
+                    {
+                        jobs.Remove(jobToRemove);
+                        SaveJobsToFile(jobs);
+                        return true;
+                    }
+                    
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error deleting job: {ex.Message}");
+                    return false;
+                }
+            }
+        }
+
+        private void SaveJobsToFile(List<SyncJobModel> jobs)
+        {
+            var json = JsonConvert.SerializeObject(jobs, Formatting.Indented);
+            File.WriteAllText(_jobsFile, json);
+        }
+
+        #endregion
+
+        #region Configuration
+
+        public ConnectionSettingsModel GetConnectionSettings()
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    if (!File.Exists(_connectionFile))
+                        return new ConnectionSettingsModel();
+
+                    var json = File.ReadAllText(_connectionFile);
+                    var settings = JsonConvert.DeserializeObject<ConnectionSettingsModel>(json);
+                    return settings ?? new ConnectionSettingsModel();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading connection settings: {ex.Message}");
+                    return new ConnectionSettingsModel();
+                }
+            }
+        }
+
+        public bool SaveConnectionSettings(ConnectionSettingsModel settings)
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
+                    File.WriteAllText(_connectionFile, json);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error saving connection settings: {ex.Message}");
+                    return false;
+                }
+            }
+        }
+
+        public FilterSettingsModel GetFilterSettings()
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    if (!File.Exists(_filtersFile))
+                        return new FilterSettingsModel();
+
+                    var json = File.ReadAllText(_filtersFile);
+                    var settings = JsonConvert.DeserializeObject<FilterSettingsModel>(json);
+                    return settings ?? new FilterSettingsModel();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading filter settings: {ex.Message}");
+                    return new FilterSettingsModel();
+                }
+            }
+        }
+
+        public bool SaveFilterSettings(FilterSettingsModel settings)
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
+                    File.WriteAllText(_filtersFile, json);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error saving filter settings: {ex.Message}");
+                    return false;
+                }
+            }
+        }
+
+        #endregion
+
+        #region Settings
+
+        public T GetSetting<T>(string key, T defaultValue = default(T))
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    var settings = LoadSettings();
+                    if (settings.ContainsKey(key))
+                    {
+                        if (typeof(T) == typeof(string))
+                            return (T)(object)settings[key].ToString()!;
+                        
+                        var jsonValue = settings[key].ToString();
+                        return JsonConvert.DeserializeObject<T>(jsonValue!) ?? defaultValue;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error getting setting '{key}': {ex.Message}");
+                }
+                
+                return defaultValue;
+            }
+        }
+
+        public bool SaveSetting<T>(string key, T value)
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    var settings = LoadSettings();
+                    settings[key] = value;
+                    SaveSettings(settings);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error saving setting '{key}': {ex.Message}");
+                    return false;
+                }
+            }
+        }
+
+        public bool DeleteSetting(string key)
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    var settings = LoadSettings();
+                    if (settings.Remove(key))
+                    {
+                        SaveSettings(settings);
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error deleting setting '{key}': {ex.Message}");
+                }
+                
+                return false;
+            }
+        }
+
+        private Dictionary<string, object> LoadSettings()
+        {
+            try
+            {
+                if (!File.Exists(_settingsFile))
+                    return new Dictionary<string, object>();
+
+                var json = File.ReadAllText(_settingsFile);
+                return JsonConvert.DeserializeObject<Dictionary<string, object>>(json) ?? 
+                       new Dictionary<string, object>();
+            }
+            catch
+            {
+                return new Dictionary<string, object>();
+            }
+        }
+
+        private void SaveSettings(Dictionary<string, object> settings)
+        {
+            var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
+            File.WriteAllText(_settingsFile, json);
+        }
+
+        #endregion
+
+        #region Backup and Restore
+
+        public bool BackupData(string backupPath)
+        {
+            try
+            {
+                var backupDir = Path.GetDirectoryName(backupPath);
+                if (backupDir != null && !Directory.Exists(backupDir))
+                    Directory.CreateDirectory(backupDir);
+
+                var backupData = new
+                {
+                    Jobs = GetAllJobs(),
+                    ConnectionSettings = GetConnectionSettings(),
+                    FilterSettings = GetFilterSettings(),
+                    Settings = LoadSettings(),
+                    BackupDate = DateTime.Now,
+                    Version = "1.0"
+                };
+
+                var json = JsonConvert.SerializeObject(backupData, Formatting.Indented);
+                File.WriteAllText(backupPath, json);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error creating backup: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool RestoreData(string backupPath)
+        {
+            lock (_lockObject)
+            {
+                try
+                {
+                    if (!File.Exists(backupPath))
+                        return false;
+
+                    var json = File.ReadAllText(backupPath);
+                    dynamic? backupData = JsonConvert.DeserializeObject(json);
+                    
+                    if (backupData?.Jobs != null)
+                    {
+                        var jobs = JsonConvert.DeserializeObject<List<SyncJobModel>>(
+                            backupData.Jobs.ToString());
+                        if (jobs != null)
+                            SaveJobsToFile(jobs);
+                    }
+
+                    if (backupData?.ConnectionSettings != null)
+                    {
+                        var connectionSettings = JsonConvert.DeserializeObject<ConnectionSettingsModel>(
+                            backupData.ConnectionSettings.ToString());
+                        if (connectionSettings != null)
+                            SaveConnectionSettings(connectionSettings);
+                    }
+
+                    if (backupData?.FilterSettings != null)
+                    {
+                        var filterSettings = JsonConvert.DeserializeObject<FilterSettingsModel>(
+                            backupData.FilterSettings.ToString());
+                        if (filterSettings != null)
+                            SaveFilterSettings(filterSettings);
+                    }
+
+                    if (backupData?.Settings != null)
+                    {
+                        var settings = JsonConvert.DeserializeObject<Dictionary<string, object>>(
+                            backupData.Settings.ToString());
+                        if (settings != null)
+                            SaveSettings(settings);
+                    }
+
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error restoring backup: {ex.Message}");
+                    return false;
+                }
+            }
+        }
+
+        #endregion
+    }
+}

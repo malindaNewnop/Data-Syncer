@@ -1,0 +1,337 @@
+﻿using System;
+using System.Diagnostics;
+using System.ServiceProcess;
+
+namespace syncer.core.Services
+{
+    /// <summary>
+    /// Enhanced Windows Service Manager for DataSyncer service
+    /// </summary>
+    public class WindowsServiceManager
+    {
+        private const string SERVICE_NAME = "DataSyncerService";
+        private readonly ILoggingService _loggingService;
+
+        public WindowsServiceManager(ILoggingService loggingService)
+        {
+            _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
+        }
+
+        public bool StartService()
+        {
+            try
+            {
+                using (var serviceController = new ServiceController(SERVICE_NAME))
+                {
+                    serviceController.Refresh();
+                    
+                    if (serviceController.Status == ServiceControllerStatus.Stopped)
+                    {
+                        _loggingService.LogInfo($"Starting {SERVICE_NAME}...");
+                        serviceController.Start();
+                        serviceController.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
+                        _loggingService.LogInfo($"{SERVICE_NAME} started successfully");
+                        return true;
+                    }
+                    else if (serviceController.Status == ServiceControllerStatus.Running)
+                    {
+                        _loggingService.LogInfo($"{SERVICE_NAME} is already running");
+                        return true;
+                    }
+                    else
+                    {
+                        _loggingService.LogWarning($"{SERVICE_NAME} is in {serviceController.Status} state");
+                        return false;
+                    }
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                _loggingService.LogError($"Service '{SERVICE_NAME}' not found or not accessible: {ex.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error starting {SERVICE_NAME}: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool StopService()
+        {
+            try
+            {
+                using (var serviceController = new ServiceController(SERVICE_NAME))
+                {
+                    serviceController.Refresh();
+                    
+                    if (serviceController.Status == ServiceControllerStatus.Running)
+                    {
+                        _loggingService.LogInfo($"Stopping {SERVICE_NAME}...");
+                        serviceController.Stop();
+                        serviceController.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
+                        _loggingService.LogInfo($"{SERVICE_NAME} stopped successfully");
+                        return true;
+                    }
+                    else if (serviceController.Status == ServiceControllerStatus.Stopped)
+                    {
+                        _loggingService.LogInfo($"{SERVICE_NAME} is already stopped");
+                        return true;
+                    }
+                    else
+                    {
+                        _loggingService.LogWarning($"{SERVICE_NAME} is in {serviceController.Status} state");
+                        return false;
+                    }
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                _loggingService.LogError($"Service '{SERVICE_NAME}' not found or not accessible: {ex.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error stopping {SERVICE_NAME}: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool IsServiceRunning()
+        {
+            try
+            {
+                using (var serviceController = new ServiceController(SERVICE_NAME))
+                {
+                    serviceController.Refresh();
+                    return serviceController.Status == ServiceControllerStatus.Running;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public string GetServiceStatus()
+        {
+            try
+            {
+                using (var serviceController = new ServiceController(SERVICE_NAME))
+                {
+                    serviceController.Refresh();
+                    return serviceController.Status switch
+                    {
+                        ServiceControllerStatus.Running => "Running",
+                        ServiceControllerStatus.Stopped => "Stopped",
+                        ServiceControllerStatus.StartPending => "Starting",
+                        ServiceControllerStatus.StopPending => "Stopping",
+                        ServiceControllerStatus.Paused => "Paused",
+                        ServiceControllerStatus.PausePending => "Pausing",
+                        ServiceControllerStatus.ContinuePending => "Resuming",
+                        _ => serviceController.Status.ToString()
+                    };
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                return "Not Installed";
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error getting service status: {ex.Message}");
+                return "Unknown";
+            }
+        }
+
+        public bool IsServiceInstalled()
+        {
+            try
+            {
+                using (var serviceController = new ServiceController(SERVICE_NAME))
+                {
+                    serviceController.Refresh();
+                    return true;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public bool InstallService(string serviceExecutablePath)
+        {
+            try
+            {
+                if (IsServiceInstalled())
+                {
+                    _loggingService.LogInfo($"{SERVICE_NAME} is already installed");
+                    return true;
+                }
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "sc",
+                    Arguments = $"create \"{SERVICE_NAME}\" binPath= \"{serviceExecutablePath}\" start= auto",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = Process.Start(startInfo))
+                {
+                    if (process != null)
+                    {
+                        process.WaitForExit();
+                        if (process.ExitCode == 0)
+                        {
+                            _loggingService.LogInfo($"{SERVICE_NAME} installed successfully");
+                            return true;
+                        }
+                        else
+                        {
+                            var error = process.StandardError.ReadToEnd();
+                            _loggingService.LogError($"Failed to install {SERVICE_NAME}: {error}");
+                            return false;
+                        }
+                    }
+                }
+                
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error installing {SERVICE_NAME}: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool UninstallService()
+        {
+            try
+            {
+                if (!IsServiceInstalled())
+                {
+                    _loggingService.LogInfo($"{SERVICE_NAME} is not installed");
+                    return true;
+                }
+
+                // Stop service first
+                if (IsServiceRunning())
+                {
+                    StopService();
+                }
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "sc",
+                    Arguments = $"delete \"{SERVICE_NAME}\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = Process.Start(startInfo))
+                {
+                    if (process != null)
+                    {
+                        process.WaitForExit();
+                        if (process.ExitCode == 0)
+                        {
+                            _loggingService.LogInfo($"{SERVICE_NAME} uninstalled successfully");
+                            return true;
+                        }
+                        else
+                        {
+                            var error = process.StandardError.ReadToEnd();
+                            _loggingService.LogError($"Failed to uninstall {SERVICE_NAME}: {error}");
+                            return false;
+                        }
+                    }
+                }
+                
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error uninstalling {SERVICE_NAME}: {ex.Message}");
+                return false;
+            }
+        }
+
+        public ServiceInfo GetServiceInfo()
+        {
+            try
+            {
+                using (var serviceController = new ServiceController(SERVICE_NAME))
+                {
+                    serviceController.Refresh();
+                    return new ServiceInfo
+                    {
+                        ServiceName = serviceController.ServiceName,
+                        DisplayName = serviceController.DisplayName,
+                        Status = serviceController.Status.ToString(),
+                        StartType = GetStartType(serviceController),
+                        IsInstalled = true
+                    };
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                return new ServiceInfo
+                {
+                    ServiceName = SERVICE_NAME,
+                    DisplayName = "DataSyncer Service",
+                    Status = "Not Installed",
+                    StartType = "Unknown",
+                    IsInstalled = false
+                };
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Error getting service info: {ex.Message}");
+                return new ServiceInfo
+                {
+                    ServiceName = SERVICE_NAME,
+                    DisplayName = "DataSyncer Service",
+                    Status = "Error",
+                    StartType = "Unknown",
+                    IsInstalled = false
+                };
+            }
+        }
+
+        private string GetStartType(ServiceController serviceController)
+        {
+            try
+            {
+                // This is a simplified approach - in a full implementation,
+                // you'd query the registry or use WMI for precise start type
+                return "Automatic";
+            }
+            catch
+            {
+                return "Unknown";
+            }
+        }
+    }
+
+    /// <summary>
+    /// Information about the Windows service
+    /// </summary>
+    public class ServiceInfo
+    {
+        public string ServiceName { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string StartType { get; set; } = string.Empty;
+        public bool IsInstalled { get; set; }
+    }
+}
