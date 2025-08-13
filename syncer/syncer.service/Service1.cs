@@ -60,13 +60,13 @@ namespace syncer.service
                 for (int i = 0; i < jobs.Count; i++)
                 {
                     Core.SyncJob job = jobs[i];
-                    if (!job.Enabled) continue;
+                    if (!job.IsEnabled) continue;
                     if (!IsDue(job, now)) continue;
 
                     try
                     {
                         int count; string error;
-                        bool ok = _runner.Run(job, out count, out error);
+                        bool ok = _runner.RunJob(job, out count, out error);
                         job.LastRun = now;
                         if (ok) _log.Info("Job completed, files transferred: " + count, job.Name);
                         else _log.Warning("Job finished with errors: " + error, job.Name);

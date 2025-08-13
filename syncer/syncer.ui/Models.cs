@@ -14,8 +14,8 @@ namespace syncer.ui
         public string DestinationPath { get; set; }
         public DateTime StartTime { get; set; }
         public int IntervalValue { get; set; }
-        public string IntervalType { get; set; } // Minutes, Hours, Days
-        public string TransferMode { get; set; } // Copy, Sync, Move
+        public string IntervalType { get; set; } 
+        public string TransferMode { get; set; } 
         public DateTime? LastRun { get; set; }
         public string LastStatus { get; set; }
         public DateTime CreatedDate { get; set; }

@@ -63,8 +63,8 @@ namespace syncer.core
 
                 result.EndTime = DateTime.Now;
                 result.Duration = result.EndTime - result.StartTime;
-                result.Status = _cancellationRequested ?
-                    TransferStatus.Cancelled :
+                result.Status = _cancellationRequested ? 
+                    TransferStatus.Cancelled : 
                     (result.FailedFiles > 0 ? TransferStatus.CompletedWithErrors : TransferStatus.Completed);
 
                 _logService.LogJobEnd(job.Id, result.Status.ToString(), result.ProcessedFiles, result.FailedFiles);
@@ -132,7 +132,7 @@ namespace syncer.core
                 var client = _transferClientFactory.Create(job.Connection.Protocol);
                 string error;
                 System.Collections.Generic.List<string> remoteFiles;
-
+                
                 if (client.ListFiles(job.Connection, job.SourcePath, out remoteFiles, out error))
                 {
                     files.AddRange(remoteFiles);
@@ -149,10 +149,10 @@ namespace syncer.core
         private void ProcessFile(SyncJob job, string sourceFile, TransferResult result)
         {
             var destinationFile = System.IO.Path.Combine(job.DestinationPath, System.IO.Path.GetFileName(sourceFile));
-
-            OnFileTransferStarted(new FileTransferEventArgs
-            {
-                SourcePath = sourceFile,
+            
+            OnFileTransferStarted(new FileTransferEventArgs 
+            { 
+                SourcePath = sourceFile, 
                 DestinationPath = destinationFile,
                 Job = job
             });
@@ -188,9 +188,9 @@ namespace syncer.core
 
                 _logService.LogTransfer(job.Id, sourceFile, destinationFile, true, null);
 
-                OnFileTransferCompleted(new FileTransferEventArgs
-                {
-                    SourcePath = sourceFile,
+                OnFileTransferCompleted(new FileTransferEventArgs 
+                { 
+                    SourcePath = sourceFile, 
                     DestinationPath = destinationFile,
                     Job = job,
                     Success = true
@@ -200,9 +200,9 @@ namespace syncer.core
             {
                 _logService.LogTransfer(job.Id, sourceFile, destinationFile, false, ex.Message);
 
-                OnFileTransferCompleted(new FileTransferEventArgs
-                {
-                    SourcePath = sourceFile,
+                OnFileTransferCompleted(new FileTransferEventArgs 
+                { 
+                    SourcePath = sourceFile, 
                     DestinationPath = destinationFile,
                     Job = job,
                     Success = false,

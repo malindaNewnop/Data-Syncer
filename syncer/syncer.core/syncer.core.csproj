@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>7c947708-102e-486e-8c63-933c6b215fd3</ProjectGuid>
+    <ProjectGuid>{7C947708-102E-486E-8C63-933C6B215FD3}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>syncer.core</RootNamespace>
@@ -35,20 +35,32 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
+    <Reference Include="System.Configuration" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Core\Interfaces.cs" />
-    <Compile Include="Core\Models.cs" />
-    <Compile Include="Core\Paths.cs" />
-    <Compile Include="Services\FileEnumerator.cs" />
-    <Compile Include="Services\FileLogService.cs" />
-    <Compile Include="Services\JobRunner.cs" />
-    <Compile Include="Services\PreviewService.cs" />
-    <Compile Include="Services\XmlJobRepository.cs" />
-    <Compile Include="Transfers\FtpTransferClient.cs" />
-    <Compile Include="Transfers\LocalTransferClient.cs" />
-    <Compile Include="Transfers\TransferClientFactory.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Core\Models.cs" />
+    <Compile Include="Core\Interfaces.cs" />
+    <Compile Include="Core\Paths.cs" />
+    <Compile Include="Core\StringExtensions.cs" />
+    <Compile Include="Services\XmlJobRepository.cs" />
+    <Compile Include="Services\FileLogService.cs" />
+    <Compile Include="Services\FileEnumerator.cs" />
+    <Compile Include="Services\PreviewService.cs" />
+    <Compile Include="Services\JobRunner.cs" />
+    <Compile Include="Services\JobScheduler.cs" />
+    <Compile Include="Services\PipeServer.cs" />
+    <Compile Include="Services\PipeClient.cs" />
+    <Compile Include="Services\SettingsService.cs" />
+    <Compile Include="Transfers\LocalTransferClient.cs" />
+    <Compile Include="Transfers\FtpTransferClient.cs" />
+    <Compile Include="Transfers\SftpTransferClient.cs" />
+    <Compile Include="Transfers\TransferClientFactory.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Core\" />
+    <Folder Include="Services\" />
+    <Folder Include="Transfers\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
- </Project>
+</Project>

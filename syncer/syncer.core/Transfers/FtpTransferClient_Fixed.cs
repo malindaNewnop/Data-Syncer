@@ -25,7 +25,7 @@ namespace syncer.core
                 var request = CreateFtpRequest(settings, "/", WebRequestMethods.Ftp.ListDirectory);
                 using (var response = (FtpWebResponse)request.GetResponse())
                 {
-                    return response.StatusCode == FtpStatusCode.OpeningData ||
+                    return response.StatusCode == FtpStatusCode.OpeningData || 
                            response.StatusCode == FtpStatusCode.DataAlreadyOpen;
                 }
             }
@@ -135,7 +135,7 @@ namespace syncer.core
 
                 using (var response = (FtpWebResponse)request.GetResponse())
                 {
-                    return response.StatusCode == FtpStatusCode.ClosingData ||
+                    return response.StatusCode == FtpStatusCode.ClosingData || 
                            response.StatusCode == FtpStatusCode.FileActionOK;
                 }
             }
@@ -269,7 +269,7 @@ namespace syncer.core
                     string line;
                     while ((line = reader.ReadLine()) != null)
                     {
-                        if (!string.IsNullOrEmpty(line) && line.Trim().Length > 0)
+                                                if (!StringExtensions.IsNullOrWhiteSpace(line))
                         {
                             // Simple file listing - in real implementation you might want to parse detailed listing
                             files.Add(line.Trim());
