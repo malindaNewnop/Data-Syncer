@@ -168,6 +168,16 @@ namespace syncer.ui.Services
         public LogService()
         {
             InitializeLogTable();
+            LoadSampleData();
+        }
+
+        private void LoadSampleData()
+        {
+            // Add some sample log entries for testing
+            _logsTable.Rows.Add(DateTime.Now.AddMinutes(-10), "INFO", "File Sync Job", "document.pdf", "Success", "File transferred successfully");
+            _logsTable.Rows.Add(DateTime.Now.AddMinutes(-8), "WARNING", "Backup Job", "data.xml", "Retry", "Connection timeout, retrying...");
+            _logsTable.Rows.Add(DateTime.Now.AddMinutes(-5), "ERROR", "Upload Task", "image.jpg", "Failed", "Authentication failed");
+            _logsTable.Rows.Add(DateTime.Now.AddMinutes(-2), "INFO", "Cleanup Job", "", "Success", "Temporary files cleaned");
         }
 
         private void InitializeLogTable()

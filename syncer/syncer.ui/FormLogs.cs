@@ -19,7 +19,20 @@ namespace syncer.ui
 
         private void InitializeServices()
         {
-            _logService = ServiceLocator.LogService;
+            try
+            {
+                _logService = ServiceLocator.LogService;
+                if (_logService == null)
+                {
+                    throw new InvalidOperationException("LogService is not available from ServiceLocator");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error initializing services: " + ex.Message, "Error",
+                              MessageBoxButtons.OK, MessageBoxIcon.Error);
+                throw; // Re-throw to prevent further execution with null service
+            }
         }
 
         private void InitializeCustomComponents()
@@ -29,51 +42,198 @@ namespace syncer.ui
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.Sizable;
 
+            // Set default value for log level combo box
+            if (cmbLogLevel != null && cmbLogLevel.Items.Count > 0)
+            {
+                cmbLogLevel.SelectedIndex = 0; // Select "All" by default
+            }
+
             InitializeLogData();
-            LoadLogs();
         }
 
         private void InitializeLogData()
         {
-            // Get logs from service instead of creating hardcoded data
-            _logsDataTable = _logService.GetLogs();
-
-            // Bind to DataGridView
-            if (dgvLogs != null)
+            try
             {
-                dgvLogs.DataSource = _logsDataTable;
+                // Ensure LogService is available
+                if (_logService == null)
+                {
+                    MessageBox.Show("Log service is not available.", "Error",
+                                  MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
 
-                // Configure columns
-                ConfigureLogColumns();
+                // Get logs from service (UI interface doesn't need parameters)
+                _logsDataTable = _logService.GetLogs();
+
+                // Bind to DataGridView
+                if (dgvLogs != null && _logsDataTable != null)
+                {
+                    dgvLogs.DataSource = _logsDataTable;
+
+                    // Use a timer to configure columns after a short delay
+                    var timer = new Timer();
+                    timer.Interval = 100; // 100ms delay
+                    timer.Tick += (s, timerArgs) => {
+                        timer.Stop();
+                        timer.Dispose();
+                        ConfigureLogColumns();
+                    };
+                    timer.Start();
+
+                    // Force the DataGridView to process the data binding
+                    dgvLogs.Refresh();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error initializing log data: " + ex.Message, "Error",
+                              MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // Use UI interface method
+                if (_logService != null)
+                {
+                    _logService.LogError("Error initializing log data in FormLogs: " + ex.Message, "UI");
+                }
             }
         }
 
         private void ConfigureLogColumns()
         {
-            if (dgvLogs != null && dgvLogs.Columns != null)
+            try
             {
-                if (dgvLogs.Columns["DateTime"] != null)
+                if (dgvLogs == null || dgvLogs.Columns == null || dgvLogs.Columns.Count == 0)
                 {
-                    dgvLogs.Columns["DateTime"].HeaderText = "Date/Time";
-                    dgvLogs.Columns["DateTime"].Width = 130;
+                    return;
                 }
 
-                if (dgvLogs.Columns["Level"] != null)
-                    dgvLogs.Columns["Level"].Width = 70;
+                // Add a small delay to ensure DataGridView has fully processed the binding
+                Application.DoEvents();
 
-                if (dgvLogs.Columns["Job"] != null)
-                    dgvLogs.Columns["Job"].Width = 100;
+                // Use actual column names from UI LogService
+                // Columns: DateTime, Level, Job, File, Status, Message
 
-                if (dgvLogs.Columns["File"] != null)
-                    dgvLogs.Columns["File"].Width = 200;
-
-                if (dgvLogs.Columns["Status"] != null)
-                    dgvLogs.Columns["Status"].Width = 80;
-
-                if (dgvLogs.Columns["Message"] != null)
+                // Configure DateTime column
+                try
                 {
-                    dgvLogs.Columns["Message"].Width = 250;
-                    dgvLogs.Columns["Message"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                    if (dgvLogs.Columns.Contains("DateTime"))
+                    {
+                        var dateTimeColumn = dgvLogs.Columns["DateTime"];
+                        if (dateTimeColumn != null)
+                        {
+                            dateTimeColumn.HeaderText = "Date/Time";
+                            dateTimeColumn.Width = 150;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_logService != null)
+                        _logService.LogError("Error configuring DateTime column: " + ex.Message, "UI");
+                }
+
+                // Configure Level column
+                try
+                {
+                    if (dgvLogs.Columns.Contains("Level"))
+                    {
+                        var levelColumn = dgvLogs.Columns["Level"];
+                        if (levelColumn != null)
+                        {
+                            levelColumn.Width = 70;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_logService != null)
+                        _logService.LogError("Error configuring Level column: " + ex.Message, "UI");
+                }
+
+                // Configure Job column
+                try
+                {
+                    if (dgvLogs.Columns.Contains("Job"))
+                    {
+                        var jobColumn = dgvLogs.Columns["Job"];
+                        if (jobColumn != null)
+                        {
+                            jobColumn.HeaderText = "Job";
+                            jobColumn.Width = 100;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_logService != null)
+                        _logService.LogError("Error configuring Job column: " + ex.Message, "UI");
+                }
+
+                // Configure File column
+                try
+                {
+                    if (dgvLogs.Columns.Contains("File"))
+                    {
+                        var fileColumn = dgvLogs.Columns["File"];
+                        if (fileColumn != null)
+                        {
+                            fileColumn.HeaderText = "File";
+                            fileColumn.Width = 200;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_logService != null)
+                        _logService.LogError("Error configuring File column: " + ex.Message, "UI");
+                }
+
+                // Configure Status column
+                try
+                {
+                    if (dgvLogs.Columns.Contains("Status"))
+                    {
+                        var statusColumn = dgvLogs.Columns["Status"];
+                        if (statusColumn != null)
+                        {
+                            statusColumn.Width = 80;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_logService != null)
+                        _logService.LogError("Error configuring Status column: " + ex.Message, "UI");
+                }
+
+                // Configure Message column with extra safety
+                try
+                {
+                    if (dgvLogs.Columns.Contains("Message"))
+                    {
+                        var messageColumn = dgvLogs.Columns["Message"];
+                        if (messageColumn != null)
+                        {
+                            messageColumn.Width = 250;
+                            // Extra safety check before setting AutoSizeMode
+                            if (messageColumn != null && dgvLogs.IsHandleCreated)
+                            {
+                                messageColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_logService != null)
+                        _logService.LogError("Error configuring Message column: " + ex.Message, "UI");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't show a message box to avoid spamming the user
+                if (_logService != null)
+                {
+                    _logService.LogError("Error configuring log columns: " + ex.Message, "UI");
                 }
             }
         }
@@ -82,13 +242,32 @@ namespace syncer.ui
         {
             try
             {
-                // Load logs from service
+                if (_logService == null)
+                {
+                    MessageBox.Show("Log service is not initialized.", "Error",
+                                  MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                // Load logs from service (UI interface)
                 _logsDataTable = _logService.GetLogs();
 
-                if (dgvLogs != null)
+                if (dgvLogs != null && _logsDataTable != null)
                 {
                     dgvLogs.DataSource = _logsDataTable;
-                    ConfigureLogColumns();
+
+                    // Use a timer to configure columns after a short delay
+                    var timer = new Timer();
+                    timer.Interval = 100; // 100ms delay
+                    timer.Tick += (s, timerArgs) => {
+                        timer.Stop();
+                        timer.Dispose();
+                        ConfigureLogColumns();
+                    };
+                    timer.Start();
+
+                    // Force the DataGridView to process the data binding
+                    dgvLogs.Refresh();
                 }
 
                 UpdateLogCount();
@@ -97,7 +276,11 @@ namespace syncer.ui
             {
                 MessageBox.Show("Error loading logs: " + ex.Message, "Error",
                               MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService.LogError("Error loading logs in FormLogs: " + ex.Message);
+                // Use UI interface method
+                if (_logService != null)
+                {
+                    _logService.LogError("Error loading logs in FormLogs: " + ex.Message, "UI");
+                }
             }
         }
 
@@ -126,7 +309,8 @@ namespace syncer.ui
                 }
                 else
                 {
-                    // Apply filter
+                    // Apply filter - use correct column names from UI LogService
+                    // Columns: DateTime, Level, Job, File, Status, Message
                     string safe = searchText.Replace("'", "''");
                     string filter = "Job LIKE '%" + safe + "%' OR File LIKE '%" + safe + "%' OR Message LIKE '%" + safe + "%'";
                     DataTable dt = dgvLogs != null ? dgvLogs.DataSource as DataTable : null;
@@ -176,18 +360,11 @@ namespace syncer.ui
             {
                 try
                 {
-                    if (_logService.ClearLogs())
-                    {
-                        LoadLogs(); // Refresh the display
-                        MessageBox.Show("Logs cleared successfully.", "Success",
-                                      MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        ServiceLocator.LogService.LogInfo("Log history cleared by user");
-                    }
-                    else
-                    {
-                        MessageBox.Show("Failed to clear logs.", "Error",
-                                      MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
+                    _logService.ClearLogs(); // Use the UI interface method
+                    LoadLogs(); // Refresh the display
+                    MessageBox.Show("Logs cleared successfully.", "Success",
+                                  MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    _logService.LogInfo("Log history cleared by user", "UI");
                 }
                 catch (Exception ex)
                 {
@@ -209,11 +386,12 @@ namespace syncer.ui
                 {
                     try
                     {
+                        // Use UI interface export method
                         if (_logService.ExportLogs(dialog.FileName))
                         {
                             MessageBox.Show("Logs exported successfully to:\n" + dialog.FileName, "Export Complete",
                                           MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            ServiceLocator.LogService.LogInfo("Logs exported to: " + dialog.FileName);
+                            _logService.LogInfo("Logs exported to: " + dialog.FileName, "UI");
                         }
                         else
                         {
@@ -225,7 +403,7 @@ namespace syncer.ui
                     {
                         MessageBox.Show("Error exporting logs: " + ex.Message, "Export Error",
                                       MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        ServiceLocator.LogService.LogError("Error exporting logs: " + ex.Message);
+                        _logService.LogError("Error exporting logs: " + ex.Message, "UI");
                     }
                 }
             }
@@ -235,27 +413,42 @@ namespace syncer.ui
         {
             try
             {
+                if (_logService == null)
+                {
+                    return;
+                }
+
                 string selectedLevel = (cmbLogLevel != null && cmbLogLevel.SelectedItem != null) ? cmbLogLevel.SelectedItem.ToString() : null;
 
                 if (StringExtensions.IsNullOrWhiteSpace(selectedLevel) || selectedLevel == "All")
                 {
-                    // Load all logs
+                    // Load all logs using UI interface
                     _logsDataTable = _logService.GetLogs();
                 }
                 else
                 {
-                    // Filter by log level
-                    DataTable dt = dgvLogs != null ? dgvLogs.DataSource as DataTable : null;
-                    if (dt != null)
-                    {
-                        dt.DefaultView.RowFilter = "Level = '" + selectedLevel.Replace("'", "''") + "'";
-                    }
+                    // Filter by log level using UI interface
+                    DateTime? from = DateTime.Now.AddDays(-30);
+                    DateTime? to = DateTime.Now;
+                    _logsDataTable = _logService.GetLogs(from, to, selectedLevel);
                 }
 
-                if (dgvLogs != null)
+                if (dgvLogs != null && _logsDataTable != null)
                 {
                     dgvLogs.DataSource = _logsDataTable;
-                    ConfigureLogColumns();
+
+                    // Use a timer to configure columns after a short delay
+                    var timer = new Timer();
+                    timer.Interval = 100; // 100ms delay
+                    timer.Tick += (s, timerArgs) => {
+                        timer.Stop();
+                        timer.Dispose();
+                        ConfigureLogColumns();
+                    };
+                    timer.Start();
+
+                    // Force the DataGridView to process the data binding
+                    dgvLogs.Refresh();
                 }
 
                 UpdateLogCount();
