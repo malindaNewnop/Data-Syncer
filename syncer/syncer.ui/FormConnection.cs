@@ -150,13 +150,13 @@ namespace syncer.ui
                 }
                 return true;
             }
-            if (StringExtensions.IsNullOrWhiteSpace(txtHost != null ? txtHost.Text : null))
+            if (UIStringExtensions.IsNullOrWhiteSpace(txtHost != null ? txtHost.Text : null))
             {
                 MessageBox.Show("Please enter a host address.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 if (txtHost != null) txtHost.Focus();
                 return false;
             }
-            if (StringExtensions.IsNullOrWhiteSpace(txtPort != null ? txtPort.Text : null))
+            if (UIStringExtensions.IsNullOrWhiteSpace(txtPort != null ? txtPort.Text : null))
             {
                 MessageBox.Show("Please enter a port number.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 if (txtPort != null) txtPort.Focus();
@@ -168,7 +168,7 @@ namespace syncer.ui
                 if (txtPort != null) txtPort.Focus();
                 return false;
             }
-            if (StringExtensions.IsNullOrWhiteSpace(txtUsername != null ? txtUsername.Text : null))
+            if (UIStringExtensions.IsNullOrWhiteSpace(txtUsername != null ? txtUsername.Text : null))
             {
                 MessageBox.Show("Please enter a username.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 if (txtUsername != null) txtUsername.Focus();

@@ -12,16 +12,32 @@ namespace syncer.ui
 
         public FormMain()
         {
-            InitializeComponent();
-            InitializeServices();
-            InitializeCustomComponents();
+            try
+            {
+                InitializeComponent();
+                InitializeServices();
+                InitializeCustomComponents();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error initializing main form: " + ex.Message + "\n\nThe application may not function correctly.",
+                    "Initialization Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void InitializeServices()
         {
-            _jobService = ServiceLocator.SyncJobService;
-            _serviceManager = ServiceLocator.ServiceManager;
-            _connectionService = ServiceLocator.ConnectionService;
+            try
+            {
+                _jobService = ServiceLocator.SyncJobService;
+                _serviceManager = ServiceLocator.ServiceManager;
+                _connectionService = ServiceLocator.ConnectionService;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to initialize services: " + ex.Message + "\n\nSome functionality may be limited.",
+                    "Service Initialization Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private void InitializeCustomComponents()
@@ -57,32 +73,51 @@ namespace syncer.ui
 
         private void UpdateServiceStatus()
         {
-            string status = _serviceManager.GetServiceStatus();
-            lblServiceStatus.Text = "Service: " + status;
-            lblServiceStatus.ForeColor = status == "Running" ? Color.Green : Color.Red;
-            if (status == "Running")
+            try
             {
-                btnStartStop.Text = "Stop Service";
-                btnStartStop.BackColor = Color.LightCoral;
+                string status = _serviceManager != null ? _serviceManager.GetServiceStatus() : "Unknown";
+                lblServiceStatus.Text = "Service: " + status;
+                lblServiceStatus.ForeColor = status == "Running" ? Color.Green : Color.Red;
+                if (status == "Running")
+                {
+                    btnStartStop.Text = "Stop Service";
+                    btnStartStop.BackColor = Color.LightCoral;
+                }
+                else
+                {
+                    btnStartStop.Text = "Start Service";
+                    btnStartStop.BackColor = Color.LightGreen;
+                }
             }
-            else
+            catch (Exception)
             {
+                lblServiceStatus.Text = "Service: Unknown";
+                lblServiceStatus.ForeColor = Color.Gray;
                 btnStartStop.Text = "Start Service";
-                btnStartStop.BackColor = Color.LightGreen;
+                btnStartStop.BackColor = Color.LightGray;
+                btnStartStop.Enabled = false;
             }
         }
 
         private void UpdateConnectionStatus()
         {
-            bool isConnected = _connectionService.IsConnected();
-            ConnectionSettings connectionSettings = _connectionService.GetConnectionSettings();
-            string status = isConnected ? "Connected (" + (connectionSettings != null ? connectionSettings.ConnectionTypeDisplay : "Unknown") + ")" : "Disconnected";
-            if (!isConnected && connectionSettings != null)
+            try
             {
-                status += " (" + connectionSettings.ConnectionTypeDisplay + ")";
+                bool isConnected = _connectionService != null && _connectionService.IsConnected();
+                ConnectionSettings connectionSettings = _connectionService != null ? _connectionService.GetConnectionSettings() : null;
+                string status = isConnected ? "Connected (" + (connectionSettings != null ? connectionSettings.ConnectionTypeDisplay : "Unknown") + ")" : "Disconnected";
+                if (!isConnected && connectionSettings != null)
+                {
+                    status += " (" + connectionSettings.ConnectionTypeDisplay + ")";
+                }
+                lblConnectionStatus.Text = "Connection: " + status;
+                lblConnectionStatus.ForeColor = isConnected ? Color.Green : Color.Red;
             }
-            lblConnectionStatus.Text = "Connection: " + status;
-            lblConnectionStatus.ForeColor = isConnected ? Color.Green : Color.Red;
+            catch (Exception)
+            {
+                lblConnectionStatus.Text = "Connection: Unknown";
+                lblConnectionStatus.ForeColor = Color.Gray;
+            }
         }
 
         private void connectionSettingsToolStripMenuItem_Click(object sender, EventArgs e)
@@ -131,6 +166,12 @@ namespace syncer.ui
         private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
         {
             MessageBox.Show("DataSyncer v1.0\nFile Synchronization Tool\n\nDeveloped for automated file transfers.", "About DataSyncer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        
+        private void testBackendConnectionToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            // Test the backend connection using our connector class
+            BackendConnector.TestConnection();
         }
 
         private void btnAddJob_Click(object sender, EventArgs e)
@@ -191,7 +232,20 @@ namespace syncer.ui
             try
             {
                 dgvJobs.Rows.Clear();
-                System.Collections.Generic.List<SyncJob> jobs = _jobService.GetAllJobs();
+                System.Collections.Generic.List<SyncJob> jobs = null;
+                
+                try 
+                {
+                    jobs = _jobService.GetAllJobs();
+                }
+                catch (Exception ex)
+                {
+                    // Handle the specific case where jobs can't be loaded
+                    MessageBox.Show("Cannot load jobs: " + ex.Message + "\n\nThe application will continue with an empty job list.", 
+                        "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    jobs = new System.Collections.Generic.List<SyncJob>();
+                }
+                
                 for (int i = 0; i < jobs.Count; i++)
                 {
                     SyncJob job = jobs[i];
@@ -199,15 +253,30 @@ namespace syncer.ui
                     string lastRun = job.LastRun.HasValue ? job.LastRun.Value.ToString("yyyy-MM-dd HH:mm") : "Never";
                     string nextRun = job.GetNextRunTime();
                     string status = job.IsEnabled ? "Enabled" : "Disabled";
-                    int rowIndex = dgvJobs.Rows.Add(new object[] { job.JobName, status, job.SourcePath, job.DestinationPath, schedule, lastRun, nextRun });
+                    int rowIndex = dgvJobs.Rows.Add(new object[] { job.Name, status, job.SourcePath, job.DestinationPath, schedule, lastRun, nextRun });
                     dgvJobs.Rows[rowIndex].Tag = job.Id;
                 }
-                ServiceLocator.LogService.LogInfo("Jobs grid refreshed. Found " + jobs.Count + " jobs.");
+                
+                try
+                {
+                    ServiceLocator.LogService.LogInfo("Jobs grid refreshed. Found " + jobs.Count + " jobs.");
+                }
+                catch 
+                {
+                    // Ignore logging errors
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Error loading jobs: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService.LogError("Error loading jobs: " + ex.Message);
+                try 
+                {
+                    ServiceLocator.LogService.LogError("Error loading jobs: " + ex.Message);
+                }
+                catch 
+                {
+                    // Ignore logging errors
+                }
             }
         }
 

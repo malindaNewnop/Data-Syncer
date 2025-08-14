@@ -3,7 +3,7 @@ using System;
 namespace syncer.ui
 {
     /// Extension methods for string to provide .NET 4.0+ functionality in .NET 3.5
-    public static class StringExtensions
+    public static class UIStringExtensions
     {
         public static bool IsNullOrWhiteSpace(string value)
         {

@@ -298,7 +298,7 @@ namespace syncer.ui
             {
                 string searchText = txtSearch != null ? txtSearch.Text.Trim() : "";
 
-                if (StringExtensions.IsNullOrWhiteSpace(searchText))
+                if (UIStringExtensions.IsNullOrWhiteSpace(searchText))
                 {
                     // Clear filter
                     DataTable dt = dgvLogs != null ? dgvLogs.DataSource as DataTable : null;
@@ -420,7 +420,7 @@ namespace syncer.ui
 
                 string selectedLevel = (cmbLogLevel != null && cmbLogLevel.SelectedItem != null) ? cmbLogLevel.SelectedItem.ToString() : null;
 
-                if (StringExtensions.IsNullOrWhiteSpace(selectedLevel) || selectedLevel == "All")
+                if (UIStringExtensions.IsNullOrWhiteSpace(selectedLevel) || selectedLevel == "All")
                 {
                     // Load all logs using UI interface
                     _logsDataTable = _logService.GetLogs();

@@ -52,7 +52,7 @@ namespace syncer.ui
         {
             if (_currentJob != null)
             {
-                if (txtJobName != null) txtJobName.Text = _currentJob.JobName;
+                if (txtJobName != null) txtJobName.Text = _currentJob.Name;
                 if (chkEnabled != null) chkEnabled.Checked = _currentJob.IsEnabled;
                 if (txtSourcePath != null) txtSourcePath.Text = _currentJob.SourcePath;
                 if (txtDestinationPath != null) txtDestinationPath.Text = _currentJob.DestinationPath;
@@ -70,7 +70,7 @@ namespace syncer.ui
                         }
                     }
                 }
-                if (cmbTransferMode != null && !StringExtensions.IsNullOrWhiteSpace(_currentJob.TransferMode))
+                if (cmbTransferMode != null && !UIStringExtensions.IsNullOrWhiteSpace(_currentJob.TransferMode))
                 {
                     cmbTransferMode.Text = _currentJob.TransferMode;
                 }
@@ -99,7 +99,7 @@ namespace syncer.ui
                 {
                     dialog.Description = "Select destination folder for local sync";
                     dialog.ShowNewFolderButton = true;
-                    if (txtDestinationPath != null && !StringExtensions.IsNullOrWhiteSpace(txtDestinationPath.Text))
+                    if (txtDestinationPath != null && !UIStringExtensions.IsNullOrWhiteSpace(txtDestinationPath.Text))
                         dialog.SelectedPath = txtDestinationPath.Text;
                     if (dialog.ShowDialog() == DialogResult.OK)
                     {
@@ -178,19 +178,19 @@ namespace syncer.ui
 
         private bool ValidateInputs()
         {
-            if (StringExtensions.IsNullOrWhiteSpace(txtJobName.Text))
+            if (UIStringExtensions.IsNullOrWhiteSpace(txtJobName.Text))
             {
                 MessageBox.Show("Please enter a job name.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtJobName.Focus();
                 return false;
             }
-            if (StringExtensions.IsNullOrWhiteSpace(txtSourcePath.Text))
+            if (UIStringExtensions.IsNullOrWhiteSpace(txtSourcePath.Text))
             {
                 MessageBox.Show("Please select a source folder.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 btnBrowseSource.Focus();
                 return false;
             }
-            if (StringExtensions.IsNullOrWhiteSpace(txtDestinationPath.Text))
+            if (UIStringExtensions.IsNullOrWhiteSpace(txtDestinationPath.Text))
             {
                 MessageBox.Show("Please enter a destination path.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtDestinationPath.Focus();
@@ -208,7 +208,7 @@ namespace syncer.ui
         private void SaveJob()
         {
             if (_currentJob == null) _currentJob = new SyncJob();
-            _currentJob.JobName = txtJobName.Text.Trim();
+            _currentJob.Name = txtJobName.Text.Trim();
             _currentJob.IsEnabled = chkEnabled.Checked;
             _currentJob.SourcePath = txtSourcePath.Text.Trim();
             _currentJob.DestinationPath = txtDestinationPath.Text.Trim();
@@ -219,12 +219,12 @@ namespace syncer.ui
             if (_isEditMode)
             {
                 _jobService.UpdateJob(_currentJob);
-                ServiceLocator.LogService.LogInfo("Job '" + _currentJob.JobName + "' updated");
+                ServiceLocator.LogService.LogInfo("Job '" + _currentJob.Name + "' updated");
             }
             else
             {
                 _currentJob.Id = _jobService.CreateJob(_currentJob);
-                ServiceLocator.LogService.LogInfo("Job '" + _currentJob.JobName + "' created");
+                ServiceLocator.LogService.LogInfo("Job '" + _currentJob.Name + "' created");
             }
         }
 

@@ -162,7 +162,7 @@ namespace syncer.ui
                 if (inputForm.ShowDialog() == DialogResult.OK)
                 {
                     string customExtension = textBox.Text.Trim();
-                    if (!StringExtensions.IsNullOrWhiteSpace(customExtension))
+                    if (!UIStringExtensions.IsNullOrWhiteSpace(customExtension))
                     {
                         if (!customExtension.StartsWith(".")) customExtension = "." + customExtension;
                         string customItem = customExtension + " - Custom extension";
@@ -291,7 +291,7 @@ namespace syncer.ui
             preview += "  • Include hidden files: " + ((chkIncludeHidden != null && chkIncludeHidden.Checked) ? "Yes" : "No") + "\n";
             preview += "  • Include system files: " + ((chkIncludeSystem != null && chkIncludeSystem.Checked) ? "Yes" : "No") + "\n";
             preview += "  • Include read-only files: " + ((chkIncludeReadOnly == null || chkIncludeReadOnly.Checked) ? "Yes" : "No") + "\n";
-            if (txtExcludePatterns != null && !StringExtensions.IsNullOrWhiteSpace(txtExcludePatterns.Text))
+            if (txtExcludePatterns != null && !UIStringExtensions.IsNullOrWhiteSpace(txtExcludePatterns.Text))
             {
                 preview += "  • Exclude patterns: " + txtExcludePatterns.Text + "\n";
             }

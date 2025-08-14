@@ -43,6 +43,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\syncer.core\syncer.core.csproj">
+      <Project>{6a6f9a95-9ccc-4fd3-997f-5ea9b53cb133}</Project>
+      <Name>syncer.core</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <!-- Core UI and services -->
@@ -51,6 +57,13 @@
     <Compile Include="StringExtensions.cs" />
     <Compile Include="ServiceLocator.cs" />
     <Compile Include="Services\ServiceImplementations.cs" />
+    <Compile Include="Services\CoreLogServiceAdapter.cs" />
+    <Compile Include="Services\CoreSyncJobServiceAdapter.cs" />
+    <Compile Include="Services\CoreConnectionServiceAdapter.cs" />
+    <Compile Include="Services\ServiceVerifier.cs" />
+    <Compile Include="Services\DebugLogger.cs" />
+    <Compile Include="Services\BackendConnector.cs" />
+    <Compile Include="Services\FileSystemPermissionChecker.cs" />
     <!-- Forms -->
     <Compile Include="FormMain.cs">
       <SubType>Form</SubType>

@@ -8,10 +8,13 @@ namespace syncer.ui
     public class SyncJob
     {
         public int Id { get; set; }
-        public string JobName { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
         public bool IsEnabled { get; set; }
         public string SourcePath { get; set; }
         public string DestinationPath { get; set; }
+        public bool IncludeSubFolders { get; set; }
+        public bool OverwriteExisting { get; set; }
         public DateTime StartTime { get; set; }
         public int IntervalValue { get; set; }
         public string IntervalType { get; set; } 
@@ -28,6 +31,8 @@ namespace syncer.ui
             IntervalType = "Minutes";
             TransferMode = "Copy (Keep both files)";
             LastStatus = "Never Run";
+            IncludeSubFolders = true;
+            OverwriteExisting = true;
         }
 
         public string GetNextRunTime()
@@ -54,7 +59,7 @@ namespace syncer.ui
 
         public override string ToString()
         {
-            return JobName + " - " + (IsEnabled ? "Enabled" : "Disabled");
+            return Name + " - " + (IsEnabled ? "Enabled" : "Disabled");
         }
     }
 
@@ -63,23 +68,28 @@ namespace syncer.ui
     /// </summary>
     public class ConnectionSettings
     {
-        public string Protocol { get; set; }
+        public int ProtocolType { get; set; } = 0; // 0 = Local, 1 = FTP, 2 = SFTP
+        public string Protocol { get; set; } = "LOCAL";
         public string Host { get; set; }
         public int Port { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }
+        public bool UsePassiveMode { get; set; }
+        public bool UseSftp { get; set; }
         public bool IsConnected { get; set; }
         public DateTime? LastConnectionTest { get; set; }
 
         public ConnectionSettings()
         {
-            Protocol = "FTP";
+            Protocol = "LOCAL";
+            ProtocolType = 0;
             Port = 21;
+            UsePassiveMode = true;
         }
 
         public bool IsLocalConnection
         {
-            get { return Protocol != null && Protocol.Equals("LOCAL", StringComparison.OrdinalIgnoreCase); }
+            get { return ProtocolType == 0 || (Protocol != null && Protocol.Equals("LOCAL", StringComparison.OrdinalIgnoreCase)); }
         }
 
         public bool IsRemoteConnection
@@ -91,12 +101,11 @@ namespace syncer.ui
         {
             get
             {
-                string p = Protocol == null ? string.Empty : Protocol.ToUpper();
-                switch (p)
+                switch (ProtocolType)
                 {
-                    case "LOCAL": return "Local File System";
-                    case "FTP": return "FTP Server";
-                    case "SFTP": return "SFTP Server";
+                    case 0: return "Local File System";
+                    case 1: return "FTP Server";
+                    case 2: return "SFTP Server";
                     default: return "Unknown";
                 }
             }
