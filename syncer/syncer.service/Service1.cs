@@ -20,36 +20,55 @@ namespace syncer.service
         public Service1()
         {
             InitializeComponent();
+            this.ServiceName = "DataSyncerService"; // Set the service name
         }
 
         protected override void OnStart(string[] args)
         {
-            // Using static factory methods instead of direct instantiation
-            _repo = Core.ServiceFactory.CreateJobRepository();
-            _log = Core.ServiceFactory.CreateLogService();
-            _factory = Core.ServiceFactory.CreateTransferClientFactory();
-            _fileEnumerator = Core.ServiceFactory.CreateFileEnumerator();
-            _runner = Core.ServiceFactory.CreateJobRunner(_factory, _log, _fileEnumerator);
+            try
+            {
+                // Using static factory methods instead of direct instantiation
+                _repo = Core.ServiceFactory.CreateJobRepository();
+                _log = Core.ServiceFactory.CreateLogService();
+                _factory = Core.ServiceFactory.CreateTransferClientFactory();
+                _fileEnumerator = Core.ServiceFactory.CreateFileEnumerator();
+                _runner = Core.ServiceFactory.CreateJobRunner(_factory, _log, _fileEnumerator);
 
-            _timer = new Timer();
-            _timer.Interval = 60 * 1000;
-            _timer.AutoReset = true;
-            _timer.Elapsed += OnTick;
-            _timer.Start();
+                _timer = new Timer();
+                _timer.Interval = 60 * 1000;
+                _timer.AutoReset = true;
+                _timer.Elapsed += OnTick;
+                _timer.Start();
 
-            OnTick(this, null);
+                _log.LogInfo(null, "Service started");
+                OnTick(this, null);
+            }
+            catch (Exception ex)
+            {
+                if (_log != null)
+                    _log.LogError(null, "Service start failed: " + ex.Message);
+                throw; // Re-throw to indicate service start failure
+            }
         }
 
         protected override void OnStop()
         {
-            if (_timer != null)
+            try
             {
-                _timer.Stop();
-                _timer.Elapsed -= OnTick;
-                _timer.Dispose();
-                _timer = null;
+                if (_timer != null)
+                {
+                    _timer.Stop();
+                    _timer.Elapsed -= OnTick;
+                    _timer.Dispose();
+                    _timer = null;
+                }
+                if (_log != null) _log.LogInfo(null, "Service stopped");
             }
-            if (_log != null) _log.LogInfo(null, "Service stopped");
+            catch (Exception ex)
+            {
+                if (_log != null)
+                    _log.LogError(null, "Service stop error: " + ex.Message);
+            }
         }
 
         private void OnTick(object sender, ElapsedEventArgs e)
