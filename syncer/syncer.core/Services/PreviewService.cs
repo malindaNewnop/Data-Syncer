@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using syncer.ui;
 
 namespace syncer.core
 {
@@ -68,23 +67,23 @@ namespace syncer.core
                     return false;
                 }
 
-                if (StringExtensions.IsNullOrWhiteSpace(job.Name))
+                if (syncer.core.StringExtensions.IsNullOrWhiteSpace(job.Name))
                 {
                     validationErrors.Add("Job name is required");
                 }
 
-                if (StringExtensions.IsNullOrWhiteSpace(job.SourcePath))
+                if (syncer.core.StringExtensions.IsNullOrWhiteSpace(job.SourcePath))
                 {
                     validationErrors.Add("Source path is required");
                 }
 
-                if (StringExtensions.IsNullOrWhiteSpace(job.DestinationPath))
+                if (syncer.core.StringExtensions.IsNullOrWhiteSpace(job.DestinationPath))
                 {
                     validationErrors.Add("Destination path is required");
                 }
 
                 // Validate source path exists
-                if (!StringExtensions.IsNullOrWhiteSpace(job.SourcePath))
+                if (!syncer.core.StringExtensions.IsNullOrWhiteSpace(job.SourcePath))
                 {
                     if (job.Connection.Protocol == ProtocolType.Local)
                     {
@@ -106,7 +105,7 @@ namespace syncer.core
                 }
 
                 // Validate destination accessibility
-                if (!StringExtensions.IsNullOrWhiteSpace(job.DestinationPath))
+                if (!syncer.core.StringExtensions.IsNullOrWhiteSpace(job.DestinationPath))
                 {
                     if (job.DestinationConnection.Protocol == ProtocolType.Local)
                     {
@@ -139,7 +138,7 @@ namespace syncer.core
                 // Validate schedule if enabled
                 if (job.IsScheduled && job.Schedule != null)
                 {
-                    if (StringExtensions.IsNullOrWhiteSpace(job.Schedule.CronExpression))
+                    if (syncer.core.StringExtensions.IsNullOrWhiteSpace(job.Schedule.CronExpression))
                     {
                         validationErrors.Add("Cron expression is required for scheduled jobs");
                     }

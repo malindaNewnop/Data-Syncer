@@ -34,6 +34,7 @@ namespace syncer.core
         System.Data.DataTable GetJobLogs(string jobId, DateTime from, DateTime to);
         void Clear();
         void Archive(DateTime cutoffDate);
+        void RotateLogs(long maxSizeBytes);
     }
 
     // Transfer Client Interface

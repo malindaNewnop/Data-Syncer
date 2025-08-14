@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Windows.Forms;
+using System.Threading;
 
 namespace syncer.ui
 {
@@ -15,6 +16,11 @@ namespace syncer.ui
         {
             try
             {
+                // Set application-wide exception handler
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                Application.ThreadException += new ThreadExceptionEventHandler(Application_ThreadException);
+                AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
+
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 
@@ -98,6 +104,27 @@ namespace syncer.ui
                         "Limited Functionality Mode", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 
+                // Pre-load notification settings
+                try
+                {
+                    var configService = ServiceLocator.ConfigurationService;
+                    if (configService != null)
+                    {
+                        // Load default notification settings if they don't exist
+                        if (!configService.GetSetting("NotificationsInitialized", false))
+                        {
+                            configService.SaveSetting("NotificationsEnabled", true);
+                            configService.SaveSetting("NotificationDuration", 3000);
+                            configService.SaveSetting("MinimizeToTray", true);
+                            configService.SaveSetting("NotificationsInitialized", true);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore settings errors - use defaults
+                }
+                
                 // Run main dashboard form
                 Application.Run(new FormMain());
             }
@@ -106,6 +133,74 @@ namespace syncer.ui
                 MessageBox.Show("Fatal Error: " + ex.Message, 
                               "Application Error", 
                               MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        static void Application_ThreadException(object sender, ThreadExceptionEventArgs e)
+        {
+            try
+            {
+                // Log the exception
+                try
+                {
+                    ServiceLocator.LogService.LogError("Unhandled UI exception: " + e.Exception.Message, "UI");
+                }
+                catch
+                {
+                    // Ignore logging errors
+                }
+                
+                // Show error to user
+                MessageBox.Show("An error has occurred in the application: " + e.Exception.Message + 
+                    "\n\nPlease check the logs for more details.", 
+                    "Application Error", 
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Error);
+            }
+            catch
+            {
+                // Last resort - if error handling itself fails
+                MessageBox.Show("A critical error has occurred. The application may need to be restarted.",
+                    "Critical Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            try
+            {
+                Exception ex = e.ExceptionObject as Exception;
+                string errorMessage = ex != null ? ex.Message : "Unknown error";
+                
+                // Log the exception
+                try
+                {
+                    ServiceLocator.LogService.LogError("Unhandled application exception: " + errorMessage, "UI");
+                }
+                catch
+                {
+                    // Ignore logging errors
+                }
+                
+                // Show error to user if it's terminating
+                if (e.IsTerminating)
+                {
+                    MessageBox.Show("A fatal error has occurred and the application needs to close: " + 
+                        errorMessage + "\n\nPlease check the logs for more details.", 
+                        "Fatal Error", 
+                        MessageBoxButtons.OK, 
+                        MessageBoxIcon.Error);
+                }
+            }
+            catch
+            {
+                // Last resort - if error handling itself fails
+                MessageBox.Show("A critical error has occurred and the application needs to close.",
+                    "Critical Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
     }

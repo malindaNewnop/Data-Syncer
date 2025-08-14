@@ -1,6 +1,7 @@
 using syncer.ui.Services;
 using System;
 using System.IO;
+using System.Reflection;
 
 namespace syncer.ui
 {
@@ -15,6 +16,10 @@ namespace syncer.ui
         private static IServiceManager _serviceManager;
         private static IConfigurationService _configurationService;
 
+        // New field for log rotation
+        private static bool _logRotationEnabled = true;
+        private static long _maxLogSizeBytes = 10 * 1024 * 1024; // 10MB default
+
         public static void Initialize()
         {
             try
@@ -24,6 +29,9 @@ namespace syncer.ui
                 
                 // Create the log service first since other services might need it
                 _logService = new Services.CoreLogServiceAdapter();
+                
+                // Set up log rotation
+                SetupLogRotation();
                 
                 // Create real service implementations using adapters
                 _syncJobService = new Services.CoreSyncJobServiceAdapter();
@@ -48,6 +56,49 @@ namespace syncer.ui
             }
         }
         
+        /// <summary>
+        /// Set up automatic log rotation
+        /// </summary>
+        private static void SetupLogRotation()
+        {
+            if (!_logRotationEnabled || _logService == null) 
+                return;
+            
+            try
+            {
+                // Use reflection to access the core service directly
+                if (_logService is CoreLogServiceAdapter adapter)
+                {
+                    var coreServiceField = typeof(CoreLogServiceAdapter).GetField(
+                        "_coreLogService", 
+                        BindingFlags.NonPublic | BindingFlags.Instance);
+                    
+                    if (coreServiceField != null)
+                    {
+                        object coreService = coreServiceField.GetValue(adapter);
+                        if (coreService != null)
+                        {
+                            // Immediately check if logs need rotation
+                            var rotateLogsMethod = coreService.GetType().GetMethod(
+                                "RotateLogs", 
+                                BindingFlags.Public | BindingFlags.Instance);
+                            
+                            if (rotateLogsMethod != null)
+                            {
+                                rotateLogsMethod.Invoke(coreService, new object[] { _maxLogSizeBytes });
+                                _logService.LogInfo("Log rotation service initialized with " + 
+                                    (_maxLogSizeBytes / (1024 * 1024)) + "MB max size", "System");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error setting up log rotation: " + ex.Message);
+            }
+        }
+        
         public static void InitializeStubs()
         {
             // Initialize with stub implementations
@@ -68,6 +119,67 @@ namespace syncer.ui
             {
                 throw new Exception("Unable to create or access required folders. Please check that the application has permission to write to " + 
                                   Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\DataSyncer");
+            }
+        }
+
+        /// <summary>
+        /// Configure log rotation settings
+        /// </summary>
+        /// <param name="enabled">Whether log rotation is enabled</param>
+        /// <param name="maxSizeBytes">Maximum log file size before rotation</param>
+        public static void ConfigureLogRotation(bool enabled, long maxSizeBytes)
+        {
+            _logRotationEnabled = enabled;
+            _maxLogSizeBytes = maxSizeBytes;
+            
+            if (_logService != null && enabled)
+            {
+                SetupLogRotation();
+            }
+        }
+        
+        /// <summary>
+        /// Perform a manual log rotation right now
+        /// </summary>
+        public static void RotateLogsNow()
+        {
+            if (_logService == null)
+                return;
+                
+            try
+            {
+                // Use reflection to access the core service directly
+                if (_logService is CoreLogServiceAdapter adapter)
+                {
+                    var coreServiceField = typeof(CoreLogServiceAdapter).GetField(
+                        "_coreLogService", 
+                        BindingFlags.NonPublic | BindingFlags.Instance);
+                    
+                    if (coreServiceField != null)
+                    {
+                        object coreService = coreServiceField.GetValue(adapter);
+                        if (coreService != null)
+                        {
+                            var rotateLogsMethod = coreService.GetType().GetMethod(
+                                "RotateLogs", 
+                                BindingFlags.Public | BindingFlags.Instance);
+                            
+                            if (rotateLogsMethod != null)
+                            {
+                                // Force rotation by using 0 as the max size
+                                rotateLogsMethod.Invoke(coreService, new object[] { 0 });
+                                _logService.LogInfo("Manual log rotation completed", "System");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_logService != null)
+                {
+                    _logService.LogError("Error during manual log rotation: " + ex.Message, "System");
+                }
             }
         }
 

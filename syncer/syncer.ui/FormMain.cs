@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using syncer.ui.Services;
 
 namespace syncer.ui
 {
@@ -9,6 +10,10 @@ namespace syncer.ui
         private ISyncJobService _jobService;
         private IServiceManager _serviceManager;
         private IConnectionService _connectionService;
+        
+        // System tray components
+        private SystemTrayManager _trayManager;
+        private NotificationService _notificationService;
 
         public FormMain()
         {
@@ -16,6 +21,7 @@ namespace syncer.ui
             {
                 InitializeComponent();
                 InitializeServices();
+                InitializeSystemTray();
                 InitializeCustomComponents();
             }
             catch (Exception ex)
@@ -37,6 +43,35 @@ namespace syncer.ui
             {
                 MessageBox.Show("Failed to initialize services: " + ex.Message + "\n\nSome functionality may be limited.",
                     "Service Initialization Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+        
+        private void InitializeSystemTray()
+        {
+            try
+            {
+                // Create the system tray manager
+                _trayManager = new SystemTrayManager(this);
+                
+                // Create the notification service
+                _notificationService = new NotificationService(_trayManager);
+                
+                // Update the tray icon tooltip with application status
+                string serviceStatus = _serviceManager != null ? 
+                    (_serviceManager.IsServiceRunning() ? "Running" : "Stopped") : "Unknown";
+                _trayManager.UpdateToolTip($"Data Syncer - Service: {serviceStatus}");
+                
+                // Show a startup notification
+                _notificationService.ShowNotification(
+                    "Data Syncer Started", 
+                    "Application is running and will minimize to the system tray when closed.",
+                    ToolTipIcon.Info);
+            }
+            catch (Exception ex)
+            {
+                // Log the error but continue - system tray is not critical
+                Console.WriteLine("Error initializing system tray: " + ex.Message);
+                try { ServiceLocator.LogService.LogError("Error initializing system tray: " + ex.Message, "UI"); } catch { }
             }
         }
 
@@ -69,6 +104,14 @@ namespace syncer.ui
             dgvJobs.Columns["Schedule"].Width = 100;
             dgvJobs.Columns["LastRun"].Width = 130;
             dgvJobs.Columns["NextRun"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            
+            // Add selection changed event to update button states
+            dgvJobs.SelectionChanged += dgvJobs_SelectionChanged;
+        }
+
+        private void dgvJobs_SelectionChanged(object sender, EventArgs e)
+        {
+            UpdateJobControlButtons();
         }
 
         private void UpdateServiceStatus()
@@ -87,6 +130,12 @@ namespace syncer.ui
                 {
                     btnStartStop.Text = "Start Service";
                     btnStartStop.BackColor = Color.LightGreen;
+                }
+                
+                // Update the tray icon tooltip
+                if (_trayManager != null)
+                {
+                    _trayManager.UpdateToolTip($"Data Syncer - Service: {status}");
                 }
             }
             catch (Exception)
@@ -127,7 +176,61 @@ namespace syncer.ui
                 if (connForm.ShowDialog() == DialogResult.OK)
                 {
                     UpdateConnectionStatus();
+                    
+                    // Show notification for connection update
+                    bool isConnected = _connectionService != null && _connectionService.IsConnected();
+                    ConnectionSettings settings = _connectionService != null ? _connectionService.GetConnectionSettings() : null;
+                    string serverName = settings != null ? settings.Host : "server";
+                    
+                    if (_notificationService != null)
+                    {
+                        _notificationService.ShowConnectionNotification(isConnected, serverName);
+                    }
                 }
+            }
+        }
+
+        private void enhancedSftpSettingsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (var enhancedForm = new Forms.FormSimplifiedConnection())
+                {
+                    if (enhancedForm.ShowDialog() == DialogResult.OK)
+                    {
+                        UpdateConnectionStatus();
+                        
+                        // Show notification for SFTP connection update
+                        if (_notificationService != null)
+                        {
+                            _notificationService.ShowNotification(
+                                "SFTP Connection Updated", 
+                                "Enhanced SFTP settings have been configured successfully.",
+                                ToolTipIcon.Info);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening enhanced SFTP settings: " + ex.Message, 
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void sshKeyGenerationToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (var keyGenForm = new Forms.FormKeyGeneration())
+                {
+                    keyGenForm.ShowDialog();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening SSH key generation: " + ex.Message, 
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -138,6 +241,15 @@ namespace syncer.ui
                 if (scheduleForm.ShowDialog() == DialogResult.OK)
                 {
                     RefreshJobsGrid();
+                    
+                    // Show notification
+                    if (_notificationService != null)
+                    {
+                        _notificationService.ShowNotification(
+                            "Schedule Updated",
+                            "Job schedules have been updated successfully.",
+                            ToolTipIcon.Info);
+                    }
                 }
             }
         }
@@ -160,7 +272,8 @@ namespace syncer.ui
 
         private void exitToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Application.Exit();
+            // This will close the application completely
+            Close();
         }
 
         private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
@@ -171,7 +284,19 @@ namespace syncer.ui
         private void testBackendConnectionToolStripMenuItem_Click(object sender, EventArgs e)
         {
             // Test the backend connection using our connector class
-            BackendConnector.TestConnection();
+            bool success = BackendConnector.TestConnection();
+            
+            // Show notification
+            if (_notificationService != null)
+            {
+                string title = success ? "Connection Test Successful" : "Connection Test Failed";
+                string message = success 
+                    ? "Successfully connected to the backend service."
+                    : "Failed to connect to the backend service. Please check your settings and try again.";
+                ToolTipIcon icon = success ? ToolTipIcon.Info : ToolTipIcon.Error;
+                
+                _notificationService.ShowNotification(title, message, icon);
+            }
         }
 
         private void btnAddJob_Click(object sender, EventArgs e)
@@ -181,7 +306,132 @@ namespace syncer.ui
                 if (scheduleForm.ShowDialog() == DialogResult.OK)
                 {
                     RefreshJobsGrid();
+                    
+                    // Show notification
+                    if (_notificationService != null)
+                    {
+                        _notificationService.ShowNotification(
+                            "Job Added",
+                            "New synchronization job has been added successfully.",
+                            ToolTipIcon.Info);
+                    }
                 }
+            }
+        }
+
+        private void btnPauseJob_Click(object sender, EventArgs e)
+        {
+            if (dgvJobs.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("Please select a job to pause/resume.", "No Job Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            try
+            {
+                int jobId = (int)dgvJobs.SelectedRows[0].Tag;
+                SyncJob job = _jobService.GetJobById(jobId);
+                
+                if (job != null)
+                {
+                    string currentStatus = _jobService.GetJobStatus(jobId);
+                    bool isRunning = currentStatus.ToLower().Contains("running") || currentStatus.ToLower().Contains("active");
+                    
+                    if (isRunning)
+                    {
+                        // Pause the job
+                        if (_jobService.StopJob(jobId))
+                        {
+                            RefreshJobsGrid();
+                            
+                            if (_notificationService != null)
+                            {
+                                _notificationService.ShowNotification(
+                                    "Job Paused",
+                                    $"Job '{job.Name}' has been paused successfully.",
+                                    ToolTipIcon.Info);
+                            }
+                        }
+                        else
+                        {
+                            MessageBox.Show("Failed to pause the job. Please try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                    else
+                    {
+                        // Resume the job
+                        if (_jobService.StartJob(jobId))
+                        {
+                            RefreshJobsGrid();
+                            
+                            if (_notificationService != null)
+                            {
+                                _notificationService.ShowNotification(
+                                    "Job Resumed",
+                                    $"Job '{job.Name}' has been resumed successfully.",
+                                    ToolTipIcon.Info);
+                            }
+                        }
+                        else
+                        {
+                            MessageBox.Show("Failed to resume the job. Please try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error managing job: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error managing job: " + ex.Message);
+            }
+        }
+
+        private void btnDeleteJob_Click(object sender, EventArgs e)
+        {
+            if (dgvJobs.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("Please select a job to delete.", "No Job Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            try
+            {
+                int jobId = (int)dgvJobs.SelectedRows[0].Tag;
+                SyncJob job = _jobService.GetJobById(jobId);
+                
+                if (job != null)
+                {
+                    DialogResult result = MessageBox.Show(
+                        $"Are you sure you want to delete the job '{job.Name}'?\n\nThis action cannot be undone.",
+                        "Confirm Deletion",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question);
+                    
+                    if (result == DialogResult.Yes)
+                    {
+                        if (_jobService.DeleteJob(jobId))
+                        {
+                            RefreshJobsGrid();
+                            
+                            if (_notificationService != null)
+                            {
+                                _notificationService.ShowNotification(
+                                    "Job Deleted",
+                                    $"Job '{job.Name}' has been deleted successfully.",
+                                    ToolTipIcon.Info);
+                            }
+                        }
+                        else
+                        {
+                            MessageBox.Show("Failed to delete the job. Please try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error deleting job: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error deleting job: " + ex.Message);
             }
         }
 
@@ -194,6 +444,12 @@ namespace syncer.ui
                     if (_serviceManager.StopService())
                     {
                         ServiceLocator.LogService.LogInfo("Service stopped by user");
+                        
+                        // Show notification
+                        if (_notificationService != null)
+                        {
+                            _notificationService.ShowServiceStatusNotification(false);
+                        }
                     }
                     else
                     {
@@ -205,6 +461,12 @@ namespace syncer.ui
                     if (_serviceManager.StartService())
                     {
                         ServiceLocator.LogService.LogInfo("Service started by user");
+                        
+                        // Show notification
+                        if (_notificationService != null)
+                        {
+                            _notificationService.ShowServiceStatusNotification(true);
+                        }
                     }
                     else
                     {
@@ -257,6 +519,9 @@ namespace syncer.ui
                     dgvJobs.Rows[rowIndex].Tag = job.Id;
                 }
                 
+                // Update button states based on selection
+                UpdateJobControlButtons();
+                
                 try
                 {
                     ServiceLocator.LogService.LogInfo("Jobs grid refreshed. Found " + jobs.Count + " jobs.");
@@ -280,6 +545,36 @@ namespace syncer.ui
             }
         }
 
+        private void UpdateJobControlButtons()
+        {
+            bool hasSelectedJob = dgvJobs.SelectedRows.Count > 0;
+            btnPauseJob.Enabled = hasSelectedJob;
+            btnDeleteJob.Enabled = hasSelectedJob;
+            
+            if (hasSelectedJob)
+            {
+                try
+                {
+                    int jobId = (int)dgvJobs.SelectedRows[0].Tag;
+                    string currentStatus = _jobService.GetJobStatus(jobId);
+                    bool isRunning = currentStatus.ToLower().Contains("running") || currentStatus.ToLower().Contains("active");
+                    
+                    btnPauseJob.Text = isRunning ? "Pause Job" : "Resume Job";
+                    btnPauseJob.BackColor = isRunning ? Color.Orange : Color.LightGreen;
+                }
+                catch
+                {
+                    btnPauseJob.Text = "Pause Job";
+                    btnPauseJob.BackColor = Color.Orange;
+                }
+            }
+            else
+            {
+                btnPauseJob.Text = "Pause Job";
+                btnPauseJob.BackColor = Color.Orange;
+            }
+        }
+
         private void dgvJobs_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex >= 0)
@@ -295,6 +590,15 @@ namespace syncer.ui
                             if (scheduleForm.ShowDialog() == DialogResult.OK)
                             {
                                 RefreshJobsGrid();
+                                
+                                // Show notification
+                                if (_notificationService != null)
+                                {
+                                    _notificationService.ShowNotification(
+                                        "Job Updated",
+                                        $"Job '{job.Name}' has been updated successfully.",
+                                        ToolTipIcon.Info);
+                                }
                             }
                         }
                     }
@@ -304,6 +608,96 @@ namespace syncer.ui
                     MessageBox.Show("Error opening job for editing: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     ServiceLocator.LogService.LogError("Error opening job for editing: " + ex.Message);
                 }
+            }
+        }
+        
+        // Handle form closing to minimize to system tray instead of exiting
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            // We only want to intercept user-initiated closing
+            if (e.CloseReason == CloseReason.UserClosing)
+            {
+                // Check if we have a system tray manager
+                if (_trayManager != null)
+                {
+                    // Cancel the close and minimize instead
+                    e.Cancel = true;
+                    WindowState = FormWindowState.Minimized;
+                }
+                else
+                {
+                    // No system tray support, ask the user if they want to exit
+                    DialogResult result = MessageBox.Show(
+                        "Are you sure you want to exit Data Syncer?", 
+                        "Confirm Exit", 
+                        MessageBoxButtons.YesNo, 
+                        MessageBoxIcon.Question);
+                        
+                    if (result == DialogResult.No)
+                    {
+                        e.Cancel = true;
+                    }
+                    else
+                    {
+                        // Cleanup system tray resources
+                        if (_trayManager != null)
+                        {
+                            _trayManager.Dispose();
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // For non-user closing (like Windows shutdown), cleanup resources
+                if (_trayManager != null)
+                {
+                    _trayManager.Dispose();
+                }
+                
+                base.OnFormClosing(e);
+            }
+        }
+        
+        // Handle minimizing to system tray
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            
+            // When minimized and we have a system tray, hide the form
+            if (WindowState == FormWindowState.Minimized && _trayManager != null)
+            {
+                Hide();
+            }
+        }
+        
+        // Handle application exit
+        private void HandleApplicationExit()
+        {
+            try
+            {
+                // Cleanup resources
+                if (_trayManager != null)
+                {
+                    _trayManager.Dispose();
+                }
+                
+                // Log the exit
+                try
+                {
+                    ServiceLocator.LogService.LogInfo("Application exiting", "UI");
+                }
+                catch
+                {
+                    // Ignore logging errors during shutdown
+                }
+                
+                // Exit the application
+                Application.Exit();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error during application exit: " + ex.Message);
             }
         }
     }

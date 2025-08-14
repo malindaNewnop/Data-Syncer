@@ -17,6 +17,16 @@ namespace syncer.core
                     return results;
                 }
 
+                // If the filter settings have include or exclude patterns, use the pattern-based enumeration
+                if (filters != null && (!string.IsNullOrEmpty(filters.IncludePattern) || !string.IsNullOrEmpty(filters.ExcludePattern)))
+                {
+                    return EnumerateFilesWithPattern(
+                        rootPath, 
+                        filters.IncludePattern, 
+                        filters.ExcludePattern, 
+                        includeSubfolders);
+                }
+
                 var searchOption = includeSubfolders 
                     ? SearchOption.AllDirectories 
                     : SearchOption.TopDirectoryOnly;
@@ -84,6 +94,134 @@ namespace syncer.core
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// Enumerates files with more robust pattern matching support
+        /// </summary>
+        /// <param name="rootPath">Root directory to start search from</param>
+        /// <param name="includePattern">Pattern to include files (semicolon-separated)</param>
+        /// <param name="excludePattern">Pattern to exclude files (semicolon-separated)</param>
+        /// <param name="includeSubfolders">Whether to include subdirectories in search</param>
+        /// <returns>List of file paths matching the criteria</returns>
+        public List<string> EnumerateFilesWithPattern(string rootPath, string includePattern, string excludePattern, bool includeSubfolders)
+        {
+            List<string> files = new List<string>();
+            
+            try
+            {
+                if (File.Exists(rootPath))
+                {
+                    // It's a single file - check if it matches our patterns
+                    if (ShouldIncludeFileByPattern(Path.GetFileName(rootPath), includePattern, excludePattern))
+                        files.Add(rootPath);
+                }
+                else if (Directory.Exists(rootPath))
+                {
+                    // Process all files in current directory
+                    foreach (string file in Directory.GetFiles(rootPath))
+                    {
+                        if (ShouldIncludeFileByPattern(Path.GetFileName(file), includePattern, excludePattern))
+                            files.Add(file);
+                    }
+                    
+                    // Recursively process subdirectories if requested
+                    if (includeSubfolders)
+                    {
+                        foreach (string subDir in Directory.GetDirectories(rootPath))
+                        {
+                            files.AddRange(EnumerateFilesWithPattern(subDir, includePattern, excludePattern, true));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log error but continue with partial results
+                Console.WriteLine($"Error enumerating files in {rootPath}: {ex.Message}");
+            }
+            
+            return files;
+        }
+
+        /// <summary>
+        /// Determines if a file should be included based on pattern matching
+        /// </summary>
+        private bool ShouldIncludeFileByPattern(string fileName, string includePattern, string excludePattern)
+        {
+            // First check exclude pattern - if file matches an exclude pattern, skip it
+            if (!string.IsNullOrEmpty(excludePattern))
+            {
+                foreach (string pattern in excludePattern.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (IsWildcardMatch(fileName, pattern.Trim()))
+                        return false;
+                }
+            }
+            
+            // If include pattern is empty or null, include all files that weren't excluded
+            if (string.IsNullOrEmpty(includePattern))
+                return true;
+                
+            // Check if file matches any include pattern
+            foreach (string pattern in includePattern.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (IsWildcardMatch(fileName, pattern.Trim()))
+                    return true;
+            }
+            
+            return false;
+        }
+
+        /// <summary>
+        /// Improved wildcard matching for file patterns
+        /// </summary>
+        private bool IsWildcardMatch(string text, string pattern)
+        {
+            // Simple wildcard matching for *, ? style patterns
+            if (pattern == "*") return true;
+            
+            if (pattern.StartsWith("*") && pattern.EndsWith("*") && pattern.Length > 2)
+            {
+                string middle = pattern.Substring(1, pattern.Length - 2);
+                return text.IndexOf(middle, StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+            else if (pattern.StartsWith("*") && pattern.Length > 1)
+            {
+                string end = pattern.Substring(1);
+                return text.EndsWith(end, StringComparison.OrdinalIgnoreCase);
+            }
+            else if (pattern.EndsWith("*") && pattern.Length > 1)
+            {
+                string start = pattern.Substring(0, pattern.Length - 1);
+                return text.StartsWith(start, StringComparison.OrdinalIgnoreCase);
+            }
+            else if (pattern.Contains("?"))
+            {
+                // Process ? wildcards (single character)
+                return MatchWithQuestionMark(text, pattern);
+            }
+            else
+            {
+                return string.Equals(text, pattern, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        /// <summary>
+        /// Handles pattern matching with question mark wildcards
+        /// </summary>
+        private bool MatchWithQuestionMark(string text, string pattern)
+        {
+            if (text.Length != pattern.Length)
+                return false;
+                
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (pattern[i] != '?' && !char.Equals(char.ToUpperInvariant(text[i]), char.ToUpperInvariant(pattern[i])))
+                    return false;
+            }
+            
+            return true;
         }
 
         private bool ShouldIncludeFile(string filePath, FilterSettings filters)

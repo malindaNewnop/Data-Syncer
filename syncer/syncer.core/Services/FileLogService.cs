@@ -11,6 +11,7 @@ namespace syncer.core
     {
         private readonly object _syncLock = new object();
         private const int MaxLogSizeBytes = 10 * 1024 * 1024; // 10MB
+        private const int MaxBackupCount = 10; // Maximum number of backup files to keep
 
         // Implement the missing interface methods
         public void LogInfo(string jobId, string message)
@@ -325,13 +326,100 @@ namespace syncer.core
                     var fileInfo = new FileInfo(Paths.LogsFile);
                     if (fileInfo.Length > MaxLogSizeBytes)
                     {
-                        Archive(DateTime.Now.AddDays(-30)); // Archive logs older than 30 days
+                        RotateLogs(MaxLogSizeBytes);
                     }
                 }
             }
             catch
             {
                 // Ignore rotation errors
+            }
+        }
+        
+        /// <summary>
+        /// Rotates log files when they exceed the specified size limit.
+        /// Creates a backup of the current log file and starts a new one.
+        /// </summary>
+        /// <param name="maxSizeBytes">Maximum size in bytes before rotation</param>
+        public void RotateLogs(long maxSizeBytes)
+        {
+            lock (_syncLock)
+            {
+                try
+                {
+                    if (!File.Exists(Paths.LogsFile))
+                        return;
+                            
+                    var fileInfo = new FileInfo(Paths.LogsFile);
+                    if (fileInfo.Length > maxSizeBytes)
+                    {
+                        string backupPath = Paths.LogsFile + "." + DateTime.Now.ToString("yyyyMMddHHmmss") + ".bak";
+                        File.Move(Paths.LogsFile, backupPath);
+                                
+                        // Create a new log file with header
+                        using (var sw = new StreamWriter(Paths.LogsFile, false, Encoding.UTF8))
+                        {
+                            sw.WriteLine("Timestamp,Level,JobName,JobId,Source,Message,Exception,FileName,FileSize,Duration,RemotePath,LocalPath");
+                        }
+                                
+                        LogInfo("system", "Log file rotated due to size limit. Previous log archived to: " + backupPath);
+                        
+                        // Clean up old backup files to prevent disk space issues
+                        CleanupOldBackups();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Can't log here as it would be recursive
+                    Console.WriteLine("Error rotating log file: " + ex.Message);
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Cleans up old log backup files, keeping only the most recent ones
+        /// </summary>
+        private void CleanupOldBackups()
+        {
+            try
+            {
+                string logsDir = Path.GetDirectoryName(Paths.LogsFile);
+                if (string.IsNullOrEmpty(logsDir) || !Directory.Exists(logsDir))
+                    return;
+                
+                string logFileName = Path.GetFileName(Paths.LogsFile);
+                string[] backupFiles = Directory.GetFiles(logsDir, logFileName + ".*.bak");
+                
+                if (backupFiles.Length <= MaxBackupCount)
+                    return;
+                
+                // Sort backup files by creation time (oldest first)
+                Array.Sort(backupFiles, (a, b) => {
+                    try {
+                        return File.GetCreationTime(a).CompareTo(File.GetCreationTime(b));
+                    }
+                    catch {
+                        return 0; // If we can't compare, treat as equal
+                    }
+                });
+                
+                // Delete oldest backups to keep only MaxBackupCount files
+                int filesToDelete = backupFiles.Length - MaxBackupCount;
+                for (int i = 0; i < filesToDelete; i++)
+                {
+                    try
+                    {
+                        File.Delete(backupFiles[i]);
+                    }
+                    catch
+                    {
+                        // Ignore errors deleting individual backup files
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore any errors in the cleanup process
             }
         }
 

@@ -1,8 +1,10 @@
 using System;
 
-namespace syncer.ui
+namespace syncer.core
 {
-    /// Extension methods for string to provide .NET 4.0+ functionality in .NET 3.5
+    /// <summary>
+    /// String helpers available to core components (kept minimal to avoid UI dependencies).
+    /// </summary>
     public static class StringExtensions
     {
         public static bool IsNullOrWhiteSpace(string value)

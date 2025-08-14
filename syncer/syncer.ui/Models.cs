@@ -78,6 +78,12 @@ namespace syncer.ui
         public bool UseSftp { get; set; }
         public bool IsConnected { get; set; }
         public DateTime? LastConnectionTest { get; set; }
+        
+        // Enhanced SFTP Properties
+        public string SshKeyPath { get; set; }
+        public int Timeout { get; set; } = 30;
+        public bool UseKeyAuthentication { get; set; }
+        public string SshKeyPassphrase { get; set; }
 
         public ConnectionSettings()
         {

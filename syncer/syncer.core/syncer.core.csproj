@@ -64,6 +64,10 @@
     <Compile Include="Transfers\FtpTransferClient.cs" />
     <Compile Include="Transfers\SftpTransferClient.cs" />
     <Compile Include="Transfers\TransferClientFactory.cs" />
+    <Compile Include="Transfers\EnhancedSftpTransferClient.cs" />
+    <Compile Include="Configuration\SftpConfiguration.cs" />
+    <Compile Include="Configuration\SftpConfigurationManager.cs" />
+    <Compile Include="Utilities\SftpUtilities.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
