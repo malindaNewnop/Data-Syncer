@@ -512,7 +512,14 @@ namespace syncer.ui
                 {
                     SyncJob job = jobs[i];
                     string schedule = "Every " + job.IntervalValue + " " + job.IntervalType;
-                    string lastRun = job.LastRun.HasValue ? job.LastRun.Value.ToString("yyyy-MM-dd HH:mm") : "Never";
+                    
+                    // Improve LastRun display - show "Never" for both null and MinValue dates
+                    string lastRun = "Never";
+                    if (job.LastRun.HasValue && job.LastRun.Value != DateTime.MinValue)
+                    {
+                        lastRun = job.LastRun.Value.ToString("yyyy-MM-dd HH:mm");
+                    }
+                    
                     string nextRun = job.GetNextRunTime();
                     string status = job.IsEnabled ? "Enabled" : "Disabled";
                     int rowIndex = dgvJobs.Rows.Add(new object[] { job.Name, status, job.SourcePath, job.DestinationPath, schedule, lastRun, nextRun });
@@ -547,31 +554,81 @@ namespace syncer.ui
 
         private void UpdateJobControlButtons()
         {
-            bool hasSelectedJob = dgvJobs.SelectedRows.Count > 0;
-            btnPauseJob.Enabled = hasSelectedJob;
-            btnDeleteJob.Enabled = hasSelectedJob;
+            // Safely check if we have selected rows
+            bool hasSelectedJob = dgvJobs != null && dgvJobs.SelectedRows != null && dgvJobs.SelectedRows.Count > 0;
+            
+            // Make sure the buttons exist before trying to access them
+            if (btnPauseJob != null) btnPauseJob.Enabled = hasSelectedJob;
+            if (btnDeleteJob != null) btnDeleteJob.Enabled = hasSelectedJob;
             
             if (hasSelectedJob)
             {
                 try
                 {
+                    // Check if Tag exists and is an integer
+                    if (dgvJobs.SelectedRows[0].Tag == null)
+                    {
+                        if (btnPauseJob != null)
+                        {
+                            btnPauseJob.Text = "Pause Job";
+                            btnPauseJob.BackColor = Color.Orange;
+                        }
+                        return;
+                    }
+                    
                     int jobId = (int)dgvJobs.SelectedRows[0].Tag;
+                    
+                    // Check if job service is available
+                    if (_jobService == null)
+                    {
+                        if (btnPauseJob != null)
+                        {
+                            btnPauseJob.Text = "Pause Job";
+                            btnPauseJob.BackColor = Color.Orange;
+                        }
+                        return;
+                    }
+                    
                     string currentStatus = _jobService.GetJobStatus(jobId);
+                    
+                    // Check if status is null or empty
+                    if (string.IsNullOrEmpty(currentStatus))
+                    {
+                        if (btnPauseJob != null)
+                        {
+                            btnPauseJob.Text = "Pause Job";
+                            btnPauseJob.BackColor = Color.Orange;
+                        }
+                        return;
+                    }
+                    
                     bool isRunning = currentStatus.ToLower().Contains("running") || currentStatus.ToLower().Contains("active");
                     
-                    btnPauseJob.Text = isRunning ? "Pause Job" : "Resume Job";
-                    btnPauseJob.BackColor = isRunning ? Color.Orange : Color.LightGreen;
+                    if (btnPauseJob != null)
+                    {
+                        btnPauseJob.Text = isRunning ? "Pause Job" : "Resume Job";
+                        btnPauseJob.BackColor = isRunning ? Color.Orange : Color.LightGreen;
+                    }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    btnPauseJob.Text = "Pause Job";
-                    btnPauseJob.BackColor = Color.Orange;
+                    // Log the error for debugging
+                    Console.WriteLine($"Error in UpdateJobControlButtons: {ex.Message}");
+                    
+                    if (btnPauseJob != null)
+                    {
+                        btnPauseJob.Text = "Pause Job";
+                        btnPauseJob.BackColor = Color.Orange;
+                    }
                 }
             }
             else
             {
-                btnPauseJob.Text = "Pause Job";
-                btnPauseJob.BackColor = Color.Orange;
+                if (btnPauseJob != null)
+                {
+                    btnPauseJob.Text = "Pause Job";
+                    btnPauseJob.BackColor = Color.Orange;
+                }
             }
         }
 

@@ -1,6 +1,9 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using syncer.core;
+using syncer.core.Configuration;
+using syncer.ui.Forms;
 
 namespace syncer.ui
 {
@@ -111,10 +114,42 @@ namespace syncer.ui
             {
                 if (_connectionService.IsConnected())
                 {
-                    MessageBox.Show("Remote folder browsing will be implemented with backend services.", "Feature Coming Soon", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    // Convert UI ConnectionSettings to Core ConnectionSettings
+                    var coreSettings = new syncer.core.ConnectionSettings
+                    {
+                        Protocol = connectionSettings.Protocol == "SFTP" ? 
+                            syncer.core.ProtocolType.Sftp : 
+                            connectionSettings.Protocol == "FTP" ? 
+                                syncer.core.ProtocolType.Ftp : 
+                                syncer.core.ProtocolType.Local,
+                        Host = connectionSettings.Host,
+                        Port = connectionSettings.Port,
+                        Username = connectionSettings.Username,
+                        Password = connectionSettings.Password,
+                        SshKeyPath = connectionSettings.SshKeyPath,
+                        Timeout = connectionSettings.Timeout
+                    };
+                    
+                    // Use the remote directory browser
+                    try
+                    {
+                        // For now, we'll use a simple input dialog since FormRemoteDirectoryBrowser would need more work
+                        // to handle the connection settings type differences
+                        ShowRemotePathInputDialog();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error browsing remote directory: {ex.Message}", "Error",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ShowRemotePathInputDialog();
+                    }
                 }
                 else
                 {
+                    MessageBox.Show("Not connected to a remote server. Please connect first.", 
+                        "Connection Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    
+                    // Show remote path input dialog for now
                     ShowRemotePathInputDialog();
                 }
             }
@@ -128,22 +163,68 @@ namespace syncer.ui
         {
             using (Form inputForm = new Form())
             {
-                inputForm.Text = "Enter Destination Path";
-                inputForm.Size = new Size(400, 150);
+                ConnectionSettings connectionSettings = _connectionService.GetConnectionSettings();
+                string protocol = connectionSettings != null ? connectionSettings.Protocol : "Unknown";
+                string host = connectionSettings != null ? connectionSettings.Host : "";
+                
+                inputForm.Text = $"Enter Remote Destination Path ({protocol})";
+                inputForm.Size = new Size(450, 180);
                 inputForm.StartPosition = FormStartPosition.CenterParent;
                 inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
                 inputForm.MaximizeBox = false;
                 inputForm.MinimizeBox = false;
-                Label label = new Label(); label.Left = 10; label.Top = 15; label.Text = "Remote destination path (e.g., /remote/folder):"; label.AutoSize = true;
-                TextBox textBox = new TextBox(); textBox.Left = 10; textBox.Top = 40; textBox.Width = 360; textBox.Text = txtDestinationPath != null ? txtDestinationPath.Text : string.Empty;
-                Button okButton = new Button(); okButton.Text = "OK"; okButton.Left = 205; okButton.Width = 75; okButton.Top = 70; okButton.DialogResult = DialogResult.OK;
-                Button cancelButton = new Button(); cancelButton.Text = "Cancel"; cancelButton.Left = 295; cancelButton.Width = 75; cancelButton.Top = 70; cancelButton.DialogResult = DialogResult.Cancel;
+                
+                Label labelInfo = new Label(); 
+                labelInfo.Left = 10; 
+                labelInfo.Top = 10; 
+                labelInfo.Width = 420;
+                labelInfo.Text = $"Enter the remote path on {protocol} server: {host}"; 
+                labelInfo.AutoSize = false;
+                
+                Label label = new Label(); 
+                label.Left = 10; 
+                label.Top = 40; 
+                label.Text = "Remote path (e.g., /remote/folder):"; 
+                label.AutoSize = true;
+                
+                TextBox textBox = new TextBox(); 
+                textBox.Left = 10; 
+                textBox.Top = 65; 
+                textBox.Width = 410; 
+                textBox.Text = txtDestinationPath != null ? txtDestinationPath.Text : string.Empty;
+                
+                Label tipLabel = new Label();
+                tipLabel.Left = 10;
+                tipLabel.Top = 95;
+                tipLabel.Width = 420;
+                tipLabel.Height = 30;
+                tipLabel.Text = "Tip: For FTP/SFTP, paths typically start with / and use forward slashes.";
+                tipLabel.ForeColor = Color.DarkBlue;
+                tipLabel.AutoSize = false;
+                
+                Button okButton = new Button(); 
+                okButton.Text = "OK"; 
+                okButton.Left = 255; 
+                okButton.Width = 75; 
+                okButton.Top = 130; 
+                okButton.DialogResult = DialogResult.OK;
+                
+                Button cancelButton = new Button(); 
+                cancelButton.Text = "Cancel"; 
+                cancelButton.Left = 345; 
+                cancelButton.Width = 75; 
+                cancelButton.Top = 130; 
+                cancelButton.DialogResult = DialogResult.Cancel;
+                
+                inputForm.Controls.Add(labelInfo);
                 inputForm.Controls.Add(label);
                 inputForm.Controls.Add(textBox);
+                inputForm.Controls.Add(tipLabel);
                 inputForm.Controls.Add(okButton);
                 inputForm.Controls.Add(cancelButton);
                 inputForm.AcceptButton = okButton;
                 inputForm.CancelButton = cancelButton;
+                
                 if (inputForm.ShowDialog() == DialogResult.OK && txtDestinationPath != null)
                 {
                     txtDestinationPath.Text = textBox.Text.Trim();

@@ -195,7 +195,11 @@ namespace syncer.ui.Services
                 OverwriteExisting = coreJob.OverwriteExisting,
                 CreatedDate = coreJob.CreatedDate,
                 LastRun = coreJob.LastRun,
-                LastStatus = coreJob.LastStatus
+                LastStatus = coreJob.LastStatus,
+                // Add schedule settings
+                StartTime = coreJob.Schedule?.StartTime ?? DateTime.Now,
+                IntervalValue = coreJob.Schedule?.RepeatEvery ?? 60,
+                IntervalType = MapTimeUnitToString(coreJob.Schedule?.Unit ?? syncer.core.TimeUnit.Minutes)
             };
 
             return uiJob;
@@ -217,10 +221,48 @@ namespace syncer.ui.Services
                 LastRun = uiJob.LastRun.HasValue ? uiJob.LastRun.Value : DateTime.MinValue,
                 LastStatus = uiJob.LastStatus,
                 Connection = new syncer.core.ConnectionSettings { Protocol = syncer.core.ProtocolType.Local },
-                DestinationConnection = new syncer.core.ConnectionSettings { Protocol = syncer.core.ProtocolType.Local }
+                DestinationConnection = new syncer.core.ConnectionSettings { Protocol = syncer.core.ProtocolType.Local },
+                // Add schedule settings
+                Schedule = new syncer.core.ScheduleSettings
+                {
+                    StartTime = uiJob.StartTime,
+                    RepeatEvery = uiJob.IntervalValue,
+                    Unit = MapStringToTimeUnit(uiJob.IntervalType),
+                    IsEnabled = uiJob.IsEnabled
+                }
             };
 
             return coreJob;
+        }
+        
+        private string MapTimeUnitToString(syncer.core.TimeUnit unit)
+        {
+            switch (unit)
+            {
+                case syncer.core.TimeUnit.Minutes:
+                    return "Minutes";
+                case syncer.core.TimeUnit.Hours:
+                    return "Hours";
+                case syncer.core.TimeUnit.Days:
+                    return "Days";
+                default:
+                    return "Minutes";
+            }
+        }
+        
+        private syncer.core.TimeUnit MapStringToTimeUnit(string intervalType)
+        {
+            switch (intervalType?.ToLower())
+            {
+                case "minutes":
+                    return syncer.core.TimeUnit.Minutes;
+                case "hours":
+                    return syncer.core.TimeUnit.Hours;
+                case "days":
+                    return syncer.core.TimeUnit.Days;
+                default:
+                    return syncer.core.TimeUnit.Minutes;
+            }
         }
     }
 }

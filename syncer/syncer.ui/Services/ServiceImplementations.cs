@@ -13,6 +13,7 @@ namespace syncer.ui.Services
         public SyncJobService()
         {
             _jobs = new List<SyncJob>();
+            Console.WriteLine("WARNING: Using stub SyncJobService - jobs will not be persisted between sessions");
         }
 
         public List<SyncJob> GetAllJobs()
@@ -86,6 +87,7 @@ namespace syncer.ui.Services
         public ConnectionService()
         {
             _settings = new ConnectionSettings();
+            Console.WriteLine("WARNING: Using stub ConnectionService - connection settings will not be persisted");
         }
 
         public ConnectionSettings GetConnectionSettings()

@@ -50,9 +50,29 @@ namespace syncer.ui
                 // Fall back to stub implementations if there's a problem
                 InitializeStubs();
                 
-                // Can't log properly yet, so show in console
-                Console.WriteLine("Error initializing services: " + ex.Message);
-                throw; // Re-throw so we can show the detailed error
+                // Log the error
+                string errorMsg = "Error initializing services: " + ex.Message;
+                if (ex.InnerException != null) {
+                    errorMsg += "\r\nInner exception: " + ex.InnerException.Message;
+                }
+                Console.WriteLine(errorMsg);
+                
+                // Try to log to file if possible
+                try {
+                    string logDir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                        "DataSyncer");
+                    string logPath = Path.Combine(logDir, "initialization_error.log");
+                    
+                    if (!Directory.Exists(logDir)) {
+                        Directory.CreateDirectory(logDir);
+                    }
+                    
+                    File.AppendAllText(logPath, DateTime.Now.ToString() + ": " + errorMsg + "\r\n" + ex.StackTrace + "\r\n\r\n");
+                } catch {}
+                
+                // Don't rethrow - let the application continue with stubs
+                // throw;
             }
         }
         

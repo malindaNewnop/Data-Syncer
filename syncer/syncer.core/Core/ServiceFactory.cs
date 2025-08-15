@@ -10,7 +10,8 @@ namespace syncer.core
     {
         public static IJobRepository CreateJobRepository()
         {
-            return new XmlJobRepository();
+            ILogService logService = CreateLogService();
+            return new XmlJobRepository(logService);
         }
 
         public static ILogService CreateLogService()

@@ -163,20 +163,38 @@ namespace syncer.ui.Forms
         private void UpdateUIForProtocol()
         {
             bool isSftp = cmbProtocol.SelectedIndex == 2; // SFTP
+            bool isFtp = cmbProtocol.SelectedIndex == 1;  // FTP
+            bool isLocal = cmbProtocol.SelectedIndex == 0; // LOCAL
             
-            // Enable/disable SFTP-specific controls
+            // Enable/disable protocol-specific controls
             gbSftpAdvanced.Enabled = isSftp;
-            gbAuthentication.Enabled = cmbProtocol.SelectedIndex != 0; // Not LOCAL
+            gbAuthentication.Enabled = !isLocal;
             
+            // SSH key-related controls (SFTP only)
+            txtSshKeyPath.Enabled = isSftp;
+            btnBrowseKey.Enabled = isSftp;
+            btnGenerateKey.Enabled = isSftp;
+            btnTestAuthMethods.Enabled = isSftp;
+            
+            // Set appropriate default ports
             if (isSftp)
             {
                 txtPort.Text = "22";
                 lblPassword.Text = "Password/Passphrase:";
             }
-            else if (cmbProtocol.SelectedIndex == 1) // FTP
+            else if (isFtp)
             {
                 txtPort.Text = "21";
                 lblPassword.Text = "Password:";
+            }
+            
+            // For local transfers, no connection credentials needed
+            if (isLocal)
+            {
+                txtHost.Text = "localhost";
+                txtUsername.Text = "local";
+                txtPassword.Text = "";
+                txtPort.Text = "0";
             }
         }
 
@@ -218,12 +236,27 @@ namespace syncer.ui.Forms
             
             try
             {
-                var client = new EnhancedSftpTransferClient(_sftpConfig);
+                ITransferClient client;
+                
+                // Use the appropriate client based on protocol
+                switch (_settings.Protocol)
+                {
+                    case ProtocolType.Sftp:
+                        client = new EnhancedSftpTransferClient(_sftpConfig);
+                        break;
+                    case ProtocolType.Ftp:
+                        client = new FtpTransferClient();
+                        break;
+                    case ProtocolType.Local:
+                    default:
+                        client = new LocalTransferClient();
+                        break;
+                }
                 
                 if (client.TestConnection(_settings, out string error))
                 {
-                    // Get server info for detailed results
-                    if (SftpUtilities.GetServerInfo(_settings, out var serverInfo))
+                    // Get server info for SFTP connections
+                    if (_settings.Protocol == ProtocolType.Sftp && SftpUtilities.GetServerInfo(_settings, out var serverInfo))
                     {
                         var result = $"✓ Connection Successful\n\n" +
                                    $"Server: {serverInfo.ServerVersion}\n" +
@@ -237,13 +270,13 @@ namespace syncer.ui.Forms
                     }
                     else
                     {
-                        MessageBox.Show("✓ Connection Successful", "Test Result", 
+                        MessageBox.Show($"✓ Connection Successful\nProtocol: {_settings.Protocol}", "Test Result", 
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
                 else
                 {
-                    MessageBox.Show($"✗ Connection Failed\n\n{error}", "Test Failed", 
+                    MessageBox.Show($"✗ Connection Failed\n\nProtocol: {_settings.Protocol}\nError: {error}", "Test Failed", 
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
@@ -264,6 +297,14 @@ namespace syncer.ui.Forms
         {
             if (!ValidateInputs())
                 return;
+                
+            // Auth methods test is only relevant for SFTP
+            if (_settings.Protocol != ProtocolType.Sftp)
+            {
+                MessageBox.Show("Authentication methods test is only available for SFTP connections.", 
+                    "Not Supported", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
 
             SaveSettingsFromUI();
             
@@ -421,6 +462,7 @@ namespace syncer.ui.Forms
                 return false;
             }
 
+            // Protocol-specific validations
             if (cmbProtocol.SelectedIndex == 2) // SFTP
             {
                 if (IsNullOrWhiteSpace(txtPassword.Text) && IsNullOrWhiteSpace(txtSshKeyPath.Text))
@@ -435,6 +477,16 @@ namespace syncer.ui.Forms
                     MessageBox.Show("The specified SSH key file does not exist.", "Validation Error", 
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtSshKeyPath.Focus();
+                    return false;
+                }
+            }
+            else if (cmbProtocol.SelectedIndex == 1) // FTP
+            {
+                if (IsNullOrWhiteSpace(txtPassword.Text))
+                {
+                    MessageBox.Show("Please enter a password for FTP authentication.", "Validation Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    txtPassword.Focus();
                     return false;
                 }
             }

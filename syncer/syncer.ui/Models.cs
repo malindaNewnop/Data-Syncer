@@ -37,21 +37,55 @@ namespace syncer.ui
 
         public string GetNextRunTime()
         {
-            if (!IsEnabled || LastRun == null)
+            if (!IsEnabled)
                 return "Not Scheduled";
-
-            DateTime nextRun = LastRun.Value;
+                
+            // Use StartTime as base if job never ran before, otherwise use LastRun
+            // If LastRun is MinValue (0001-01-01), consider it as never run
+            DateTime baseTime;
+            
+            if (LastRun == null || !LastRun.HasValue || LastRun.Value == DateTime.MinValue)
+            {
+                // For new jobs, use StartTime or current time if StartTime is too old
+                if (StartTime > DateTime.Now.AddDays(-1)) // If StartTime is recent
+                    baseTime = StartTime;
+                else
+                    baseTime = DateTime.Now; // Use current time for jobs with old StartTime
+            }
+            else
+            {
+                baseTime = LastRun.Value;
+            }
+            
+            DateTime nextRun = baseTime;
             switch (IntervalType)
             {
                 case "Minutes":
-                    nextRun = nextRun.AddMinutes(IntervalValue);
+                    nextRun = baseTime.AddMinutes(IntervalValue);
                     break;
                 case "Hours":
-                    nextRun = nextRun.AddHours(IntervalValue);
+                    nextRun = baseTime.AddHours(IntervalValue);
                     break;
                 case "Days":
-                    nextRun = nextRun.AddDays(IntervalValue);
+                    nextRun = baseTime.AddDays(IntervalValue);
                     break;
+            }
+            
+            // If next run is in the past, increment until it's in the future
+            while (nextRun < DateTime.Now)
+            {
+                switch (IntervalType)
+                {
+                    case "Minutes":
+                        nextRun = nextRun.AddMinutes(IntervalValue);
+                        break;
+                    case "Hours":
+                        nextRun = nextRun.AddHours(IntervalValue);
+                        break;
+                    case "Days":
+                        nextRun = nextRun.AddDays(IntervalValue);
+                        break;
+                }
             }
 
             return nextRun.ToString("yyyy-MM-dd HH:mm");
