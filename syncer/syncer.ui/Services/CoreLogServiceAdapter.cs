@@ -10,7 +10,7 @@ namespace syncer.ui.Services
     /// </summary>
     public class CoreLogServiceAdapter : ILogService
     {
-        private readonly syncer.core.ILogService _coreLogService;
+        private readonly syncer.core.FileLogService _coreLogService;
 
         public CoreLogServiceAdapter()
         {
@@ -35,7 +35,7 @@ namespace syncer.ui.Services
         public DataTable GetLogs(DateTime? fromDate, DateTime? toDate, string logLevel)
         {
             syncer.core.LogLevel? level = null;
-            
+
             if (!string.IsNullOrEmpty(logLevel) && logLevel != "All")
             {
                 if (logLevel == "INFO")
@@ -47,7 +47,7 @@ namespace syncer.ui.Services
             }
 
             return _coreLogService.GetLogs(
-                fromDate ?? DateTime.Now.AddDays(-30), 
+                fromDate ?? DateTime.Now.AddDays(-30),
                 toDate ?? DateTime.Now,
                 level);
         }
@@ -93,7 +93,7 @@ namespace syncer.ui.Services
         private string EscapeCsvField(string field)
         {
             if (string.IsNullOrEmpty(field)) return "";
-            
+
             field = field.Replace("\"", "\"\"");
             if (field.Contains(",") || field.Contains("\"") || field.Contains("\n") || field.Contains("\r"))
             {

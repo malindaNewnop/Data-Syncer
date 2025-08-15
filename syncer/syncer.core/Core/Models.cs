@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Xml.Serialization;
 
 namespace syncer.core
 {
@@ -233,5 +234,269 @@ namespace syncer.core
         public DateTime LastModified;
         public PreviewStatus Status;
         public string Message;
+    }
+
+    /// <summary>
+    /// Represents a job queue with priority and execution management
+    /// </summary>
+    [Serializable]
+    [XmlRoot("JobQueue")]
+    public class JobQueue
+    {
+        /// <summary>
+        /// Unique identifier for the queue
+        /// </summary>
+        [XmlAttribute]
+        public string Id { get; set; }
+        
+        /// <summary>
+        /// Name of the job queue
+        /// </summary>
+        [XmlAttribute]
+        public string Name { get; set; }
+        
+        /// <summary>
+        /// Maximum number of concurrent jobs in this queue
+        /// </summary>
+        [XmlAttribute]
+        public int MaxConcurrentJobs { get; set; } = 3;
+        
+        /// <summary>
+        /// Whether this queue is active
+        /// </summary>
+        [XmlAttribute]
+        public bool IsActive { get; set; } = true;
+        
+        /// <summary>
+        /// Queue priority (higher number = higher priority)
+        /// </summary>
+        [XmlAttribute]
+        public int Priority { get; set; } = 0;
+        
+        /// <summary>
+        /// Jobs in this queue
+        /// </summary>
+        [XmlArray("QueuedJobs")]
+        [XmlArrayItem("QueuedJob")]
+        public List<QueuedJob> QueuedJobs { get; set; }
+        
+        /// <summary>
+        /// Creation date
+        /// </summary>
+        [XmlAttribute]
+        public DateTime CreatedDate { get; set; }
+        
+        /// <summary>
+        /// Last modified date
+        /// </summary>
+        [XmlAttribute]
+        public DateTime ModifiedDate { get; set; }
+
+        public JobQueue()
+        {
+            Id = Guid.NewGuid().ToString();
+            CreatedDate = DateTime.Now;
+            ModifiedDate = DateTime.Now;
+            QueuedJobs = new List<QueuedJob>();
+        }
+    }
+
+    /// <summary>
+    /// Represents a job in the execution queue
+    /// </summary>
+    [Serializable]
+    public class QueuedJob
+    {
+        /// <summary>
+        /// Reference to the SyncJob ID
+        /// </summary>
+        [XmlAttribute]
+        public string JobId { get; set; }
+        
+        /// <summary>
+        /// Priority within the queue (higher = higher priority)
+        /// </summary>
+        [XmlAttribute]
+        public int Priority { get; set; } = 0;
+        
+        /// <summary>
+        /// When this job was added to the queue
+        /// </summary>
+        [XmlAttribute]
+        public DateTime QueuedTime { get; set; }
+        
+        /// <summary>
+        /// When this job should be executed (for delayed execution)
+        /// </summary>
+        [XmlAttribute]
+        public DateTime? ScheduledTime { get; set; }
+        
+        /// <summary>
+        /// Current status of the queued job
+        /// </summary>
+        [XmlAttribute]
+        public QueuedJobStatus Status { get; set; }
+        
+        /// <summary>
+        /// Number of retry attempts for this job
+        /// </summary>
+        [XmlAttribute]
+        public int RetryCount { get; set; } = 0;
+        
+        /// <summary>
+        /// Maximum retry attempts allowed
+        /// </summary>
+        [XmlAttribute]
+        public int MaxRetries { get; set; } = 3;
+        
+        /// <summary>
+        /// Dependencies - other job IDs that must complete before this job can run
+        /// </summary>
+        [XmlArray("Dependencies")]
+        [XmlArrayItem("JobId")]
+        public List<string> Dependencies { get; set; }
+        
+        /// <summary>
+        /// Execution context or additional parameters
+        /// </summary>
+        [XmlElement]
+        public string ExecutionContext { get; set; }
+
+        public QueuedJob()
+        {
+            QueuedTime = DateTime.Now;
+            Status = QueuedJobStatus.Pending;
+            Dependencies = new List<string>();
+        }
+
+        public QueuedJob(string jobId) : this()
+        {
+            JobId = jobId;
+        }
+    }
+
+    /// <summary>
+    /// Status of a queued job
+    /// </summary>
+    public enum QueuedJobStatus
+    {
+        Pending = 0,
+        Running = 1,
+        Completed = 2,
+        Failed = 3,
+        Cancelled = 4,
+        WaitingForDependencies = 5,
+        Scheduled = 6,
+        Retrying = 7
+    }
+
+    /// <summary>
+    /// Job execution context and runtime information
+    /// </summary>
+    [Serializable]
+    public class JobExecutionContext
+    {
+        /// <summary>
+        /// Job ID being executed
+        /// </summary>
+        public string JobId { get; set; }
+        
+        /// <summary>
+        /// Queue ID
+        /// </summary>
+        public string QueueId { get; set; }
+        
+        /// <summary>
+        /// Thread ID executing the job
+        /// </summary>
+        public int ThreadId { get; set; }
+        
+        /// <summary>
+        /// Execution start time
+        /// </summary>
+        public DateTime StartTime { get; set; }
+        
+        /// <summary>
+        /// Current progress percentage
+        /// </summary>
+        public double ProgressPercentage { get; set; }
+        
+        /// <summary>
+        /// Current status message
+        /// </summary>
+        public string StatusMessage { get; set; }
+        
+        /// <summary>
+        /// Whether cancellation has been requested
+        /// </summary>
+        public bool CancellationRequested { get; set; }
+        
+        /// <summary>
+        /// Any additional execution data
+        /// </summary>
+        public Dictionary<string, object> Data { get; set; }
+
+        public JobExecutionContext()
+        {
+            StartTime = DateTime.Now;
+            Data = new Dictionary<string, object>();
+        }
+    }
+
+    // Event Args Classes for Multi-Job Operations
+    public class JobQueuedEventArgs : EventArgs
+    {
+        public string JobId { get; set; }
+        public string QueueId { get; set; }
+        public QueuedJob QueuedJob { get; set; }
+    }
+
+    public class JobDequeuedEventArgs : EventArgs
+    {
+        public string JobId { get; set; }
+        public string QueueId { get; set; }
+        public string Reason { get; set; }
+    }
+
+    public class QueueStatusChangedEventArgs : EventArgs
+    {
+        public string QueueId { get; set; }
+        public bool IsActive { get; set; }
+        public string StatusMessage { get; set; }
+    }
+
+    public class MultiJobStatusEventArgs : EventArgs
+    {
+        public Dictionary<string, string> JobStatuses { get; set; }
+        public int RunningJobs { get; set; }
+        public int PendingJobs { get; set; }
+        public int CompletedJobs { get; set; }
+    }
+
+    public class JobBatchCompletedEventArgs : EventArgs
+    {
+        public List<string> CompletedJobIds { get; set; }
+        public List<string> FailedJobIds { get; set; }
+        public TimeSpan TotalExecutionTime { get; set; }
+    }
+
+    /// <summary>
+    /// Statistics for job queue monitoring
+    /// </summary>
+    public class QueueStatistics
+    {
+        public string QueueId { get; set; }
+        public string QueueName { get; set; }
+        public int TotalJobs { get; set; }
+        public int PendingJobs { get; set; }
+        public int RunningJobs { get; set; }
+        public int CompletedJobs { get; set; }
+        public int FailedJobs { get; set; }
+        public int CancelledJobs { get; set; }
+        public DateTime LastActivity { get; set; }
+        public TimeSpan AverageExecutionTime { get; set; }
+        public double SuccessRate { get; set; }
+        public int MaxConcurrentJobs { get; set; }
+        public bool IsActive { get; set; }
     }
 }

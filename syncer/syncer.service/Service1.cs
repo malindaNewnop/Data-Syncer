@@ -27,12 +27,14 @@ namespace syncer.service
         {
             try
             {
-                // Using static factory methods instead of direct instantiation
+                // Using enhanced service factory methods for multi-job support
                 _repo = Core.ServiceFactory.CreateJobRepository();
                 _log = Core.ServiceFactory.CreateLogService();
                 _factory = Core.ServiceFactory.CreateTransferClientFactory();
                 _fileEnumerator = Core.ServiceFactory.CreateFileEnumerator();
-                _runner = Core.ServiceFactory.CreateJobRunner(_factory, _log, _fileEnumerator);
+                
+                // Use the new multi-job runner from configuration
+                _runner = Core.ServiceFactory.CreateJobRunnerFromConfiguration();
 
                 _timer = new Timer();
                 _timer.Interval = 60 * 1000;
@@ -40,7 +42,7 @@ namespace syncer.service
                 _timer.Elapsed += OnTick;
                 _timer.Start();
 
-                _log.LogInfo(null, "Service started");
+                _log.LogInfo(null, "Data Syncer Service started with multi-job support");
                 OnTick(this, null);
             }
             catch (Exception ex)
@@ -87,10 +89,16 @@ namespace syncer.service
 
                     try
                     {
-                        _runner.RunJob(job);
-                        job.LastRun = now;
-                        // Note: We now rely on JobRunner events for tracking progress and completion
-                        // Results are logged automatically by the JobRunner
+                        // Use StartJob method which is available in IJobRunner
+                        if (_runner.StartJob(job.Id))
+                        {
+                            job.LastRun = now;
+                            _log.LogInfo(job.Id, $"Started job '{job.Name}'");
+                        }
+                        else
+                        {
+                            _log.LogWarning(job.Id, $"Failed to start job '{job.Name}' - may be already running or queued");
+                        }
                     }
                     catch (Exception ex)
                     {

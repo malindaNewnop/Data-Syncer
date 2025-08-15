@@ -11,7 +11,7 @@ namespace syncer.console
         private static void Main(string[] args)
         {
             Console.Title = "DataSyncer Console Runner";
-            Console.WriteLine("Starting DataSyncer (console mode). Press Ctrl+C to stop...");
+            Console.WriteLine("Starting DataSyncer (console mode) with multi-job support. Press Ctrl+C to stop...");
 
             // Wire Ctrl+C
             Console.CancelKeyPress += (s, e) =>
@@ -20,12 +20,12 @@ namespace syncer.console
                 _quit.Set();
             };
 
-            // Create core services via factory
+            // Create core services via factory with multi-job support
             var repo = Core.ServiceFactory.CreateJobRepository();
             var log = Core.ServiceFactory.CreateLogService();
-            var factory = Core.ServiceFactory.CreateTransferClientFactory();
-            var fileEnum = Core.ServiceFactory.CreateFileEnumerator();
-            var runner = Core.ServiceFactory.CreateJobRunner(factory, log, fileEnum);
+            var runner = Core.ServiceFactory.CreateJobRunnerFromConfiguration();
+
+            log.LogInfo(null, "DataSyncer console started with multi-job capabilities");
 
             // Basic loop: run due jobs every minute (mirrors service timer)
             var timer = new Timer(_ => Tick(repo, runner, log), null, 0, 60 * 1000);
@@ -51,8 +51,16 @@ namespace syncer.console
 
                     try
                     {
-                        runner.RunJob(job);
-                        job.LastRun = now;
+                        // Use StartJob method which is available in IJobRunner
+                        if (runner.StartJob(job.Id))
+                        {
+                            job.LastRun = now;
+                            log.LogInfo(job.Id, $"Started job '{job.Name}'");
+                        }
+                        else
+                        {
+                            log.LogWarning(job.Id, $"Failed to start job '{job.Name}' - may be already running or queued");
+                        }
                     }
                     catch (Exception ex)
                     {

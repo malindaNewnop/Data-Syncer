@@ -133,4 +133,69 @@ namespace syncer.core
         public SyncJob Job { get; set; }
         public TransferResult Result { get; set; }
     }
+
+    /// <summary>
+    /// Interface for job queue management operations
+    /// </summary>
+    public interface IJobQueueService
+    {
+        // Queue Management
+        List<JobQueue> GetAllQueues();
+        JobQueue GetQueueById(string queueId);
+        JobQueue CreateQueue(string name, int maxConcurrentJobs = 3, int priority = 0);
+        bool UpdateQueue(JobQueue queue);
+        bool DeleteQueue(string queueId);
+        
+        // Job Queueing Operations
+        bool QueueJob(string jobId, string queueId = null, int priority = 0, DateTime? scheduledTime = null);
+        bool QueueJobWithDependencies(string jobId, List<string> dependencyJobIds, string queueId = null, int priority = 0);
+        bool DequeueJob(string jobId);
+        bool RequeueJob(string jobId, string queueId = null);
+        
+        // Queue Status and Information
+        List<QueuedJob> GetJobsInQueue(string queueId);
+        List<QueuedJob> GetPendingJobs(string queueId = null);
+        List<QueuedJob> GetRunningJobs(string queueId = null);
+        QueuedJob GetQueuedJob(string jobId);
+        
+        // Queue Operations
+        bool StartQueue(string queueId);
+        bool StopQueue(string queueId);
+        bool PauseQueue(string queueId);
+        bool ClearQueue(string queueId);
+        
+        // Statistics and Monitoring
+        QueueStatistics GetQueueStatistics(string queueId);
+        List<QueueStatistics> GetAllQueueStatistics();
+        
+        // Events
+        event EventHandler<JobQueuedEventArgs> JobQueued;
+        event EventHandler<JobDequeuedEventArgs> JobDequeued;
+        event EventHandler<QueueStatusChangedEventArgs> QueueStatusChanged;
+    }
+
+    /// <summary>
+    /// Enhanced job runner interface for multiple job execution
+    /// </summary>
+    public interface IMultiJobRunner : IJobRunner
+    {
+        // Multi-job capabilities
+        bool StartMultipleJobs(List<string> jobIds);
+        bool StartJobsInQueue(string queueId);
+        Dictionary<string, string> GetAllJobStatuses();
+        
+        // Queue integration
+        bool ProcessJobQueue(string queueId);
+        void SetMaxConcurrentJobs(int maxJobs);
+        int GetMaxConcurrentJobs();
+        
+        // Advanced operations
+        bool StartJobWithDependencies(string jobId, List<string> dependencyJobIds);
+        List<string> GetJobDependencies(string jobId);
+        bool IsJobEligibleToRun(string jobId);
+        
+        // Events for multi-job operations
+        event EventHandler<MultiJobStatusEventArgs> MultiJobStatusChanged;
+        event EventHandler<JobBatchCompletedEventArgs> JobBatchCompleted;
+    }
 }

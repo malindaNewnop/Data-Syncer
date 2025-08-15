@@ -52,6 +52,8 @@
     <Compile Include="Core\StringExtensions.cs" />
     <Compile Include="Services\PreviewService.cs" />
     <Compile Include="Services\JobRunner.cs" />
+    <Compile Include="Services\MultiJobRunner.cs" />
+    <Compile Include="Services\XmlJobQueueService.cs" />
     <Compile Include="Services\JobScheduler.cs" />
     <Compile Include="Services\PipeServer.cs" />
     <Compile Include="Services\PipeClient.cs" />
@@ -67,6 +69,7 @@
     <Compile Include="Transfers\EnhancedSftpTransferClient.cs" />
     <Compile Include="Configuration\SftpConfiguration.cs" />
     <Compile Include="Configuration\SftpConfigurationManager.cs" />
+    <Compile Include="Configuration\MultiJobConfiguration.cs" />
     <Compile Include="Utilities\SftpUtilities.cs" />
   </ItemGroup>
   <ItemGroup>

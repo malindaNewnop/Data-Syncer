@@ -13,7 +13,28 @@ namespace syncer.core
         private const int MaxLogSizeBytes = 10 * 1024 * 1024; // 10MB
         private const int MaxBackupCount = 10; // Maximum number of backup files to keep
 
-        // Implement the missing interface methods
+        // Implement the interface methods with correct signatures
+        public void LogJobStart(SyncJob job)
+        {
+            Write(LogLevel.Info, job.Name, job.Id, "job", "Job started", null, "", 0, TimeSpan.Zero, "", "");
+        }
+
+        public void LogJobProgress(SyncJob job, string message)
+        {
+            Write(LogLevel.Info, job.Name, job.Id, "job", message, null, "", 0, TimeSpan.Zero, "", "");
+        }
+
+        public void LogJobSuccess(SyncJob job, string message)
+        {
+            Write(LogLevel.Info, job.Name, job.Id, "job", message, null, "", 0, TimeSpan.Zero, "", "");
+        }
+
+        public void LogJobError(SyncJob job, string message, Exception ex)
+        {
+            Write(LogLevel.Error, job.Name, job.Id, "job", message, ex, "", 0, TimeSpan.Zero, "", "");
+        }
+
+        // Keep existing methods for backward compatibility
         public void LogInfo(string jobId, string message)
         {
             Write(LogLevel.Info, "", jobId, "core", message, null, "", 0, TimeSpan.Zero, "", "");
@@ -27,24 +48,6 @@ namespace syncer.core
         public void LogError(string jobId, string message)
         {
             Write(LogLevel.Error, "", jobId, "core", message, null, "", 0, TimeSpan.Zero, "", "");
-        }
-
-        public void LogJobStart(string jobId, string jobName)
-        {
-            Write(LogLevel.Info, jobName, jobId, "job", "Job started", null, "", 0, TimeSpan.Zero, "", "");
-        }
-
-        public void LogJobEnd(string jobId, string status, int processedFiles, int failedFiles)
-        {
-            string message = string.Format("Job ended: {0} - Processed: {1}, Failed: {2}", status, processedFiles, failedFiles);
-            Write(LogLevel.Info, "", jobId, "job", message, null, "", 0, TimeSpan.Zero, "", "");
-        }
-
-        public void LogTransfer(string jobId, string sourcePath, string destPath, bool success, string error)
-        {
-            var level = success ? LogLevel.Info : LogLevel.Error;
-            var message = success ? "Transfer completed" : "Transfer failed: " + error;
-            Write(level, "", jobId, "transfer", message, null, Path.GetFileName(sourcePath), 0, TimeSpan.Zero, sourcePath, destPath);
         }
 
         public void Info(string message, string jobName)
@@ -69,8 +72,8 @@ namespace syncer.core
             Write(level, jobName, "", "transfer", message, null, fileName, fileSize, TimeSpan.Zero, "", "");
         }
 
-        private void Write(LogLevel level, string jobName, string jobId, string source, string message, 
-                          Exception ex, string fileName, long fileSize, TimeSpan duration, 
+        private void Write(LogLevel level, string jobName, string jobId, string source, string message,
+                          Exception ex, string fileName, long fileSize, TimeSpan duration,
                           string remotePath, string localPath)
         {
             lock (_syncLock)
@@ -78,7 +81,7 @@ namespace syncer.core
                 try
                 {
                     CheckLogRotation();
-                    
+
                     bool exists = File.Exists(Paths.LogsFile);
                     using (var sw = new StreamWriter(Paths.LogsFile, true, Encoding.UTF8))
                     {
@@ -86,7 +89,7 @@ namespace syncer.core
                         {
                             sw.WriteLine("Timestamp,Level,JobName,JobId,Source,Message,Exception,FileName,FileSize,Duration,RemotePath,LocalPath");
                         }
-                        
+
                         string line = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}",
                             DateTime.Now.ToString("o", CultureInfo.InvariantCulture),
                             level,
@@ -94,13 +97,13 @@ namespace syncer.core
                             EscapeCsv(jobId),
                             EscapeCsv(source),
                             EscapeCsv(message),
-                            EscapeCsv(ex?.ToString() ?? ""),
+                            EscapeCsv(ex != null ? ex.ToString() : ""),
                             EscapeCsv(fileName),
                             fileSize,
                             duration.TotalMilliseconds,
                             EscapeCsv(remotePath),
                             EscapeCsv(localPath));
-                        
+
                         sw.WriteLine(line);
                     }
                 }
@@ -114,7 +117,7 @@ namespace syncer.core
         public DataTable GetLogs(DateTime from, DateTime to, LogLevel? level)
         {
             var dt = CreateLogTable();
-            
+
             if (!File.Exists(Paths.LogsFile)) return dt;
 
             lock (_syncLock)
@@ -128,12 +131,12 @@ namespace syncer.core
                         while ((line = sr.ReadLine()) != null)
                         {
                             var entry = ParseLogLine(line);
-                            if (entry != null && 
-                                entry.Timestamp >= from && 
+                            if (entry != null &&
+                                entry.Timestamp >= from &&
                                 entry.Timestamp <= to &&
                                 (!level.HasValue || entry.Level == level.Value))
                             {
-                                dt.Rows.Add(entry.Timestamp, entry.Level.ToString(), entry.JobName, 
+                                dt.Rows.Add(entry.Timestamp, entry.Level.ToString(), entry.JobName,
                                            entry.JobId, entry.Source, entry.Message, entry.Exception,
                                            entry.FileName, entry.FileSize, entry.Duration.TotalMilliseconds,
                                            entry.RemotePath, entry.LocalPath);
@@ -146,14 +149,14 @@ namespace syncer.core
                     // Return empty table on error
                 }
             }
-            
+
             return dt;
         }
 
         public DataTable GetJobLogs(string jobId, DateTime from, DateTime to)
         {
             var dt = CreateLogTable();
-            
+
             if (!File.Exists(Paths.LogsFile)) return dt;
 
             lock (_syncLock)
@@ -167,12 +170,12 @@ namespace syncer.core
                         while ((line = sr.ReadLine()) != null)
                         {
                             var entry = ParseLogLine(line);
-                            if (entry != null && 
+                            if (entry != null &&
                                 entry.JobId == jobId &&
-                                entry.Timestamp >= from && 
+                                entry.Timestamp >= from &&
                                 entry.Timestamp <= to)
                             {
-                                dt.Rows.Add(entry.Timestamp, entry.Level.ToString(), entry.JobName, 
+                                dt.Rows.Add(entry.Timestamp, entry.Level.ToString(), entry.JobName,
                                            entry.JobId, entry.Source, entry.Message, entry.Exception,
                                            entry.FileName, entry.FileSize, entry.Duration.TotalMilliseconds,
                                            entry.RemotePath, entry.LocalPath);
@@ -185,7 +188,7 @@ namespace syncer.core
                     // Return empty table on error
                 }
             }
-            
+
             return dt;
         }
 
@@ -286,15 +289,17 @@ namespace syncer.core
 
                 var entry = new LogEntry();
                 DateTime.TryParse(parts[0], null, DateTimeStyles.RoundtripKind, out entry.Timestamp);
-                
+
                 // Replace Enum.TryParse with manual parsing for .NET 3.5 compatibility
-                try {
-                    entry.Level = (LogLevel)Enum.Parse(typeof(LogLevel), parts[1]);
+                try
+                {
+                    entry.Level = (LogLevel)Enum.Parse(typeof(LogLevel), parts[1], true);
                 }
-                catch {
+                catch
+                {
                     entry.Level = LogLevel.Info; // Default value if parsing fails
                 }
-                
+
                 entry.JobName = parts[2];
                 entry.JobId = parts[3];
                 entry.Source = parts[4];
@@ -302,10 +307,13 @@ namespace syncer.core
                 entry.Exception = parts[6];
                 entry.FileName = parts[7];
                 long.TryParse(parts[8], out entry.FileSize);
-                if (double.TryParse(parts[9], out double durationMs))
+
+                double durationMs;
+                if (double.TryParse(parts[9], out durationMs))
                 {
                     entry.Duration = TimeSpan.FromMilliseconds(durationMs);
                 }
+
                 entry.RemotePath = parts[10];
                 entry.LocalPath = parts[11];
 
@@ -335,7 +343,7 @@ namespace syncer.core
                 // Ignore rotation errors
             }
         }
-        
+
         /// <summary>
         /// Rotates log files when they exceed the specified size limit.
         /// Creates a backup of the current log file and starts a new one.
@@ -349,21 +357,21 @@ namespace syncer.core
                 {
                     if (!File.Exists(Paths.LogsFile))
                         return;
-                            
+
                     var fileInfo = new FileInfo(Paths.LogsFile);
                     if (fileInfo.Length > maxSizeBytes)
                     {
                         string backupPath = Paths.LogsFile + "." + DateTime.Now.ToString("yyyyMMddHHmmss") + ".bak";
                         File.Move(Paths.LogsFile, backupPath);
-                                
+
                         // Create a new log file with header
                         using (var sw = new StreamWriter(Paths.LogsFile, false, Encoding.UTF8))
                         {
                             sw.WriteLine("Timestamp,Level,JobName,JobId,Source,Message,Exception,FileName,FileSize,Duration,RemotePath,LocalPath");
                         }
-                                
+
                         LogInfo("system", "Log file rotated due to size limit. Previous log archived to: " + backupPath);
-                        
+
                         // Clean up old backup files to prevent disk space issues
                         CleanupOldBackups();
                     }
@@ -375,7 +383,7 @@ namespace syncer.core
                 }
             }
         }
-        
+
         /// <summary>
         /// Cleans up old log backup files, keeping only the most recent ones
         /// </summary>
@@ -386,23 +394,25 @@ namespace syncer.core
                 string logsDir = Path.GetDirectoryName(Paths.LogsFile);
                 if (string.IsNullOrEmpty(logsDir) || !Directory.Exists(logsDir))
                     return;
-                
+
                 string logFileName = Path.GetFileName(Paths.LogsFile);
                 string[] backupFiles = Directory.GetFiles(logsDir, logFileName + ".*.bak");
-                
+
                 if (backupFiles.Length <= MaxBackupCount)
                     return;
-                
-                // Sort backup files by creation time (oldest first)
-                Array.Sort(backupFiles, (a, b) => {
-                    try {
+
+                // Sort backup files by creation time (oldest first) - .NET 3.5 compatible
+                Array.Sort(backupFiles, new Comparison<string>((a, b) => {
+                    try
+                    {
                         return File.GetCreationTime(a).CompareTo(File.GetCreationTime(b));
                     }
-                    catch {
+                    catch
+                    {
                         return 0; // If we can't compare, treat as equal
                     }
-                });
-                
+                }));
+
                 // Delete oldest backups to keep only MaxBackupCount files
                 int filesToDelete = backupFiles.Length - MaxBackupCount;
                 for (int i = 0; i < filesToDelete; i++)
@@ -426,7 +436,7 @@ namespace syncer.core
         private static string EscapeCsv(string field)
         {
             if (string.IsNullOrEmpty(field)) return "";
-            
+
             field = field.Replace("\"", "\"\"");
             if (field.Contains(",") || field.Contains("\"") || field.Contains("\n") || field.Contains("\r"))
             {
@@ -444,7 +454,7 @@ namespace syncer.core
             for (int i = 0; i < line.Length; i++)
             {
                 char c = line[i];
-                
+
                 if (inQuotes)
                 {
                     if (c == '"')
@@ -482,7 +492,7 @@ namespace syncer.core
                     }
                 }
             }
-            
+
             result.Add(current.ToString());
             return result.ToArray();
         }

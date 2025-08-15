@@ -219,25 +219,7 @@ namespace syncer.core
                 // Notify that scheduled job is triggered
                 OnScheduledJobTriggered(new ScheduledJobTriggeredEventArgs { Job = job });
 
-                // Execute the job (this might run in background)
-                if (!_jobRunner.IsRunning)
-                {
-                    System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-                    {
-                        try
-                        {
-                            _jobRunner.RunJob(job);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logService.LogError(jobId, $"Scheduled job execution failed: {ex.Message}");
-                        }
-                    });
-                }
-                else
-                {
-                    _logService.LogWarning(jobId, "Job runner is busy, skipping scheduled execution");
-                }
+
 
                 // Reschedule for next occurrence
                 if (job.IsScheduled && job.Schedule != null)

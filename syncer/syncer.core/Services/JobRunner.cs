@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using System.Collections.Generic;
 
 namespace syncer.core
 {
@@ -8,36 +9,94 @@ namespace syncer.core
         private readonly ITransferClientFactory _transferClientFactory;
         private readonly ILogService _logService;
         private readonly IFileEnumerator _fileEnumerator;
-        private bool _cancellationRequested;
-        private bool _isRunning;
+        private readonly Dictionary<string, bool> _runningJobs = new Dictionary<string, bool>();
+        private readonly Dictionary<string, bool> _cancellationRequests = new Dictionary<string, bool>();
 
         public event EventHandler<JobStartedEventArgs> JobStarted;
         public event EventHandler<JobProgressEventArgs> JobProgress;
         public event EventHandler<JobCompletedEventArgs> JobCompleted;
         public event EventHandler<FileTransferEventArgs> FileTransferStarted;
         public event EventHandler<FileTransferEventArgs> FileTransferCompleted;
+        public event EventHandler<JobStatusEventArgs> JobStatusChanged;
 
         public JobRunner(ITransferClientFactory transferClientFactory, ILogService logService, IFileEnumerator fileEnumerator)
         {
-            _transferClientFactory = transferClientFactory ?? throw new ArgumentNullException("transferClientFactory");
-            _logService = logService ?? throw new ArgumentNullException("logService");
-            _fileEnumerator = fileEnumerator ?? throw new ArgumentNullException("fileEnumerator");
+            if (transferClientFactory == null)
+                throw new ArgumentNullException("transferClientFactory");
+            if (logService == null)
+                throw new ArgumentNullException("logService");
+            if (fileEnumerator == null)
+                throw new ArgumentNullException("fileEnumerator");
+
+            _transferClientFactory = transferClientFactory;
+            _logService = logService;
+            _fileEnumerator = fileEnumerator;
         }
 
-        public bool IsRunning
+        public bool IsRunning(string jobId)
         {
-            get { return _isRunning; }
+            lock (_runningJobs)
+            {
+                return _runningJobs.ContainsKey(jobId) && _runningJobs[jobId];
+            }
+        }
+
+        public List<string> GetRunningJobIds()
+        {
+            lock (_runningJobs)
+            {
+                var runningIds = new List<string>();
+                foreach (var kvp in _runningJobs)
+                {
+                    if (kvp.Value)
+                        runningIds.Add(kvp.Key);
+                }
+                return runningIds;
+            }
+        }
+
+        public bool StartJob(string jobId)
+        {
+            // This method should trigger job execution - implementation depends on your job management system
+            // For now, throwing NotImplementedException as the original RunJob method handles this differently
+            throw new NotImplementedException("Use RunJob(SyncJob) method instead");
+        }
+
+        public bool CancelJob(string jobId)
+        {
+            lock (_cancellationRequests)
+            {
+                if (_runningJobs.ContainsKey(jobId) && _runningJobs[jobId])
+                {
+                    _cancellationRequests[jobId] = true;
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        public bool WaitForJob(string jobId, int timeoutMs)
+        {
+            var startTime = DateTime.Now;
+            while (IsRunning(jobId) && (DateTime.Now - startTime).TotalMilliseconds < timeoutMs)
+            {
+                Thread.Sleep(100);
+            }
+            return !IsRunning(jobId);
         }
 
         public void RunJob(SyncJob job)
         {
-            if (_isRunning)
+            if (IsRunning(job.Id))
             {
-                throw new InvalidOperationException("Job runner is already running.");
+                throw new InvalidOperationException("Job is already running: " + job.Id);
             }
 
-            _isRunning = true;
-            _cancellationRequested = false;
+            lock (_runningJobs)
+            {
+                _runningJobs[job.Id] = true;
+                _cancellationRequests[job.Id] = false;
+            }
 
             try
             {
@@ -53,37 +112,63 @@ namespace syncer.core
                     FailedFiles = 0,
                     TotalBytes = 0,
                     TransferredBytes = 0,
-                    Errors = new System.Collections.Generic.List<string>()
+                    Errors = new List<string>()
                 };
 
                 OnJobStarted(new JobStartedEventArgs { Job = job, Result = result });
-                _logService.LogJobStart(job.Id, job.Name);
+                _logService.LogJobStart(job);
 
                 ExecuteJob(job, result);
 
                 result.EndTime = DateTime.Now;
                 result.Duration = result.EndTime - result.StartTime;
-                result.Status = _cancellationRequested ?
+
+                bool wasCancelled;
+                lock (_cancellationRequests)
+                {
+                    wasCancelled = _cancellationRequests.ContainsKey(job.Id) && _cancellationRequests[job.Id];
+                }
+
+                result.Status = wasCancelled ?
                     TransferStatus.Cancelled :
                     (result.FailedFiles > 0 ? TransferStatus.CompletedWithErrors : TransferStatus.Completed);
 
-                _logService.LogJobEnd(job.Id, result.Status.ToString(), result.ProcessedFiles, result.FailedFiles);
+                if (result.Status == TransferStatus.Completed)
+                {
+                    _logService.LogJobSuccess(job, "Job completed successfully");
+                }
+                else if (result.Status == TransferStatus.CompletedWithErrors)
+                {
+                    _logService.LogJobError(job, "Job completed with errors", null);
+                }
+
                 OnJobCompleted(new JobCompletedEventArgs { Job = job, Result = result });
             }
             catch (Exception ex)
             {
-                _logService.LogError(job.Id, "Job execution failed: " + ex.Message);
+                _logService.LogJobError(job, "Job execution failed: " + ex.Message, ex);
                 throw;
             }
             finally
             {
-                _isRunning = false;
+                lock (_runningJobs)
+                {
+                    _runningJobs[job.Id] = false;
+                }
             }
         }
 
         public void CancelJob()
         {
-            _cancellationRequested = true;
+            // Legacy method - cancel all running jobs
+            lock (_cancellationRequests)
+            {
+                var runningJobIds = GetRunningJobIds();
+                foreach (var jobId in runningJobIds)
+                {
+                    _cancellationRequests[jobId] = true;
+                }
+            }
         }
 
         private void ExecuteJob(SyncJob job, TransferResult result)
@@ -91,8 +176,17 @@ namespace syncer.core
             var filesToProcess = GetFilesToProcess(job);
             result.TotalFiles = filesToProcess.Count;
 
-            for (int i = 0; i < filesToProcess.Count && !_cancellationRequested; i++)
+            for (int i = 0; i < filesToProcess.Count; i++)
             {
+                bool shouldCancel;
+                lock (_cancellationRequests)
+                {
+                    shouldCancel = _cancellationRequests.ContainsKey(job.Id) && _cancellationRequests[job.Id];
+                }
+
+                if (shouldCancel)
+                    break;
+
                 var sourceFile = filesToProcess[i];
                 try
                 {
@@ -103,18 +197,22 @@ namespace syncer.core
                 {
                     result.FailedFiles++;
                     result.Errors.Add("File '" + sourceFile + "': " + ex.Message);
-                    _logService.LogError(job.Id, "Failed to process file '" + sourceFile + "': " + ex.Message);
+                    _logService.LogJobError(job, "Failed to process file '" + sourceFile + "': " + ex.Message, ex);
                 }
 
                 result.ProcessedFiles++;
                 var progressPercent = (result.ProcessedFiles * 100) / result.TotalFiles;
+
+                _logService.LogJobProgress(job, string.Format("Processing file {0} of {1} ({2}%)",
+                    result.ProcessedFiles, result.TotalFiles, progressPercent));
+
                 OnJobProgress(new JobProgressEventArgs { Job = job, Result = result, ProgressPercent = progressPercent });
             }
         }
 
-        private System.Collections.Generic.List<string> GetFilesToProcess(SyncJob job)
+        private List<string> GetFilesToProcess(SyncJob job)
         {
-            var files = new System.Collections.Generic.List<string>();
+            var files = new List<string>();
 
             if (job.Connection.Protocol == ProtocolType.Local)
             {
@@ -131,7 +229,7 @@ namespace syncer.core
             {
                 var client = _transferClientFactory.Create(job.Connection.Protocol);
                 string error;
-                System.Collections.Generic.List<string> remoteFiles;
+                List<string> remoteFiles;
 
                 if (client.ListFiles(job.Connection, job.SourcePath, out remoteFiles, out error))
                 {
@@ -186,7 +284,8 @@ namespace syncer.core
                     throw new Exception(error ?? "Transfer failed");
                 }
 
-                _logService.LogTransfer(job.Id, sourceFile, destinationFile, true, null);
+                // Use a generic log method for transfer, or add LogTransfer to ILogService if needed
+                _logService.LogJobProgress(job, $"Transferred file: {System.IO.Path.GetFileName(sourceFile)}");
 
                 OnFileTransferCompleted(new FileTransferEventArgs
                 {
@@ -198,7 +297,7 @@ namespace syncer.core
             }
             catch (Exception ex)
             {
-                _logService.LogTransfer(job.Id, sourceFile, destinationFile, false, ex.Message);
+                _logService.LogJobError(job, $"Failed to transfer file: {System.IO.Path.GetFileName(sourceFile)} - {ex.Message}", ex);
 
                 OnFileTransferCompleted(new FileTransferEventArgs
                 {
@@ -236,6 +335,11 @@ namespace syncer.core
         protected virtual void OnFileTransferCompleted(FileTransferEventArgs e)
         {
             if (FileTransferCompleted != null) FileTransferCompleted(this, e);
+        }
+
+        protected virtual void OnJobStatusChanged(JobStatusEventArgs e)
+        {
+            if (JobStatusChanged != null) JobStatusChanged(this, e);
         }
     }
 }
