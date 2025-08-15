@@ -205,7 +205,7 @@ namespace syncer.ui
 
         public static ISyncJobService SyncJobService
         {
-            get { return _syncJobService ?? (_syncJobService = new SyncJobService()); }
+            get { return _syncJobService; }
         }
 
         public static IConnectionService ConnectionService

@@ -12,6 +12,7 @@ namespace syncer.ui.Services
         private readonly syncer.core.IJobRepository _jobRepository;
         private readonly syncer.core.IJobRunner _jobRunner;
         private readonly syncer.core.ILogService _logService;
+        private static int _nextJobId = 1;
 
         public CoreSyncJobServiceAdapter()
         {
@@ -19,11 +20,14 @@ namespace syncer.ui.Services
             {
                 _jobRepository = syncer.core.ServiceFactory.CreateJobRepository();
                 _logService = syncer.core.ServiceFactory.CreateLogService();
-                var transferClientFactory = syncer.core.ServiceFactory.CreateTransferClientFactory();
-                var fileEnumerator = syncer.core.ServiceFactory.CreateFileEnumerator();
-                _jobRunner = syncer.core.ServiceFactory.CreateJobRunner(transferClientFactory, _logService, fileEnumerator);
                 
-                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", "Initialized successfully");
+                // Use the MultiJobRunner for concurrent job execution
+                _jobRunner = syncer.core.ServiceFactory.CreateJobRunnerFromConfiguration();
+                
+                // Initialize the next job ID based on existing jobs
+                InitializeJobIdSequence();
+                
+                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", "Initialized successfully with MultiJobRunner");
             }
             catch (Exception ex)
             {
@@ -60,31 +64,63 @@ namespace syncer.ui.Services
 
         public int CreateJob(SyncJob job)
         {
-            var coreJob = ConvertUIJobToCoreJob(job);
-            
-            // Generate a unique ID if needed
-            if (string.IsNullOrEmpty(coreJob.Id))
+            try
             {
-                coreJob.Id = Guid.NewGuid().ToString();
+                var coreJob = ConvertUIJobToCoreJob(job);
+                
+                // Generate a unique sequential integer ID
+                int newJobId = GetNextJobId();
+                coreJob.Id = newJobId.ToString();
+                
+                // Set creation date
+                coreJob.CreatedDate = DateTime.Now;
+                
+                // Save the job
+                _jobRepository.Save(coreJob);
+                
+                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", 
+                    string.Format("Created job '{0}' with ID {1}", coreJob.Name, coreJob.Id));
+                
+                return newJobId;
             }
-            
-            // Set creation date
-            coreJob.CreatedDate = DateTime.Now;
-            
-            // Save the job
-            _jobRepository.Save(coreJob);
-            
-            // Try to parse the ID as an integer
-            int jobId;
-            if (int.TryParse(coreJob.Id, out jobId))
+            catch (Exception ex)
             {
-                return jobId;
+                DebugLogger.LogError(ex, "CoreSyncJobServiceAdapter.CreateJob");
+                throw;
             }
-            else
+        }
+        
+        private void InitializeJobIdSequence()
+        {
+            try
             {
-                // If the ID isn't an integer, generate a unique int ID
-                return Math.Abs(coreJob.Id.GetHashCode());
+                var existingJobs = _jobRepository.GetAll();
+                int maxId = 0;
+                
+                foreach (var job in existingJobs)
+                {
+                    int id;
+                    if (int.TryParse(job.Id, out id) && id > maxId)
+                    {
+                        maxId = id;
+                    }
+                }
+                
+                _nextJobId = maxId + 1;
+                
+                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", 
+                    string.Format("Initialized job ID sequence. Next ID: {0}", _nextJobId));
             }
+            catch (Exception ex)
+            {
+                DebugLogger.LogError(ex, "CoreSyncJobServiceAdapter.InitializeJobIdSequence");
+                _nextJobId = 1; // Fallback to 1
+            }
+        }
+        
+        private int GetNextJobId()
+        {
+            return _nextJobId++;
         }
 
         public bool UpdateJob(SyncJob job)
