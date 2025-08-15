@@ -118,20 +118,11 @@ namespace syncer.ui.Services
         {
             try
             {
-                var coreJob = _jobRepository.GetById(id.ToString());
-                if (coreJob == null)
-                    return false;
-
-                coreJob.IsEnabled = true;
-                _jobRepository.Save(coreJob);
-                
-                // Actually run the job
-                _jobRunner.RunJob(coreJob);
-                
-                return true;
+                return _jobRunner.StartJob(id.ToString());
             }
-            catch
+            catch (Exception ex)
             {
+                DebugLogger.LogError(ex, $"Failed to start job {id}");
                 return false;
             }
         }
@@ -140,23 +131,11 @@ namespace syncer.ui.Services
         {
             try
             {
-                var coreJob = _jobRepository.GetById(id.ToString());
-                if (coreJob == null)
-                    return false;
-
-                coreJob.IsEnabled = false;
-                _jobRepository.Save(coreJob);
-                
-                // If the job is running, cancel it
-                if (_jobRunner.IsRunning)
-                {
-                    _jobRunner.CancelJob();
-                }
-                
-                return true;
+                return _jobRunner.CancelJob(id.ToString());
             }
-            catch
+            catch (Exception ex)
             {
+                DebugLogger.LogError(ex, $"Failed to stop job {id}");
                 return false;
             }
         }
@@ -169,7 +148,7 @@ namespace syncer.ui.Services
                 if (coreJob == null)
                     return "Not Found";
                 
-                if (_jobRunner.IsRunning && coreJob.IsRunning)
+                if (_jobRunner.IsRunning(id.ToString()))
                     return "Running";
                     
                 return coreJob.IsEnabled ? "Enabled" : "Disabled";

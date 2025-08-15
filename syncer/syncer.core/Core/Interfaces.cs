@@ -18,23 +18,13 @@ namespace syncer.core
     // Enhanced Logging Interface
     public interface ILogService
     {
-        void LogInfo(string jobId, string message);
-        void LogWarning(string jobId, string message);
-        void LogError(string jobId, string message);
-        void LogJobStart(string jobId, string jobName);
-        void LogJobEnd(string jobId, string status, int processedFiles, int failedFiles);
-        void LogTransfer(string jobId, string sourcePath, string destPath, bool success, string error);
-        
-        void Info(string message, string jobName);
-        void Warning(string message, string jobName);
-        void Error(string message, string jobName, Exception ex);
-        void LogTransfer(string jobName, string fileName, long fileSize, bool success, string error);
-        
-        System.Data.DataTable GetLogs(DateTime from, DateTime to, LogLevel? level);
-        System.Data.DataTable GetJobLogs(string jobId, DateTime from, DateTime to);
-        void Clear();
-        void Archive(DateTime cutoffDate);
-        void RotateLogs(long maxSizeBytes);
+        void LogInfo(string message, string source = null);
+        void LogWarning(string message, string source = null);
+        void LogError(string message, string source = null);
+        void LogJobStart(SyncJob job);
+        void LogJobProgress(SyncJob job, string message);
+        void LogJobSuccess(SyncJob job, string message);
+        void LogJobError(SyncJob job, string message, Exception ex = null);
     }
 
     // Transfer Client Interface
@@ -75,14 +65,12 @@ namespace syncer.core
     // Job Runner Interface
     public interface IJobRunner
     {
-        bool IsRunning { get; }
-        void RunJob(SyncJob job);
-        void CancelJob();
-        event EventHandler<JobStartedEventArgs> JobStarted;
-        event EventHandler<JobProgressEventArgs> JobProgress;
-        event EventHandler<JobCompletedEventArgs> JobCompleted;
-        event EventHandler<FileTransferEventArgs> FileTransferStarted;
-        event EventHandler<FileTransferEventArgs> FileTransferCompleted;
+        bool IsRunning(string jobId);
+        List<string> GetRunningJobIds();
+        bool StartJob(string jobId);
+        bool CancelJob(string jobId);
+        bool WaitForJob(string jobId, int timeoutMilliseconds = -1);
+        event EventHandler<JobStatusEventArgs> JobStatusChanged;
     }
 
     // Scheduler Interface
@@ -136,7 +124,8 @@ namespace syncer.core
     // Event Args
     public class JobStatusEventArgs : EventArgs
     {
-        public JobStatus Status { get; set; }
+        public string JobId { get; set; }
+        public string Status { get; set; }
     }
 
     public class JobExecutionEventArgs : EventArgs

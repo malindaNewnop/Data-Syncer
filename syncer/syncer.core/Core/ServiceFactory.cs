@@ -11,12 +11,12 @@ namespace syncer.core
         public static IJobRepository CreateJobRepository()
         {
             ILogService logService = CreateLogService();
-            return new XmlJobRepository(logService);
+            return new SqliteJobRepository(logService);
         }
 
         public static ILogService CreateLogService()
         {
-            return new FileLogService();
+            return new SqliteLogService();
         }
 
         public static ITransferClientFactory CreateTransferClientFactory()
@@ -31,7 +31,7 @@ namespace syncer.core
 
         public static IJobRunner CreateJobRunner(ITransferClientFactory factory, ILogService logService, IFileEnumerator fileEnumerator)
         {
-            return new JobRunner(factory, logService, fileEnumerator);
+            return new ParallelJobRunner(CreateJobRepository(), logService);
         }
 
         public static IPreviewService CreatePreviewService(IFileEnumerator fileEnumerator, ITransferClientFactory factory)

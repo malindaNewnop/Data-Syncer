@@ -1,102 +1,109 @@
-# Enhanced SFTP Implementation Summary
+# Data Syncer - SQLite and Multiple Jobs Implementation
 
 ## Overview
-I have successfully implemented a comprehensive SFTP solution with all the requested features for the Data Syncer project. The implementation includes secure key handling, bandwidth throttling, transfer resumption, and advanced error handling with retry logic.
+This document summarizes the implementation of SQLite-based storage replacing XML files and the addition of support for running multiple jobs in parallel.
 
-## Files Created/Modified
+## Key Components Added/Modified
 
-### Core Implementation Files
-1. **SftpTransferClient.cs** - Fully implemented base SFTP client
-2. **EnhancedSftpTransferClient.cs** - Extended client with advanced features
-3. **SftpConfiguration.cs** - Configuration classes and data structures
-4. **SftpConfigurationManager.cs** - Profile management and configuration storage
-5. **SftpUtilities.cs** - Utility methods for key management and server operations
-6. **SftpExamples.cs** - Comprehensive usage examples and test cases
-7. **SFTP-Implementation.md** - Complete documentation
+### 1. Core Components
+- **SqliteJobRepository** - Replaces XmlJobRepository for job persistence
+- **SqliteLogService** - Replaces FileLogService for logging
+- **DatabaseHelper** - New centralized utility for database operations
+- **ParallelJobRunner** - New implementation supporting multiple concurrent jobs
+- **ServiceFactory** - Updated to use the new SQLite-based components
+- **IJobRunner** - Updated interface to support multiple jobs
 
-## Key Features Implemented
+### 2. Database Structure
+The SQLite database includes the following tables:
+- **Jobs** - Stores all job configuration and status information
+- **Logs** - Stores application and job logs
+- **Settings** - Stores application settings
 
-### 1. Secure Key Handling ✅
-- **RSA, DSA, ECDSA key support** via SSH.NET library
-- **Passphrase-protected keys** with secure loading
-- **Key generation utilities** for creating new key pairs
-- **Key validation methods** to verify key integrity
-- **Secure key deletion** with multiple overwrites
-- **Public key extraction** from private keys
-- **Multiple authentication methods** (password, key, keyboard-interactive)
+### 3. Migration Support
+- Automatic migration from XML to SQLite on first run
+- Backup of XML file after successful migration
 
-### 2. Bandwidth Throttling ✅
-- **Configurable speed limits** in bytes per second
-- **ThrottledStream class** for real-time bandwidth control
-- **Smooth throttling algorithm** without blocking operations
-- **Per-transfer or global limits** support
-- **Dynamic speed adjustment** based on actual transfer rates
+### 4. Features Added
+- Multiple jobs can run simultaneously (parallel execution)
+- More robust data storage with transaction support
+- Automatic database backups
+- Database maintenance utilities
+- Improved logging with filtering capabilities
 
-### 3. Transfer Resumption ✅
-- **Automatic resume detection** for interrupted transfers
-- **Partial file support** for both uploads and downloads
-- **Resume offset calculation** based on existing file sizes
-- **Configurable minimum file size** for resumption
-- **Resume validation** to ensure data integrity
+## Implementation Details
 
-### 4. Advanced Error Handling & Retry Logic ✅
-- **Exponential backoff strategy** (1s, 2s, 4s, 8s...)
-- **Configurable retry attempts** (default: 3)
-- **Smart error classification** (retryable vs non-retryable)
-- **Detailed error reporting** with inner exception details
-- **Connection timeout handling** with configurable timeouts
-- **Operation timeout management** for long-running operations
-- **Graceful degradation** for partial failures
+### Database Location
+The SQLite database is stored in the local application data folder:
+```
+%LOCALAPPDATA%\DataSyncer\syncer.db
+```
 
-### 5. Additional Advanced Features ✅
+### Job Persistence
+- Jobs are now stored in the SQLite database
+- Complex objects (like Connection settings, Filters, etc.) are serialized as JSON
 
-#### Progress Tracking & Statistics
-- **Real-time progress updates** with percentage completion
-- **Transfer speed calculation** and monitoring
-- **ETA estimation** based on current speed
-- **Detailed transfer statistics** (duration, bytes, retry count)
-- **Event-driven progress notifications**
+### Logging
+- Logs are now stored in the SQLite database
+- Logs can be queried by level, source, or job ID
+- Automatic cleanup of old logs based on retention settings
 
-#### File Integrity Verification
-- **SHA-256 checksum validation** for transferred files
-- **Automatic integrity checking** (configurable)
-- **Local and remote checksum comparison**
-- **Post-transfer verification** with detailed error reporting
+### Parallel Job Execution
+- Each job runs in its own thread
+- Jobs can be individually started, stopped, and monitored
+- Central management through ParallelJobRunner
 
-#### Configuration Management
-- **Profile-based configuration** with named connection profiles
-- **Usage statistics tracking** (transfer count, bytes, speed)
-- **Import/export functionality** for configuration sharing
-- **Global configuration settings** with defaults
-- **Validation and testing** of profile configurations
+## How to Use
 
-#### Server Capabilities
-- **Server information retrieval** (version, protocol, capabilities)
-- **Connection method testing** (password, key, interactive)
-- **Directory listing with attributes** (permissions, timestamps, size)
-- **Working directory detection** and path normalization
+### Running Multiple Jobs
+Jobs can now be added, scheduled, and run independently without interfering with each other.
 
-#### Directory Synchronization
-- **Recursive directory sync** with multiple sync modes
-- **Timestamp and size comparison** for change detection
-- **Pattern-based exclusions** for filtering files
-- **Preserve attributes** (timestamps, permissions)
-- **Bidirectional sync support** (planned for future)
+### Viewing Logs
+Logs are stored in the database and can be viewed through the application's log viewer.
 
-## Technical Implementation Details
+### Database Maintenance
+The database is automatically maintained, including:
+- Backups before significant operations
+- Cleanup of old logs
+- Database optimization (VACUUM and ANALYZE)
 
-### Architecture
-- **Modular design** with clear separation of concerns
-- **Interface-based** implementation for testability
-- **Event-driven** progress and completion notifications
-- **Configuration-driven** behavior with sensible defaults
-- **Thread-safe** operations with proper locking
+## Technical Notes
 
-### Performance Optimizations
-- **Efficient streaming** with configurable buffer sizes
-- **Connection pooling** support (via base class design)
-- **Minimal memory footprint** for large file transfers
-- **Asynchronous-ready** design for future async support
+### Dependencies
+- System.Data.SQLite.Core (1.0.115.5)
+- Newtonsoft.Json (for serializing complex objects)
+
+### Performance Considerations
+- Connection pooling is used for database access
+- Transactions are used for batch operations
+- Proper indexing on frequently queried columns
+
+### Error Handling
+- All database operations have proper error handling
+- Transaction rollback on failure
+- Detailed logging of errors
+
+## Troubleshooting
+
+### Common Issues
+1. **Database Access Errors**
+   - Ensure the application has write access to the %LOCALAPPDATA%\DataSyncer folder
+   - Check for database file corruption
+
+2. **Missing Jobs After Upgrade**
+   - Check for backup files in %LOCALAPPDATA%\DataSyncer\Backups
+   - Verify successful migration from XML
+
+3. **Performance Issues**
+   - Try running database maintenance manually
+   - Check disk space and I/O performance
+
+### Diagnostics
+- Enable debug logging for more detailed information
+- Check the application logs for database-related errors
+
+## Enhanced SFTP Implementation Summary
+
+The previous implementation focused on SFTP features. This new implementation adds SQLite storage and multiple job support while maintaining all the previous SFTP capabilities.
 
 ### Security Considerations
 - **Secure credential handling** with encrypted storage options
