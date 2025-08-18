@@ -341,5 +341,53 @@ namespace syncer.core
         {
             if (JobStatusChanged != null) JobStatusChanged(this, e);
         }
+        
+        #region IDisposable Implementation
+        
+        private bool _disposed = false;
+        
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+        
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Cancel all running jobs
+                    lock (_runningJobs)
+                    {
+                        foreach (string jobId in new List<string>(_runningJobs.Keys))
+                        {
+                            if (_runningJobs[jobId])
+                            {
+                                _cancellationRequests[jobId] = true;
+                                _logService.LogInfo($"Cancelling job {jobId} during disposal", "JobRunner");
+                            }
+                        }
+                        
+                        // Wait a short time for jobs to respond to cancellation
+                        Thread.Sleep(500);
+                        
+                        // Clear collections
+                        _runningJobs.Clear();
+                        _cancellationRequests.Clear();
+                    }
+                }
+                
+                _disposed = true;
+            }
+        }
+        
+        ~JobRunner()
+        {
+            Dispose(false);
+        }
+        
+        #endregion
     }
 }

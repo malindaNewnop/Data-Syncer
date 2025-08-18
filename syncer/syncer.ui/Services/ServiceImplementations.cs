@@ -305,6 +305,11 @@ namespace syncer.ui.Services
         public bool StopService() { _isRunning = false; return true; }
         public bool IsServiceRunning() { return _isRunning; }
         public string GetServiceStatus() { return _isRunning ? "Running" : "Stopped"; }
+        
+        public void Dispose()
+        {
+            // Nothing to dispose in stub implementation
+        }
     }
 
     // Stub implementation of configuration service - will be replaced with actual backend implementation

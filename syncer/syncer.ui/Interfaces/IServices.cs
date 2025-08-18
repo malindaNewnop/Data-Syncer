@@ -61,7 +61,7 @@ namespace syncer.ui
     /// <summary>
     /// Interface for service management
     /// </summary>
-    public interface IServiceManager
+    public interface IServiceManager : IDisposable
     {
         bool StartService();
         bool StopService();

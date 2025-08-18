@@ -85,9 +85,6 @@
     <Compile Include="FormSchedule.Designer.cs">
       <DependentUpon>FormSchedule.cs</DependentUpon>
     </Compile>
-    <Compile Include="FtpTestForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Include="FormFilters.cs">
       <SubType>Form</SubType>
     </Compile>

@@ -337,6 +337,67 @@ namespace syncer.core
         {
             JobStatusChanged?.Invoke(this, e);
         }
+        
+        #region IDisposable Implementation
+        
+        private bool _disposed = false;
+        
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+        
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    lock (_lockObject)
+                    {
+                        // Set cancellation flags for all running jobs
+                        foreach (var jobId in new List<string>(_runningJobs.Keys))
+                        {
+                            _cancellationFlags[jobId] = true;
+                            _logService.LogInfo($"Cancelling job {jobId} during disposal", "ParallelJobRunner");
+                        }
+                        
+                        // Wait a short time for jobs to respond to cancellation
+                        Thread.Sleep(500);
+                        
+                        // Attempt to abort any threads that didn't respond to cancellation
+                        foreach (var kvp in _runningJobs)
+                        {
+                            try
+                            {
+                                if (kvp.Value.IsAlive)
+                                {
+                                    kvp.Value.Abort();
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logService.LogError($"Error aborting job thread {kvp.Key}: {ex.Message}", "ParallelJobRunner");
+                            }
+                        }
+                        
+                        // Clear collections
+                        _runningJobs.Clear();
+                        _cancellationFlags.Clear();
+                    }
+                }
+                
+                _disposed = true;
+            }
+        }
+        
+        ~ParallelJobRunner()
+        {
+            Dispose(false);
+        }
+        
+        #endregion
     }
     
     public class JobStatusEventArgs : EventArgs

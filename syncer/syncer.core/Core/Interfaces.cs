@@ -63,7 +63,7 @@ namespace syncer.core
     }
 
     // Job Runner Interface
-    public interface IJobRunner
+    public interface IJobRunner : IDisposable
     {
         bool IsRunning(string jobId);
         List<string> GetRunningJobIds();

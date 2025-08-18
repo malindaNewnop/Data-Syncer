@@ -713,23 +713,45 @@ namespace syncer.ui
                     }
                     else
                     {
-                        // Cleanup system tray resources
-                        if (_trayManager != null)
-                        {
-                            _trayManager.Dispose();
-                        }
+                        // Stop service and cleanup resources
+                        StopServiceAndCleanup();
                     }
                 }
             }
             else
             {
                 // For non-user closing (like Windows shutdown), cleanup resources
+                StopServiceAndCleanup();
+                base.OnFormClosing(e);
+            }
+        }
+        
+        private void StopServiceAndCleanup()
+        {
+            try
+            {
+                // First stop the service
+                if (_serviceManager.IsServiceRunning())
+                {
+                    _serviceManager.StopService();
+                }
+                
+                // Dispose of service manager
+                _serviceManager.Dispose();
+                
+                // Cleanup system tray resources
                 if (_trayManager != null)
                 {
                     _trayManager.Dispose();
                 }
                 
-                base.OnFormClosing(e);
+                // If needed, stop any timers here
+                
+                ServiceLocator.LogService.LogInfo("Application closed, all resources cleaned up", "FormMain");
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Error during application shutdown: " + ex.Message, "FormMain");
             }
         }
         
