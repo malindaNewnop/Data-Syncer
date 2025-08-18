@@ -214,7 +214,10 @@ namespace syncer.ui.Services
                 // Add schedule settings
                 StartTime = coreJob.Schedule?.StartTime ?? DateTime.Now,
                 IntervalValue = coreJob.Schedule?.RepeatEvery ?? 60,
-                IntervalType = MapTimeUnitToString(coreJob.Schedule?.Unit ?? syncer.core.TimeUnit.Minutes)
+                IntervalType = MapTimeUnitToString(coreJob.Schedule?.Unit ?? syncer.core.TimeUnit.Minutes),
+                // Convert connection settings
+                SourceConnection = ConvertCoreConnectionToUIConnection(coreJob.Connection),
+                DestinationConnection = ConvertCoreConnectionToUIConnection(coreJob.DestinationConnection)
             };
 
             return uiJob;
@@ -235,8 +238,8 @@ namespace syncer.ui.Services
                 CreatedDate = uiJob.CreatedDate,
                 LastRun = uiJob.LastRun.HasValue ? uiJob.LastRun.Value : DateTime.MinValue,
                 LastStatus = uiJob.LastStatus,
-                Connection = new syncer.core.ConnectionSettings { Protocol = syncer.core.ProtocolType.Local },
-                DestinationConnection = new syncer.core.ConnectionSettings { Protocol = syncer.core.ProtocolType.Local },
+                Connection = ConvertUIConnectionToCoreConnection(uiJob.SourceConnection),
+                DestinationConnection = ConvertUIConnectionToCoreConnection(uiJob.DestinationConnection),
                 // Add schedule settings
                 Schedule = new syncer.core.ScheduleSettings
                 {
@@ -278,6 +281,59 @@ namespace syncer.ui.Services
                 default:
                     return syncer.core.TimeUnit.Minutes;
             }
+        }
+
+        /// <summary>
+        /// Converts Core ConnectionSettings to UI ConnectionSettings
+        /// </summary>
+        private ConnectionSettings ConvertCoreConnectionToUIConnection(syncer.core.ConnectionSettings coreConnection)
+        {
+            if (coreConnection == null)
+            {
+                return new ConnectionSettings(); // Return default local connection
+            }
+
+            var uiConnection = new ConnectionSettings
+            {
+                ProtocolType = (int)coreConnection.Protocol,
+                Protocol = coreConnection.Protocol.ToString().ToUpper(),
+                Host = coreConnection.Host,
+                Port = coreConnection.Port,
+                Username = coreConnection.Username,
+                Password = coreConnection.Password,
+                UsePassiveMode = coreConnection.UsePassiveMode,
+                UseSftp = coreConnection.UseSftp,
+                SshKeyPath = coreConnection.SshKeyPath,
+                Timeout = coreConnection.Timeout
+            };
+
+            return uiConnection;
+        }
+
+        /// <summary>
+        /// Converts UI ConnectionSettings to Core ConnectionSettings
+        /// </summary>
+        private syncer.core.ConnectionSettings ConvertUIConnectionToCoreConnection(ConnectionSettings uiConnection)
+        {
+            if (uiConnection == null)
+            {
+                return new syncer.core.ConnectionSettings { Protocol = syncer.core.ProtocolType.Local };
+            }
+
+            var coreConnection = new syncer.core.ConnectionSettings
+            {
+                Protocol = (syncer.core.ProtocolType)uiConnection.ProtocolType,
+                Host = uiConnection.Host,
+                Port = uiConnection.Port,
+                Username = uiConnection.Username,
+                Password = uiConnection.Password,
+                UsePassiveMode = uiConnection.UsePassiveMode,
+                UseSftp = uiConnection.UseSftp,
+                SshKeyPath = uiConnection.SshKeyPath,
+                Timeout = uiConnection.Timeout
+            };
+
+            return coreConnection;
         }
     }
 }

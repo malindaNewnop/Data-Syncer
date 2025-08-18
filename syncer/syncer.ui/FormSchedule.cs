@@ -297,6 +297,36 @@ namespace syncer.ui
             _currentJob.IntervalValue = (int)numInterval.Value;
             _currentJob.IntervalType = cmbIntervalType.SelectedItem != null ? cmbIntervalType.SelectedItem.ToString() : "Minutes";
             _currentJob.TransferMode = cmbTransferMode.SelectedItem != null ? cmbTransferMode.SelectedItem.ToString() : "Copy (Keep both files)";
+            
+            // Set connection settings for source and destination
+            var currentConnection = _connectionService.GetConnectionSettings();
+            if (currentConnection != null && currentConnection.IsRemoteConnection)
+            {
+                // If we have a remote connection configured, use it as source or destination
+                // For FTP sender scenario: local source, remote destination
+                // For FTP receiver scenario: remote source, local destination
+                
+                if (_currentJob.DestinationPath.StartsWith("ftp://") || _currentJob.DestinationPath.StartsWith("sftp://") || 
+                    (currentConnection.Protocol == "FTP" || currentConnection.Protocol == "SFTP"))
+                {
+                    // Upload scenario: local to remote
+                    _currentJob.SourceConnection = new ConnectionSettings(); // Local
+                    _currentJob.DestinationConnection = currentConnection; // Remote
+                }
+                else
+                {
+                    // Download scenario: remote to local
+                    _currentJob.SourceConnection = currentConnection; // Remote
+                    _currentJob.DestinationConnection = new ConnectionSettings(); // Local
+                }
+            }
+            else
+            {
+                // Local to local transfer
+                _currentJob.SourceConnection = new ConnectionSettings(); // Local
+                _currentJob.DestinationConnection = new ConnectionSettings(); // Local
+            }
+            
             if (_isEditMode)
             {
                 _jobService.UpdateJob(_currentJob);

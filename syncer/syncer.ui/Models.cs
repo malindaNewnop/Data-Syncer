@@ -22,6 +22,10 @@ namespace syncer.ui
         public DateTime? LastRun { get; set; }
         public string LastStatus { get; set; }
         public DateTime CreatedDate { get; set; }
+        
+        // Connection settings for source and destination
+        public ConnectionSettings SourceConnection { get; set; }
+        public ConnectionSettings DestinationConnection { get; set; }
 
         public SyncJob()
         {
@@ -33,6 +37,10 @@ namespace syncer.ui
             LastStatus = "Never Run";
             IncludeSubFolders = true;
             OverwriteExisting = true;
+            
+            // Initialize with local connections by default
+            SourceConnection = new ConnectionSettings();
+            DestinationConnection = new ConnectionSettings();
         }
 
         public string GetNextRunTime()

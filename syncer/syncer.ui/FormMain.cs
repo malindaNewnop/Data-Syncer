@@ -298,6 +298,23 @@ namespace syncer.ui
                 _notificationService.ShowNotification(title, message, icon);
             }
         }
+        
+        private void testFtpConnectionToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (var ftpTestForm = new FtpTestForm())
+                {
+                    ftpTestForm.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening FTP test form: " + ex.Message, 
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService?.LogError("Error opening FTP test form: " + ex.Message);
+            }
+        }
 
         private void btnAddJob_Click(object sender, EventArgs e)
         {
