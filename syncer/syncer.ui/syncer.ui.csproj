@@ -64,7 +64,6 @@
     <Compile Include="Services\CoreConnectionServiceAdapter.cs" />
     <Compile Include="Services\ServiceVerifier.cs" />
     <Compile Include="Services\DebugLogger.cs" />
-    <Compile Include="Services\BackendConnector.cs" />
     <Compile Include="Services\FileSystemPermissionChecker.cs" />
     <!-- Forms -->
     <Compile Include="FormMain.cs">

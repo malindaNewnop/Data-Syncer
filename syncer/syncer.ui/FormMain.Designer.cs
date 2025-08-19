@@ -13,7 +13,6 @@ namespace syncer.ui
         private System.Windows.Forms.ToolStripMenuItem viewLogsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem testBackendConnectionToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem enhancedSftpSettingsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem sshKeyGenerationToolStripMenuItem;
         private System.Windows.Forms.DataGridView dgvJobs;
@@ -66,12 +65,6 @@ namespace syncer.ui
             this.gbJobs.SuspendLayout();
             this.gbControls.SuspendLayout();
             this.SuspendLayout();
-            // Initialize testBackendConnectionToolStripMenuItem before we add it to the menu
-            this.testBackendConnectionToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.testBackendConnectionToolStripMenuItem.Name = "testBackendConnectionToolStripMenuItem";
-            this.testBackendConnectionToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
-            this.testBackendConnectionToolStripMenuItem.Text = "Test Backend Connection";
-            this.testBackendConnectionToolStripMenuItem.Click += new System.EventHandler(this.testBackendConnectionToolStripMenuItem_Click);
             
             // Initialize enhancedSftpSettingsToolStripMenuItem
             this.enhancedSftpSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -115,8 +108,7 @@ namespace syncer.ui
             this.sshKeyGenerationToolStripMenuItem,
             this.scheduleSettingsToolStripMenuItem,
             this.filterSettingsToolStripMenuItem,
-            this.viewLogsToolStripMenuItem,
-            this.testBackendConnectionToolStripMenuItem});
+            this.viewLogsToolStripMenuItem});
             this.settingsToolStripMenuItem.Name = "settingsToolStripMenuItem";
             this.settingsToolStripMenuItem.Size = new System.Drawing.Size(61, 20);
             this.settingsToolStripMenuItem.Text = "Settings";

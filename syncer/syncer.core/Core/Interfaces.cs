@@ -69,6 +69,7 @@ namespace syncer.core
         void LogJobProgress(SyncJob job, string message);
         void LogJobSuccess(SyncJob job, string message);
         void LogJobError(SyncJob job, string message, Exception ex = null);
+        void LogTransfer(string jobName, string fileName, long fileSize, bool success, string error);
     }
 
     // Transfer Client Interface

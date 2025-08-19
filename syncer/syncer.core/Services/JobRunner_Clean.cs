@@ -164,6 +164,21 @@ namespace syncer.core
 
                 bool success = false;
                 string error = null;
+                DateTime transferStart = DateTime.Now;
+                long fileSize = 0;
+
+                // Get file size for logging
+                try
+                {
+                    if (File.Exists(sourceFile))
+                    {
+                        fileSize = new FileInfo(sourceFile).Length;
+                    }
+                }
+                catch
+                {
+                    fileSize = 0;
+                }
 
                 if (job.Direction == TransferDirection.SourceToDestination)
                 {
@@ -181,12 +196,16 @@ namespace syncer.core
                     }
                 }
 
+                TimeSpan transferDuration = DateTime.Now - transferStart;
+                string fileName = Path.GetFileName(sourceFile);
+
                 if (!success)
                 {
                     throw new Exception(error ?? "Transfer failed");
                 }
 
-                _logService.LogTransfer(job.Id, sourceFile, destinationFile, true, null);
+                // Log successful transfer with proper details
+                LogTransferWithDetails(job.Name, fileName, fileSize, transferDuration, sourceFile, destinationFile, true, null);
 
                 OnFileTransferCompleted(new FileTransferEventArgs 
                 { 
@@ -198,7 +217,23 @@ namespace syncer.core
             }
             catch (Exception ex)
             {
-                _logService.LogTransfer(job.Id, sourceFile, destinationFile, false, ex.Message);
+                TimeSpan transferDuration = DateTime.Now - transferStart;
+                string fileName = Path.GetFileName(sourceFile);
+                
+                try
+                {
+                    if (File.Exists(sourceFile) && fileSize == 0)
+                    {
+                        fileSize = new FileInfo(sourceFile).Length;
+                    }
+                }
+                catch
+                {
+                    fileSize = 0;
+                }
+
+                // Log failed transfer with proper details
+                LogTransferWithDetails(job.Name, fileName, fileSize, transferDuration, sourceFile, destinationFile, false, ex.Message);
 
                 OnFileTransferCompleted(new FileTransferEventArgs 
                 { 
@@ -236,6 +271,33 @@ namespace syncer.core
         protected virtual void OnFileTransferCompleted(FileTransferEventArgs e)
         {
             if (FileTransferCompleted != null) FileTransferCompleted(this, e);
+        }
+
+        /// <summary>
+        /// Logs transfer with detailed information including file size, duration, and paths
+        /// </summary>
+        private void LogTransferWithDetails(string jobName, string fileName, long fileSize, TimeSpan duration, 
+            string sourcePath, string destinationPath, bool success, string error)
+        {
+            try
+            {
+                // Use the enhanced logging method with all details
+                if (_logService is FileLogService fileLogService)
+                {
+                    fileLogService.LogTransferDetailed(jobName, fileName, fileSize, duration, 
+                        destinationPath, sourcePath, success, error);
+                }
+                else
+                {
+                    // Fallback to standard transfer logging
+                    _logService.LogTransfer(jobName, fileName, fileSize, success, error);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Don't let logging errors affect the transfer process
+                Console.WriteLine("Error logging transfer: " + ex.Message);
+            }
         }
     }
 }

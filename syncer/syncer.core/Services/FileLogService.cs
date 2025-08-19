@@ -72,6 +72,20 @@ namespace syncer.core
             Write(level, jobName, "", "transfer", message, null, fileName, fileSize, TimeSpan.Zero, "", "");
         }
 
+        /// <summary>
+        /// Enhanced transfer logging with duration and path information
+        /// </summary>
+        public void LogTransferDetailed(string jobName, string fileName, long fileSize, TimeSpan duration, 
+            string remotePath, string localPath, bool success, string error)
+        {
+            var level = success ? LogLevel.Info : LogLevel.Error;
+            var message = success ? 
+                string.Format("Transfer completed: {0} ({1} bytes in {2:F1}s)", fileName, fileSize, duration.TotalSeconds) :
+                string.Format("Transfer failed: {0} - {1}", fileName, error ?? "Unknown error");
+            
+            Write(level, jobName, "", "transfer", message, null, fileName, fileSize, duration, remotePath, localPath);
+        }
+
         private void Write(LogLevel level, string jobName, string jobId, string source, string message,
                           Exception ex, string fileName, long fileSize, TimeSpan duration,
                           string remotePath, string localPath)

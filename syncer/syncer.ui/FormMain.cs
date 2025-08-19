@@ -304,25 +304,6 @@ namespace syncer.ui
             MessageBox.Show("DataSyncer v1.0\nFile Synchronization Tool\n\nDeveloped for automated file transfers.", "About DataSyncer", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         
-        private void testBackendConnectionToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            // Test the backend connection using our connector class
-            bool success = BackendConnector.TestConnection();
-            
-            // Show notification
-            if (_notificationService != null)
-            {
-                string title = success ? "Connection Test Successful" : "Connection Test Failed";
-                string message = success 
-                    ? "Successfully connected to the backend service."
-                    : "Failed to connect to the backend service. Please check your settings and try again.";
-                ToolTipIcon icon = success ? ToolTipIcon.Info : ToolTipIcon.Error;
-                
-                _notificationService.ShowNotification(title, message, icon);
-            }
-        }
-        
-
 
         private void btnAddJob_Click(object sender, EventArgs e)
         {
