@@ -130,16 +130,25 @@ namespace syncer.ui
                         Timeout = connectionSettings.Timeout
                     };
                     
-                    // Use the remote directory browser
+                    // Use the new FileZilla-like file manager
                     try
                     {
-                        // For now, we'll use a simple input dialog since FormRemoteDirectoryBrowser would need more work
-                        // to handle the connection settings type differences
-                        ShowRemotePathInputDialog();
+                        using (FormRemoteDirectoryBrowser fileManager = new FormRemoteDirectoryBrowser(coreSettings))
+                        {
+                            fileManager.IsUploadMode = false; // We want to select destination path
+                            if (fileManager.ShowDialog() == DialogResult.OK)
+                            {
+                                if (!string.IsNullOrEmpty(fileManager.SelectedRemotePath))
+                                {
+                                    if (txtDestinationPath != null) 
+                                        txtDestinationPath.Text = fileManager.SelectedRemotePath;
+                                }
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"Error browsing remote directory: {ex.Message}", "Error",
+                        MessageBox.Show("Error opening file manager: " + ex.Message, "Error",
                             MessageBoxButtons.OK, MessageBoxIcon.Error);
                         ShowRemotePathInputDialog();
                     }

@@ -103,6 +103,13 @@
     <Compile Include="Forms\FormComprehensiveConnection.Designer.cs">
       <DependentUpon>FormComprehensiveConnection.cs</DependentUpon>
     </Compile>
+    <!-- FileZilla-like File Manager -->
+    <Compile Include="Forms\FormRemoteDirectoryBrowser.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FormRemoteDirectoryBrowser.Designer.cs">
+      <DependentUpon>FormRemoteDirectoryBrowser.cs</DependentUpon>
+    </Compile>
     <Compile Include="Examples\ConnectionFormUsageExample.cs" />
     <!-- Resources -->
     <EmbeddedResource Include="Properties\Resources.resx">
