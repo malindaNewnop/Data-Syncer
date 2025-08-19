@@ -16,6 +16,7 @@ namespace syncer.ui.Services
         private ILogService _logService;
         private IServiceManager _serviceManager;
         private bool _disposed = false;
+        private System.Timers.Timer _statusUpdateTimer;
         
         // Notification settings
         private bool _notificationsEnabled = true;
@@ -36,8 +37,17 @@ namespace syncer.ui.Services
             
             try
             {
+                // Initialize services
                 _logService = ServiceLocator.LogService;
                 _serviceManager = ServiceLocator.ServiceManager;
+                
+                // Load configuration settings
+                var configService = ServiceLocator.ConfigurationService;
+                if (configService != null)
+                {
+                    _notificationsEnabled = configService.GetSetting("NotificationsEnabled", true);
+                    _notificationDuration = configService.GetSetting("NotificationDelay", 3000);
+                }
             }
             catch (Exception ex)
             {
@@ -48,6 +58,61 @@ namespace syncer.ui.Services
             InitializeContextMenu();
             InitializeNotifyIcon();
             RegisterMainFormEvents();
+            StartStatusUpdater();
+        }
+
+        /// <summary>
+        /// Starts the background timer that updates tray status
+        /// </summary>
+        private void StartStatusUpdater()
+        {
+            try
+            {
+                _statusUpdateTimer = new System.Timers.Timer(30000); // Update every 30 seconds
+                _statusUpdateTimer.Elapsed += OnStatusUpdateTimer;
+                _statusUpdateTimer.AutoReset = true;
+                _statusUpdateTimer.Start();
+                
+                if (_logService != null)
+                    _logService.LogInfo("Tray status updater started", "UI");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error starting status updater: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Timer event handler for updating tray status
+        /// </summary>
+        private void OnStatusUpdateTimer(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            try
+            {
+                if (_disposed || _notifyIcon == null || _serviceManager == null)
+                    return;
+
+                // Update service status in the UI thread
+                if (_mainForm != null && !_mainForm.IsDisposed)
+                {
+                    _mainForm.BeginInvoke(new Action(() =>
+                    {
+                        try
+                        {
+                            bool serviceRunning = _serviceManager.IsServiceRunning();
+                            UpdateStatus(serviceRunning);
+                        }
+                        catch
+                        {
+                            // Ignore errors during status update
+                        }
+                    }));
+                }
+            }
+            catch
+            {
+                // Ignore timer errors
+            }
         }
 
         #region Public Methods
@@ -85,12 +150,21 @@ namespace syncer.ui.Services
             try
             {
                 int showDuration = duration ?? _notificationDuration;
-                _notifyIcon.ShowBalloonTip(showDuration, title, message, icon);
+                
+                // Ensure title and message are not too long
+                string safeTitle = StringExtensions.Truncate(title ?? "Data Syncer", 63);
+                string safeMessage = message ?? "";
+                if (safeMessage.Length > 255)
+                {
+                    safeMessage = safeMessage.Substring(0, 252) + "...";
+                }
+                
+                _notifyIcon.ShowBalloonTip(showDuration, safeTitle, safeMessage, icon);
                 
                 // Log the notification
                 if (_logService != null)
                 {
-                    string logMessage = string.Format("Notification displayed: {0} - {1}", title, message);
+                    string logMessage = string.Format("Notification displayed: {0} - {1}", safeTitle, safeMessage);
                     _logService.LogInfo(logMessage, "UI");
                 }
             }
@@ -129,6 +203,42 @@ namespace syncer.ui.Services
                 _notifyIcon.Icon = icon;
         }
 
+        /// <summary>
+        /// Updates both the icon and tooltip based on service status
+        /// </summary>
+        /// <param name="serviceRunning">Whether the service is currently running</param>
+        /// <param name="lastSyncTime">The last synchronization time (optional)</param>
+        public void UpdateStatus(bool serviceRunning, DateTime? lastSyncTime = null)
+        {
+            try
+            {
+                // Update tooltip
+                string status = serviceRunning ? "Running" : "Stopped";
+                string tooltip = "Data Syncer - Service: " + status;
+                
+                if (lastSyncTime.HasValue)
+                {
+                    string timeStr = lastSyncTime.Value.ToString("HH:mm");
+                    tooltip += " (Last: " + timeStr + ")";
+                }
+                
+                UpdateToolTip(tooltip);
+                
+                // Update menu text if context menu is available
+                UpdateServiceMenuText();
+                
+                // Log status update
+                if (_logService != null)
+                {
+                    _logService.LogInfo("Tray icon status updated - Service: " + status, "UI");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error updating tray status: " + ex.Message);
+            }
+        }
+
         #endregion
 
         #region Private Methods
@@ -160,12 +270,14 @@ namespace syncer.ui.Services
             // Create settings submenu
             MenuItem connectionItem = new MenuItem("Connection...", OnMenuConnectionClick);
             MenuItem filtersItem = new MenuItem("Filters...", OnMenuFiltersClick);
+            MenuItem traySettingsItem = new MenuItem("Tray Settings...", OnMenuTraySettingsClick);
             MenuItem notificationsItem = new MenuItem("Notifications", OnMenuNotificationsClick);
             notificationsItem.Checked = _notificationsEnabled;
 
             settingsItem.MenuItems.Add(connectionItem);
             settingsItem.MenuItems.Add(filtersItem);
             settingsItem.MenuItems.Add(new MenuItem("-")); // Separator
+            settingsItem.MenuItems.Add(traySettingsItem);
             settingsItem.MenuItems.Add(notificationsItem);
 
             // Add items to main context menu
@@ -182,8 +294,16 @@ namespace syncer.ui.Services
         {
             if (_mainForm != null)
             {
+                // Unregister any existing events first to prevent duplicates
+                _mainForm.Resize -= OnMainFormResize;
+                _mainForm.FormClosing -= OnMainFormClosing;
+                
+                // Register the events
                 _mainForm.Resize += OnMainFormResize;
                 _mainForm.FormClosing += OnMainFormClosing;
+                
+                if (_logService != null)
+                    _logService.LogInfo("System tray events registered successfully", "UI");
             }
         }
 
@@ -349,6 +469,25 @@ namespace syncer.ui.Services
             }
         }
 
+        private void OnMenuTraySettingsClick(object sender, EventArgs e)
+        {
+            try
+            {
+                // For now, show a simple message dialog until the form compilation issue is resolved
+                MessageBox.Show("Tray settings configuration will be available in the next update.\n\n" +
+                    "Current Settings:\n" +
+                    "• Notifications: " + (_notificationsEnabled ? "Enabled" : "Disabled") + "\n" +
+                    "• Duration: " + _notificationDuration + "ms\n\n" +
+                    "Use the 'Notifications' menu item to toggle notifications on/off.", 
+                    "Tray Settings", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error showing tray settings: " + ex.Message, "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         private void OnMenuNotificationsClick(object sender, EventArgs e)
         {
             MenuItem menuItem = sender as MenuItem;
@@ -427,7 +566,14 @@ namespace syncer.ui.Services
             {
                 e.Cancel = true; // Cancel the close operation
                 _mainForm.WindowState = FormWindowState.Minimized; // Minimize the form
-                // The resize event will handle hiding the form
+                _mainForm.Hide(); // Explicitly hide the form (don't rely only on resize)
+                
+                if (_notificationsEnabled)
+                {
+                    ShowNotification("Data Syncer Running", 
+                        "The application is still running in the background. Double-click the tray icon to restore.",
+                        ToolTipIcon.Info);
+                }
             }
         }
         
@@ -469,6 +615,14 @@ namespace syncer.ui.Services
             {
                 if (disposing)
                 {
+                    // Stop and dispose the status update timer
+                    if (_statusUpdateTimer != null)
+                    {
+                        _statusUpdateTimer.Stop();
+                        _statusUpdateTimer.Dispose();
+                        _statusUpdateTimer = null;
+                    }
+                    
                     // Dispose managed resources
                     if (_notifyIcon != null)
                     {

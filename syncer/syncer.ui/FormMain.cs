@@ -50,7 +50,7 @@ namespace syncer.ui
         {
             try
             {
-                // Create the system tray manager
+                // Create the system tray manager - it will load its own settings
                 _trayManager = new SystemTrayManager(this);
                 
                 // Create the notification service
@@ -59,13 +59,33 @@ namespace syncer.ui
                 // Update the tray icon tooltip with application status
                 string serviceStatus = _serviceManager != null ? 
                     (_serviceManager.IsServiceRunning() ? "Running" : "Stopped") : "Unknown";
-                _trayManager.UpdateToolTip($"Data Syncer - Service: {serviceStatus}");
+                _trayManager.UpdateToolTip(string.Format("Data Syncer - Service: {0}", serviceStatus));
                 
-                // Show a startup notification
-                _notificationService.ShowNotification(
-                    "Data Syncer Started", 
-                    "Application is running and will minimize to the system tray when closed.",
-                    ToolTipIcon.Info);
+                // Load user preference for startup notification
+                bool showStartupNotification = true;
+                try
+                {
+                    var configService = ServiceLocator.ConfigurationService;
+                    if (configService != null)
+                    {
+                        showStartupNotification = configService.GetSetting("ShowStartupNotification", true);
+                    }
+                }
+                catch
+                {
+                    // Ignore configuration errors
+                }
+                
+                // Show a startup notification if enabled
+                if (showStartupNotification)
+                {
+                    _notificationService.ShowNotification(
+                        "Data Syncer Started", 
+                        "Application is running and will minimize to the system tray when closed.",
+                        ToolTipIcon.Info);
+                }
+                
+                ServiceLocator.LogService.LogInfo("System tray initialized successfully", "UI");
             }
             catch (Exception ex)
             {
@@ -752,6 +772,7 @@ namespace syncer.ui
             if (WindowState == FormWindowState.Minimized && _trayManager != null)
             {
                 Hide();
+                // Show notification via tray manager instead of here
             }
         }
         

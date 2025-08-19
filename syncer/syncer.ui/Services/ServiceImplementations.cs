@@ -312,22 +312,152 @@ namespace syncer.ui.Services
         }
     }
 
-    // Stub implementation of configuration service - will be replaced with actual backend implementation
+    // Full implementation of configuration service using Windows Registry for .NET 3.5 compatibility
     public class ConfigurationService : IConfigurationService
     {
         private Dictionary<string, object> _settings = new Dictionary<string, object>();
-        public ConfigurationService() { LoadAllSettings(); }
+        private const string REGISTRY_KEY = @"SOFTWARE\DataSyncer\Settings";
+        private bool _registryAvailable = true;
+        
+        public ConfigurationService() 
+        { 
+            LoadAllSettings(); 
+        }
+        
         public T GetSetting<T>(string key, T defaultValue)
         {
             if (_settings.ContainsKey(key))
             {
-                try { return (T)_settings[key]; } catch { return defaultValue; }
+                try 
+                { 
+                    object value = _settings[key];
+                    if (value is T)
+                        return (T)value;
+                    return (T)Convert.ChangeType(value, typeof(T));
+                } 
+                catch 
+                { 
+                    return defaultValue; 
+                }
             }
             return defaultValue;
         }
-        public bool SaveSetting<T>(string key, T value) { _settings[key] = value; return true; }
-        public bool DeleteSetting(string key) { return _settings.Remove(key); }
-        public void SaveAllSettings() { }
-        public void LoadAllSettings() { }
+        
+        public bool SaveSetting<T>(string key, T value) 
+        { 
+            try
+            {
+                _settings[key] = value;
+                SaveToRegistry(key, value);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
+        public bool DeleteSetting(string key) 
+        { 
+            try
+            {
+                bool removed = _settings.Remove(key);
+                if (removed && _registryAvailable)
+                {
+                    using (Microsoft.Win32.RegistryKey regKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(REGISTRY_KEY, true))
+                    {
+                        if (regKey != null)
+                        {
+                            regKey.DeleteValue(key, false);
+                        }
+                    }
+                }
+                return removed;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
+        public void SaveAllSettings() 
+        { 
+            try
+            {
+                if (!_registryAvailable) return;
+                
+                foreach (var kvp in _settings)
+                {
+                    SaveToRegistry(kvp.Key, kvp.Value);
+                }
+            }
+            catch
+            {
+                // Ignore errors during bulk save
+            }
+        }
+        
+        public void LoadAllSettings() 
+        { 
+            try
+            {
+                _settings.Clear();
+                
+                using (Microsoft.Win32.RegistryKey regKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(REGISTRY_KEY))
+                {
+                    if (regKey != null)
+                    {
+                        foreach (string valueName in regKey.GetValueNames())
+                        {
+                            object value = regKey.GetValue(valueName);
+                            if (value != null)
+                            {
+                                _settings[valueName] = value;
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                _registryAvailable = false;
+                // Fall back to default settings if registry is not available
+                SetDefaultSettings();
+            }
+        }
+        
+        private void SaveToRegistry<T>(string key, T value)
+        {
+            try
+            {
+                if (!_registryAvailable) return;
+                
+                using (Microsoft.Win32.RegistryKey regKey = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(REGISTRY_KEY))
+                {
+                    if (regKey != null)
+                    {
+                        // Convert to appropriate registry type
+                        if (value is bool)
+                            regKey.SetValue(key, (bool)(object)value ? 1 : 0, Microsoft.Win32.RegistryValueKind.DWord);
+                        else if (value is int)
+                            regKey.SetValue(key, (int)(object)value, Microsoft.Win32.RegistryValueKind.DWord);
+                        else
+                            regKey.SetValue(key, value.ToString(), Microsoft.Win32.RegistryValueKind.String);
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore registry save errors
+            }
+        }
+        
+        private void SetDefaultSettings()
+        {
+            _settings["NotificationsEnabled"] = true;
+            _settings["NotificationDelay"] = 3000;
+            _settings["MinimizeToTray"] = true;
+            _settings["StartMinimized"] = false;
+        }
     }
 }
