@@ -5,26 +5,31 @@ using syncer.core;
 namespace syncer.ui
 {
     /// <summary>
-    /// Simple FTP connection test utility for .NET 3.5 compatibility
-    /// Use this to verify FTP functionality before setting up FileZilla tests
+    /// Transfer connection test utility for .NET 3.5 compatibility
+    /// Tests FTP, SFTP, and LOCAL transfer engines
+    /// Works with the actual transfer clients used by the application
     /// </summary>
     public partial class FtpTestForm : Form
     {
         private GroupBox gbConnection;
         private TextBox txtHost, txtUsername, txtPassword, txtPort;
         private ComboBox cmbProtocol;
-        private Button btnTest, btnClose;
+        private Button btnTest, btnClose, btnLoadSettings;
         private CheckBox chkPassiveMode;
         private TextBox txtResults;
+        private Label lblStatus;
         
         public FtpTestForm()
         {
             InitializeComponent();
+            UpdateConnectionStatus();
+            // Trigger initial protocol setup
+            CmbProtocol_SelectedIndexChanged(cmbProtocol, EventArgs.Empty);
         }
 
         private void InitializeComponent()
         {
-            this.Text = "FTP Connection Test";
+            this.Text = "Transfer Connection Test";
             this.Size = new System.Drawing.Size(500, 600);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -44,10 +49,11 @@ namespace syncer.ui
             
             cmbProtocol = new ComboBox();
             cmbProtocol.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbProtocol.Items.AddRange(new object[] { "FTP", "SFTP" });
-            cmbProtocol.SelectedIndex = 0;
+            cmbProtocol.Items.AddRange(new object[] { "LOCAL", "FTP", "SFTP" });
+            cmbProtocol.SelectedIndex = 1; // Default to FTP
             cmbProtocol.Location = new System.Drawing.Point(100, 22);
             cmbProtocol.Size = new System.Drawing.Size(100, 21);
+            cmbProtocol.SelectedIndexChanged += CmbProtocol_SelectedIndexChanged;
             
             // Host
             var lblHost = new Label();
@@ -58,7 +64,8 @@ namespace syncer.ui
             txtHost = new TextBox();
             txtHost.Location = new System.Drawing.Point(100, 52);
             txtHost.Size = new System.Drawing.Size(200, 20);
-            txtHost.Text = "127.0.0.1"; // Default to localhost for FileZilla server testing
+            txtHost.Text = ""; // Empty by default
+            txtHost.TextChanged += (s, ev) => UpdateConnectionStatus();
             
             // Port
             var lblPort = new Label();
@@ -70,6 +77,7 @@ namespace syncer.ui
             txtPort.Location = new System.Drawing.Point(370, 52);
             txtPort.Size = new System.Drawing.Size(60, 20);
             txtPort.Text = "21"; // Default FTP port
+            txtPort.TextChanged += (s, ev) => UpdateConnectionStatus();
             
             // Username
             var lblUsername = new Label();
@@ -80,7 +88,7 @@ namespace syncer.ui
             txtUsername = new TextBox();
             txtUsername.Location = new System.Drawing.Point(100, 82);
             txtUsername.Size = new System.Drawing.Size(150, 20);
-            txtUsername.Text = "test"; // Default test user
+            txtUsername.Text = ""; // Empty by default
             
             // Password
             var lblPassword = new Label();
@@ -92,7 +100,7 @@ namespace syncer.ui
             txtPassword.Location = new System.Drawing.Point(100, 112);
             txtPassword.Size = new System.Drawing.Size(150, 20);
             txtPassword.UseSystemPasswordChar = true;
-            txtPassword.Text = "test"; // Default test password
+            txtPassword.Text = ""; // Empty by default
             
             // Passive mode
             chkPassiveMode = new CheckBox();
@@ -104,19 +112,34 @@ namespace syncer.ui
             // Test button
             btnTest = new Button();
             btnTest.Text = "Test Connection";
-            btnTest.Location = new System.Drawing.Point(320, 140);
-            btnTest.Size = new System.Drawing.Size(120, 30);
+            btnTest.Location = new System.Drawing.Point(220, 140);
+            btnTest.Size = new System.Drawing.Size(100, 30);
             btnTest.Click += BtnTest_Click;
+            
+            // Load Settings button
+            btnLoadSettings = new Button();
+            btnLoadSettings.Text = "Load App Settings";
+            btnLoadSettings.Location = new System.Drawing.Point(330, 140);
+            btnLoadSettings.Size = new System.Drawing.Size(110, 30);
+            btnLoadSettings.Click += BtnLoadSettings_Click;
+            
+            // Connection status label
+            lblStatus = new Label();
+            lblStatus.Text = "Status: Not Connected";
+            lblStatus.Location = new System.Drawing.Point(12, 225);
+            lblStatus.Size = new System.Drawing.Size(460, 20);
+            lblStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            lblStatus.ForeColor = System.Drawing.Color.DarkRed;
             
             // Results area
             var lblResults = new Label();
             lblResults.Text = "Test Results:";
-            lblResults.Location = new System.Drawing.Point(12, 225);
+            lblResults.Location = new System.Drawing.Point(12, 250);
             lblResults.Size = new System.Drawing.Size(100, 20);
             
             txtResults = new TextBox();
-            txtResults.Location = new System.Drawing.Point(12, 250);
-            txtResults.Size = new System.Drawing.Size(460, 250);
+            txtResults.Location = new System.Drawing.Point(12, 275);
+            txtResults.Size = new System.Drawing.Size(460, 225);
             txtResults.Multiline = true;
             txtResults.ScrollBars = ScrollBars.Both;
             txtResults.ReadOnly = true;
@@ -132,47 +155,279 @@ namespace syncer.ui
             // Add controls to group
             gbConnection.Controls.AddRange(new Control[] {
                 lblProtocol, cmbProtocol, lblHost, txtHost, lblPort, txtPort,
-                lblUsername, txtUsername, lblPassword, txtPassword, chkPassiveMode, btnTest
+                lblUsername, txtUsername, lblPassword, txtPassword, chkPassiveMode, btnTest, btnLoadSettings
             });
             
             // Add all to form
             this.Controls.AddRange(new Control[] {
-                gbConnection, lblResults, txtResults, btnClose
+                gbConnection, lblStatus, lblResults, txtResults, btnClose
             });
+        }
+        
+        private void CmbProtocol_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            bool isLocal = cmbProtocol.SelectedIndex == 0; // LOCAL
+            bool isFtp = cmbProtocol.SelectedIndex == 1;   // FTP
+            bool isSftp = cmbProtocol.SelectedIndex == 2;  // SFTP
+
+            // Enable/disable controls based on protocol
+            txtHost.Enabled = !isLocal;
+            txtPort.Enabled = !isLocal;
+            txtUsername.Enabled = !isLocal;
+            txtPassword.Enabled = !isLocal;
+            chkPassiveMode.Enabled = !isLocal;
+
+            // Set default values based on protocol
+            if (isLocal)
+            {
+                txtHost.Text = "";
+                txtPort.Text = "0";
+                txtUsername.Text = "";
+                txtPassword.Text = "";
+                chkPassiveMode.Checked = false;
+            }
+            else if (isFtp)
+            {
+                txtPort.Text = "21";
+                chkPassiveMode.Checked = true;
+            }
+            else if (isSftp)
+            {
+                txtPort.Text = "22";
+                chkPassiveMode.Checked = false; // Not applicable for SFTP
+                chkPassiveMode.Enabled = false;
+            }
+            
+            UpdateConnectionStatus();
+        }
+        
+        private void BtnLoadSettings_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                txtResults.Clear();
+                LogMessage("Attempting to load application connection settings...");
+                
+                // Try to get connection settings from the application's service locator
+                try
+                {
+                    if (ServiceLocator.ConnectionService != null)
+                    {
+                        var appSettings = ServiceLocator.ConnectionService.GetConnectionSettings();
+                        if (appSettings != null)
+                        {
+                            LoadSettingsToForm(appSettings);
+                            LogMessage("✓ Application connection settings loaded successfully.");
+                            LogMessage($"Loaded protocol: {appSettings.Protocol}, Host: {appSettings.Host}, Port: {appSettings.Port}");
+                            return;
+                        }
+                    }
+                    LogMessage("⚠ Connection service not available or no settings found.");
+                }
+                catch (Exception serviceEx)
+                {
+                    LogMessage($"⚠ Error accessing connection service: {serviceEx.Message}");
+                }
+                
+                // Fallback: Try to create a dummy UI ConnectionSettings for compatibility
+                try
+                {
+                    var uiSettings = new syncer.ui.ConnectionSettings();
+                    LoadUISettingsToForm(uiSettings);
+                    LogMessage("✓ Default connection settings loaded.");
+                }
+                catch (Exception uiEx)
+                {
+                    LogMessage($"✗ Error loading default settings: {uiEx.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"✗ Unexpected error loading settings: {ex.Message}");
+            }
+        }
+        
+        private void LoadSettingsToForm(syncer.core.ConnectionSettings settings)
+        {
+            // Map from core.ConnectionSettings to form
+            switch (settings.Protocol)
+            {
+                case syncer.core.ProtocolType.Local:
+                    cmbProtocol.SelectedIndex = 0;
+                    break;
+                case syncer.core.ProtocolType.Ftp:
+                    cmbProtocol.SelectedIndex = 1;
+                    break;
+                case syncer.core.ProtocolType.Sftp:
+                    cmbProtocol.SelectedIndex = 2;
+                    break;
+            }
+            
+            txtHost.Text = settings.Host ?? "";
+            txtPort.Text = settings.Port.ToString();
+            txtUsername.Text = settings.Username ?? "";
+            txtPassword.Text = settings.Password ?? "";
+            chkPassiveMode.Checked = settings.UsePassiveMode;
+            
+            UpdateConnectionStatus();
+        }
+        
+        private void LoadUISettingsToForm(syncer.ui.ConnectionSettings settings)
+        {
+            // Map from ui.ConnectionSettings to form
+            cmbProtocol.SelectedIndex = settings.ProtocolType; // Should match our indices
+            txtHost.Text = settings.Host ?? "";
+            txtPort.Text = settings.Port.ToString();
+            txtUsername.Text = settings.Username ?? "";
+            txtPassword.Text = settings.Password ?? "";
+            chkPassiveMode.Checked = settings.UsePassiveMode;
+            
+            UpdateConnectionStatus();
+        }
+        
+        private void UpdateConnectionStatus()
+        {
+            try
+            {
+                string statusText = "Status: ";
+                System.Drawing.Color statusColor = System.Drawing.Color.DarkRed;
+                
+                if (cmbProtocol.SelectedIndex == 0) // LOCAL
+                {
+                    statusText += "Local File System Connection";
+                    statusColor = System.Drawing.Color.DarkGreen;
+                }
+                else
+                {
+                    string protocol = cmbProtocol.SelectedIndex == 1 ? "FTP" : "SFTP";
+                    string host = txtHost.Text.Trim();
+                    string port = txtPort.Text.Trim();
+                    
+                    if (string.IsNullOrEmpty(host))
+                    {
+                        statusText += $"{protocol} - No Host Specified";
+                        statusColor = System.Drawing.Color.DarkRed;
+                    }
+                    else
+                    {
+                        statusText += $"{protocol} Connection to {host}:{port}";
+                        statusColor = System.Drawing.Color.DarkBlue;
+                    }
+                }
+                
+                if (lblStatus != null)
+                {
+                    lblStatus.Text = statusText;
+                    lblStatus.ForeColor = statusColor;
+                }
+            }
+            catch (Exception ex)
+            {
+                if (lblStatus != null)
+                {
+                    lblStatus.Text = $"Status: Error - {ex.Message}";
+                    lblStatus.ForeColor = System.Drawing.Color.Red;
+                }
+            }
         }
         
         private void BtnTest_Click(object sender, EventArgs e)
         {
+            // Disable buttons during test
+            btnTest.Enabled = false;
+            btnLoadSettings.Enabled = false;
+            btnTest.Text = "Testing...";
+            
+            // Update status to show testing
+            if (lblStatus != null)
+            {
+                lblStatus.Text = "Status: Testing connection...";
+                lblStatus.ForeColor = System.Drawing.Color.Orange;
+            }
+            
             txtResults.Clear();
-            LogMessage("Starting FTP connection test...");
+            LogMessage("Starting transfer connection test...");
             
             try
             {
-                var settings = new syncer.core.ConnectionSettings
-                {
-                    Protocol = cmbProtocol.SelectedItem.ToString() == "SFTP" ? syncer.core.ProtocolType.Sftp : syncer.core.ProtocolType.Ftp,
-                    Host = txtHost.Text.Trim(),
-                    Port = int.Parse(txtPort.Text),
-                    Username = txtUsername.Text.Trim(),
-                    Password = txtPassword.Text,
-                    UsePassiveMode = chkPassiveMode.Checked
-                };
+                var settings = new syncer.core.ConnectionSettings();
                 
-                LogMessage($"Protocol: {settings.Protocol}");
-                LogMessage($"Host: {settings.Host}");
-                LogMessage($"Port: {settings.Port}");
-                LogMessage($"Username: {settings.Username}");
-                LogMessage($"Passive Mode: {settings.UsePassiveMode}");
-                LogMessage("");
-                
-                ITransferClient client;
-                if (settings.Protocol == syncer.core.ProtocolType.Ftp)
+                // Map protocol correctly
+                switch (cmbProtocol.SelectedIndex)
                 {
-                    client = new EnhancedFtpTransferClient();
+                    case 0: // LOCAL
+                        settings.Protocol = syncer.core.ProtocolType.Local;
+                        break;
+                    case 1: // FTP
+                        settings.Protocol = syncer.core.ProtocolType.Ftp;
+                        break;
+                    case 2: // SFTP
+                        settings.Protocol = syncer.core.ProtocolType.Sftp;
+                        break;
+                    default:
+                        settings.Protocol = syncer.core.ProtocolType.Ftp;
+                        break;
+                }
+                
+                settings.Host = txtHost.Text.Trim();
+                settings.Username = txtUsername.Text.Trim();
+                settings.Password = txtPassword.Text;
+                settings.UsePassiveMode = chkPassiveMode.Checked;
+                
+                // Parse port with validation
+                if (int.TryParse(txtPort.Text, out int port))
+                {
+                    settings.Port = port;
                 }
                 else
                 {
-                    client = new ProductionSftpTransferClient();
+                    settings.Port = settings.Protocol == syncer.core.ProtocolType.Sftp ? 22 : 21;
+                }
+                
+                LogMessage($"Protocol: {settings.Protocol}");
+                if (settings.Protocol != syncer.core.ProtocolType.Local)
+                {
+                    LogMessage($"Host: {settings.Host}");
+                    LogMessage($"Port: {settings.Port}");
+                    LogMessage($"Username: {settings.Username}");
+                    if (settings.Protocol == syncer.core.ProtocolType.Ftp)
+                    {
+                        LogMessage($"Passive Mode: {settings.UsePassiveMode}");
+                    }
+                }
+                LogMessage("");
+                
+                // Validate required fields for remote connections
+                if (settings.Protocol != syncer.core.ProtocolType.Local)
+                {
+                    if (string.IsNullOrEmpty(settings.Host))
+                    {
+                        LogMessage("✗ Host is required for remote connections");
+                        return;
+                    }
+                    if (string.IsNullOrEmpty(settings.Username))
+                    {
+                        LogMessage("✗ Username is required for remote connections");
+                        return;
+                    }
+                }
+                
+                // Create appropriate transfer client
+                ITransferClient client;
+                switch (settings.Protocol)
+                {
+                    case syncer.core.ProtocolType.Local:
+                        client = new LocalTransferClient();
+                        break;
+                    case syncer.core.ProtocolType.Ftp:
+                        client = new EnhancedFtpTransferClient();
+                        break;
+                    case syncer.core.ProtocolType.Sftp:
+                        client = new ProductionSftpTransferClient();
+                        break;
+                    default:
+                        client = new EnhancedFtpTransferClient();
+                        break;
                 }
                 
                 LogMessage("Testing connection...");
@@ -184,15 +439,27 @@ namespace syncer.ui
                     LogMessage("✓ Connection test SUCCESSFUL!");
                     LogMessage("");
                     
-                    // Test directory listing
+                    // Test directory listing based on protocol
                     LogMessage("Testing directory listing...");
                     System.Collections.Generic.List<string> files;
-                    if (client.ListFiles(settings, "/", out files, out error))
+                    string testPath = "/";
+                    
+                    if (settings.Protocol == syncer.core.ProtocolType.Local)
+                    {
+                        testPath = System.IO.Path.GetTempPath(); // Use temp directory for local testing
+                    }
+                    
+                    if (client.ListFiles(settings, testPath, out files, out error))
                     {
                         LogMessage($"✓ Directory listing successful. Found {files.Count} items:");
-                        foreach (string file in files)
+                        int itemsToShow = Math.Min(10, files.Count); // Show max 10 items
+                        for (int i = 0; i < itemsToShow; i++)
                         {
-                            LogMessage($"  - {file}");
+                            LogMessage($"  - {files[i]}");
+                        }
+                        if (files.Count > 10)
+                        {
+                            LogMessage($"  ... and {files.Count - 10} more items");
                         }
                     }
                     else
@@ -204,18 +471,46 @@ namespace syncer.ui
                 {
                     LogMessage($"✗ Connection test FAILED: {error}");
                     LogMessage("");
-                    LogMessage("Common issues:");
-                    LogMessage("- Check if FileZilla Server is running");
-                    LogMessage("- Verify host/port settings");
-                    LogMessage("- Check username/password");
-                    LogMessage("- Try toggling passive mode");
-                    LogMessage("- Check firewall settings");
+                    LogMessage("Common troubleshooting tips:");
+                    
+                    if (settings.Protocol == syncer.core.ProtocolType.Local)
+                    {
+                        LogMessage("- Ensure the application has file system access");
+                        LogMessage("- Check if the temp directory is accessible");
+                    }
+                    else
+                    {
+                        LogMessage("- Check if the server is running and accessible");
+                        LogMessage("- Verify host/port settings are correct");
+                        LogMessage("- Confirm username/password are valid");
+                        
+                        if (settings.Protocol == syncer.core.ProtocolType.Ftp)
+                        {
+                            LogMessage("- Try toggling passive mode");
+                            LogMessage("- Check firewall settings for FTP data ports");
+                        }
+                        else if (settings.Protocol == syncer.core.ProtocolType.Sftp)
+                        {
+                            LogMessage("- Ensure SSH service is running");
+                            LogMessage("- Verify SSH key authentication if using keys");
+                        }
+                        
+                        LogMessage("- Check network connectivity");
+                    }
                 }
             }
             catch (Exception ex)
             {
                 LogMessage($"✗ Test failed with exception: {ex.Message}");
                 LogMessage($"Stack trace: {ex.StackTrace}");
+            }
+            finally
+            {
+                // Re-enable buttons and restore UI
+                btnTest.Enabled = true;
+                btnLoadSettings.Enabled = true;
+                btnTest.Text = "Test Connection";
+                UpdateConnectionStatus();
             }
         }
         
