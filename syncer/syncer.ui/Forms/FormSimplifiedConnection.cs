@@ -3,6 +3,7 @@ using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 using syncer.core;
+using syncer.core.Transfers;
 
 namespace syncer.ui.Forms
 {
@@ -191,7 +192,7 @@ namespace syncer.ui.Forms
                 // Simple connection test using basic SFTP client
                 if (_settings.Protocol == "SFTP")
                 {
-                    var transferClient = new SftpTransferClient();
+                    var transferClient = new ProductionSftpTransferClient();
                     
                     // Create a basic connection settings for the core library
                     var coreSettings = new syncer.core.ConnectionSettings
@@ -200,7 +201,7 @@ namespace syncer.ui.Forms
                         Port = _settings.Port,
                         Username = _settings.Username,
                         Password = _settings.Password,
-                        Protocol = ProtocolType.Sftp
+                        Protocol = syncer.core.ProtocolType.Sftp
                     };
 
                     string error;

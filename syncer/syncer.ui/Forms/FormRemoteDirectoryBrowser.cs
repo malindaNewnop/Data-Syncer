@@ -178,10 +178,10 @@ namespace syncer.ui.Forms
                 switch (_connectionSettings.Protocol)
                 {
                     case ProtocolType.Sftp:
-                        client = new EnhancedSftpTransferClient(new SftpConfiguration());
+                        client = new ProductionSftpTransferClient();
                         break;
                     case ProtocolType.Ftp:
-                        client = new FtpTransferClient();
+                        client = new EnhancedFtpTransferClient();
                         break;
                     default:
                         throw new InvalidOperationException("Unsupported protocol for remote directory browsing");

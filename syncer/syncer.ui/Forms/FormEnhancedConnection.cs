@@ -242,10 +242,10 @@ namespace syncer.ui.Forms
                 switch (_settings.Protocol)
                 {
                     case ProtocolType.Sftp:
-                        client = new EnhancedSftpTransferClient(_sftpConfig);
+                        client = new ProductionSftpTransferClient();
                         break;
                     case ProtocolType.Ftp:
-                        client = new FtpTransferClient();
+                        client = new EnhancedFtpTransferClient();
                         break;
                     case ProtocolType.Local:
                     default:

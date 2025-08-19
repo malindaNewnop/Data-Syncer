@@ -89,7 +89,9 @@ namespace syncer.core
         public TransferDirection Direction = TransferDirection.SourceToDestination;
         public TransferMode TransferMode = TransferMode.Mirror;
         public ConnectionSettings Connection = new ConnectionSettings();
+        public ConnectionSettings SourceConnection = new ConnectionSettings();
         public ConnectionSettings DestinationConnection = new ConnectionSettings();
+        public bool IncludeSubFolders = true; // Alias for compatibility
         public FilterSettings Filters = new FilterSettings();
         public ScheduleSettings Schedule = new ScheduleSettings();
         public PostProcessSettings PostProcess = new PostProcessSettings();

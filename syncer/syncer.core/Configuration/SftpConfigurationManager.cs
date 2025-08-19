@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
 using syncer.core.Configuration;
+using syncer.core.Transfers;
 
 namespace syncer.core
 {
@@ -203,7 +204,7 @@ namespace syncer.core
                 return false;
             }
 
-            var client = new SftpTransferClient();
+            var client = new ProductionSftpTransferClient();
             return client.TestConnection(profile.ConnectionSettings, out error);
         }
 

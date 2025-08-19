@@ -46,6 +46,7 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Core\Models.cs" />
+    <Compile Include="Models\CoreModels.cs" />
     <Compile Include="Core\Interfaces.cs" />
     <Compile Include="Core\Paths.cs" />
     <Compile Include="Core\ServiceFactory.cs" />
@@ -61,12 +62,15 @@
     <Compile Include="Services\FileEnumerator.cs" />
     <Compile Include="Services\FileLogService.cs" />
     <Compile Include="Services\XmlJobRepository.cs" />
+    <Compile Include="Services\EnhancedSettingsService.cs" />
+    <Compile Include="Services\EnhancedTransferClientFactory.cs" />
+    <Compile Include="Services\TransferEngine.cs" />
+    <Compile Include="Utilities\SimpleJsonSerializer.cs" />
     <Compile Include="StringExtensions.cs" />
     <Compile Include="Transfers\LocalTransferClient.cs" />
-    <Compile Include="Transfers\FtpTransferClient.cs" />
-    <Compile Include="Transfers\SftpTransferClient.cs" />
+    <Compile Include="Transfers\EnhancedFtpTransferClient.cs" />
+    <Compile Include="Transfers\ProductionSftpTransferClient.cs" />
     <Compile Include="Transfers\TransferClientFactory.cs" />
-    <Compile Include="Transfers\EnhancedSftpTransferClient.cs" />
     <Compile Include="Configuration\SftpConfiguration.cs" />
     <Compile Include="Configuration\SftpConfigurationManager.cs" />
     <Compile Include="Configuration\MultiJobConfiguration.cs" />

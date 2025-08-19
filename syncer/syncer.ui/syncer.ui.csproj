@@ -97,19 +97,14 @@
     <Compile Include="FormLogs.Designer.cs">
       <DependentUpon>FormLogs.cs</DependentUpon>
     </Compile>
-    <!-- Enhanced SFTP Forms -->
-    <Compile Include="Forms\FormSimplifiedConnection.cs">
+    <!-- Enhanced Connection Form -->
+    <Compile Include="Forms\FormComprehensiveConnection.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Forms\FormSimplifiedConnection.Designer.cs">
-      <DependentUpon>Forms\FormSimplifiedConnection.cs</DependentUpon>
+    <Compile Include="Forms\FormComprehensiveConnection.Designer.cs">
+      <DependentUpon>FormComprehensiveConnection.cs</DependentUpon>
     </Compile>
-    <Compile Include="Forms\FormKeyGeneration.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Forms\FormKeyGeneration.Designer.cs">
-      <DependentUpon>Forms\FormKeyGeneration.cs</DependentUpon>
-    </Compile>
+    <Compile Include="Examples\ConnectionFormUsageExample.cs" />
     <!-- Resources -->
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>

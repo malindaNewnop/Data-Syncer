@@ -168,11 +168,11 @@ namespace syncer.ui
                 ITransferClient client;
                 if (settings.Protocol == syncer.core.ProtocolType.Ftp)
                 {
-                    client = new FtpTransferClient();
+                    client = new EnhancedFtpTransferClient();
                 }
                 else
                 {
-                    client = new SftpTransferClient();
+                    client = new ProductionSftpTransferClient();
                 }
                 
                 LogMessage("Testing connection...");

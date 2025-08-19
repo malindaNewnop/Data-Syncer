@@ -1,10 +1,12 @@
+using syncer.core.Transfers;
+
 namespace syncer.core
 {
     public class TransferClientFactory : ITransferClientFactory
     {
         private readonly LocalTransferClient _local = new LocalTransferClient();
-        private readonly FtpTransferClient _ftp = new FtpTransferClient();
-        private readonly SftpTransferClient _sftp = new SftpTransferClient();
+        private readonly EnhancedFtpTransferClient _ftp = new EnhancedFtpTransferClient();
+        private readonly ProductionSftpTransferClient _sftp = new ProductionSftpTransferClient();
 
         public ITransferClient Create(ProtocolType protocol)
         {

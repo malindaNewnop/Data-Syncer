@@ -227,7 +227,7 @@ namespace syncer.ui.Forms
 
                 if (_settings.Protocol == "SFTP")
                 {
-                    var client = new SftpTransferClient();
+                    var client = new ProductionSftpTransferClient();
                     bool success = client.TestConnection(_settings);
                     
                     if (success)

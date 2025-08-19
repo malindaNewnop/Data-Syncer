@@ -194,7 +194,7 @@ namespace syncer.ui
         {
             try
             {
-                using (var enhancedForm = new Forms.FormSimplifiedConnection())
+                using (var enhancedForm = new Forms.FormComprehensiveConnection())
                 {
                     if (enhancedForm.ShowDialog() == DialogResult.OK)
                     {
@@ -222,8 +222,11 @@ namespace syncer.ui
         {
             try
             {
-                using (var keyGenForm = new Forms.FormKeyGeneration())
+                using (var keyGenForm = new Forms.FormComprehensiveConnection())
                 {
+                    // Set the form to open directly to the SSH Key Generation tab
+                    keyGenForm.Text = "SSH Key Generation & Connection Settings";
+                    keyGenForm.SetDefaultTab(1); // Tab index 1 is SSH Key Generation
                     keyGenForm.ShowDialog();
                 }
             }
@@ -299,22 +302,7 @@ namespace syncer.ui
             }
         }
         
-        private void testFtpConnectionToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                using (var ftpTestForm = new FtpTestForm())
-                {
-                    ftpTestForm.ShowDialog(this);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error opening FTP test form: " + ex.Message, 
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService?.LogError("Error opening FTP test form: " + ex.Message);
-            }
-        }
+
 
         private void btnAddJob_Click(object sender, EventArgs e)
         {
