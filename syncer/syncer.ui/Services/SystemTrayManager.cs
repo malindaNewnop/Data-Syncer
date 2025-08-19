@@ -239,6 +239,31 @@ namespace syncer.ui.Services
             }
         }
 
+        /// <summary>
+        /// Shows a sync-specific notification from external callers
+        /// </summary>
+        /// <param name="jobName">The name of the sync job</param>
+        /// <param name="success">Whether the sync was successful</param>
+        /// <param name="message">Additional message details</param>
+        public void ShowSyncNotification(string jobName, bool success, string message)
+        {
+            if (!_notificationsEnabled || _notifyIcon == null)
+                return;
+                
+            try
+            {
+                string title = success ? "Sync Completed" : "Sync Failed";
+                ToolTipIcon icon = success ? ToolTipIcon.Info : ToolTipIcon.Error;
+                string fullMessage = string.Format("{0}: {1}", jobName, message);
+                
+                ShowNotification(title, fullMessage, icon);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error showing sync notification: " + ex.Message);
+            }
+        }
+
         #endregion
 
         #region Private Methods
@@ -260,34 +285,50 @@ namespace syncer.ui.Services
         {
             _contextMenu = new ContextMenu();
 
-            // Create menu items
-            MenuItem openItem = new MenuItem("Open", OnMenuOpenClick);
-            MenuItem openLogsItem = new MenuItem("View Logs", OnMenuViewLogsClick);
-            MenuItem startStopItem = new MenuItem(GetServiceToggleText(), OnMenuStartStopClick);
+            // Open/Restore window
+            MenuItem openItem = new MenuItem("Open Data Syncer", OnMenuOpenClick);
+            openItem.DefaultItem = true;
+            _contextMenu.MenuItems.Add(openItem);
+            
+            _contextMenu.MenuItems.Add(new MenuItem("-")); // Separator
+            
+            // Service control
+            MenuItem serviceItem = new MenuItem("Service Control");
+            serviceItem.MenuItems.Add(new MenuItem("Start Service", OnStartServiceClicked));
+            serviceItem.MenuItems.Add(new MenuItem("Stop Service", OnStopServiceClicked));
+            serviceItem.MenuItems.Add(new MenuItem("Restart Service", OnRestartServiceClicked));
+            _contextMenu.MenuItems.Add(serviceItem);
+            
+            _contextMenu.MenuItems.Add(new MenuItem("-")); // Separator
+            
+            // Quick actions
+            MenuItem actionsItem = new MenuItem("Quick Actions");
+            actionsItem.MenuItems.Add(new MenuItem("View Logs", OnViewLogsClicked));
+            actionsItem.MenuItems.Add(new MenuItem("Refresh Status", OnRefreshStatusClicked));
+            actionsItem.MenuItems.Add(new MenuItem("Show Last Sync", OnShowLastSyncClicked));
+            _contextMenu.MenuItems.Add(actionsItem);
+            
+            _contextMenu.MenuItems.Add(new MenuItem("-")); // Separator
+            
+            // Settings
             MenuItem settingsItem = new MenuItem("Settings");
-            MenuItem exitItem = new MenuItem("Exit", OnMenuExitClick);
-
-            // Create settings submenu
             MenuItem connectionItem = new MenuItem("Connection...", OnMenuConnectionClick);
             MenuItem filtersItem = new MenuItem("Filters...", OnMenuFiltersClick);
             MenuItem traySettingsItem = new MenuItem("Tray Settings...", OnMenuTraySettingsClick);
             MenuItem notificationsItem = new MenuItem("Notifications", OnMenuNotificationsClick);
             notificationsItem.Checked = _notificationsEnabled;
-
+            
             settingsItem.MenuItems.Add(connectionItem);
             settingsItem.MenuItems.Add(filtersItem);
             settingsItem.MenuItems.Add(new MenuItem("-")); // Separator
             settingsItem.MenuItems.Add(traySettingsItem);
             settingsItem.MenuItems.Add(notificationsItem);
-
-            // Add items to main context menu
-            _contextMenu.MenuItems.Add(openItem);
-            _contextMenu.MenuItems.Add(openLogsItem);
-            _contextMenu.MenuItems.Add(startStopItem);
-            _contextMenu.MenuItems.Add(new MenuItem("-")); // Separator
             _contextMenu.MenuItems.Add(settingsItem);
+            
             _contextMenu.MenuItems.Add(new MenuItem("-")); // Separator
-            _contextMenu.MenuItems.Add(exitItem);
+            
+            // Exit
+            _contextMenu.MenuItems.Add(new MenuItem("Exit", OnMenuExitClick));
         }
 
         private void RegisterMainFormEvents()
@@ -337,9 +378,29 @@ namespace syncer.ui.Services
 
         private void UpdateServiceMenuText()
         {
-            if (_contextMenu != null && _contextMenu.MenuItems.Count > 2)
+            try
             {
-                _contextMenu.MenuItems[2].Text = GetServiceToggleText();
+                if (_contextMenu != null && _serviceManager != null)
+                {
+                    // Find the Service Control submenu (index 1 in new structure)
+                    if (_contextMenu.MenuItems.Count > 1)
+                    {
+                        MenuItem serviceControlItem = _contextMenu.MenuItems[1];
+                        if (serviceControlItem.MenuItems.Count >= 2)
+                        {
+                            bool isRunning = _serviceManager.IsServiceRunning();
+                            
+                            // Enable/disable menu items based on service state
+                            serviceControlItem.MenuItems[0].Enabled = !isRunning; // Start Service
+                            serviceControlItem.MenuItems[1].Enabled = isRunning;  // Stop Service
+                            serviceControlItem.MenuItems[2].Enabled = isRunning;  // Restart Service
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error updating service menu text: " + ex.Message);
             }
         }
 
@@ -542,6 +603,183 @@ namespace syncer.ui.Services
                 Environment.Exit(1); // Force exit on error
             }
         }
+
+        #region Enhanced Service Control Event Handlers
+
+        private void OnStartServiceClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_serviceManager != null)
+                {
+                    bool success = _serviceManager.StartService();
+                    if (success)
+                    {
+                        UpdateStatus(true);
+                        ShowNotification("Service Started", "Data Syncer service is now running", ToolTipIcon.Info);
+                        if (_logService != null)
+                            _logService.LogInfo("Service started from system tray", "UI");
+                    }
+                    else
+                    {
+                        ShowNotification("Service Error", "Failed to start service", ToolTipIcon.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowNotification("Service Error", "Error starting service: " + ex.Message, ToolTipIcon.Error);
+                if (_logService != null)
+                    _logService.LogError("Failed to start service from tray: " + ex.Message, "UI");
+            }
+        }
+
+        private void OnStopServiceClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_serviceManager != null)
+                {
+                    bool success = _serviceManager.StopService();
+                    if (success)
+                    {
+                        UpdateStatus(false);
+                        ShowNotification("Service Stopped", "Data Syncer service has been stopped", ToolTipIcon.Warning);
+                        if (_logService != null)
+                            _logService.LogInfo("Service stopped from system tray", "UI");
+                    }
+                    else
+                    {
+                        ShowNotification("Service Error", "Failed to stop service", ToolTipIcon.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowNotification("Service Error", "Error stopping service: " + ex.Message, ToolTipIcon.Error);
+                if (_logService != null)
+                    _logService.LogError("Failed to stop service from tray: " + ex.Message, "UI");
+            }
+        }
+
+        private void OnRestartServiceClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_serviceManager != null)
+                {
+                    ShowNotification("Service Restarting", "Restarting Data Syncer service...", ToolTipIcon.Info);
+                    
+                    _serviceManager.StopService();
+                    System.Threading.Thread.Sleep(1000); // Wait 1 second
+                    bool success = _serviceManager.StartService();
+                    
+                    if (success)
+                    {
+                        UpdateStatus(true);
+                        ShowNotification("Service Restarted", "Data Syncer service has been restarted", ToolTipIcon.Info);
+                        if (_logService != null)
+                            _logService.LogInfo("Service restarted from system tray", "UI");
+                    }
+                    else
+                    {
+                        ShowNotification("Service Error", "Failed to restart service", ToolTipIcon.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowNotification("Service Error", "Error restarting service: " + ex.Message, ToolTipIcon.Error);
+                if (_logService != null)
+                    _logService.LogError("Failed to restart service from tray: " + ex.Message, "UI");
+            }
+        }
+
+        #endregion
+
+        #region Quick Actions Event Handlers
+
+        private void OnViewLogsClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                using (FormLogs logsForm = new FormLogs())
+                {
+                    logsForm.ShowDialog();
+                }
+                
+                if (_logService != null)
+                    _logService.LogInfo("Logs accessed from system tray", "UI");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening logs: " + ex.Message, "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void OnRefreshStatusClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_serviceManager != null)
+                {
+                    bool isRunning = _serviceManager.IsServiceRunning();
+                    string status = _serviceManager.GetServiceStatus();
+                    
+                    UpdateStatus(isRunning);
+                    UpdateToolTip("Data Syncer - Service: " + status);
+                    
+                    ShowNotification("Status Refreshed", "Service is currently: " + status, ToolTipIcon.Info);
+                    
+                    if (_logService != null)
+                        _logService.LogInfo("Status refreshed from system tray - Service: " + status, "UI");
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowNotification("Error", "Failed to refresh status: " + ex.Message, ToolTipIcon.Error);
+            }
+        }
+
+        private void OnShowLastSyncClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_logService != null)
+                {
+                    // Get recent logs
+                    var logs = _logService.GetLogs();
+                    if (logs.Rows.Count > 0)
+                    {
+                        var recentLogs = new List<string>();
+                        int maxLogs = Math.Min(3, logs.Rows.Count);
+                        
+                        for (int i = logs.Rows.Count - maxLogs; i < logs.Rows.Count; i++)
+                        {
+                            var row = logs.Rows[i];
+                            string logEntry = string.Format("{0}: {1}", 
+                                row["DateTime"], 
+                                row["Message"].ToString().Substring(0, Math.Min(50, row["Message"].ToString().Length)));
+                            recentLogs.Add(logEntry);
+                        }
+                        
+                        string message = "Recent activity:\n" + string.Join("\n", recentLogs.ToArray());
+                        ShowNotification("Recent Activity", message, ToolTipIcon.Info);
+                    }
+                    else
+                    {
+                        ShowNotification("No Activity", "No sync activities recorded yet", ToolTipIcon.Info);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowNotification("Error", "Failed to get recent activity: " + ex.Message, ToolTipIcon.Error);
+            }
+        }
+
+        #endregion
 
         private void OnMainFormResize(object sender, EventArgs e)
         {
