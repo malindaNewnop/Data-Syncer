@@ -4,6 +4,24 @@ using System.Data;
 
 namespace syncer.core
 {
+    [Flags]
+    public enum ValidationOptions
+    {
+        None = 0,
+        Existence = 1,
+        FileSize = 2,
+        Timestamp = 4,
+        PreserveTimestamp = 8,
+        All = Existence | FileSize | Timestamp
+    }
+
+    public enum RelocationOptions
+    {
+        None,
+        Delete,
+        Archive,
+        CustomFolder
+    }
     // Repository Interface
     public interface IJobRepository
     {
@@ -15,6 +33,32 @@ namespace syncer.core
         void Delete(string id);
     }
 
+    // File Filter Interface
+    public interface IFileFilterService
+    {
+        List<string> ApplyFilters(List<string> files, FilterSettings filters);
+        bool ValidateFile(string sourcePath, string destinationPath, ValidationOptions options);
+        bool EnsureDirectoryExists(string path, bool isLocal);
+        bool RelocateFile(string sourceFilePath, RelocationOptions options);
+    }
+    
+    // Using FilterSettings from Models.cs
+    
+    // Scheduler Interface
+    public interface ISchedulerService
+    {
+        void Start();
+        void Stop();
+        void RefreshScheduledJobs();
+        void ScheduleJob(SyncJob job);
+        void UnscheduleJob(string jobId);
+        
+        event EventHandler JobScheduled;
+        event EventHandler JobTriggered;
+    }
+
+    // Event arguments defined in SchedulerService.cs
+    
     // Enhanced Logging Interface
     public interface ILogService
     {

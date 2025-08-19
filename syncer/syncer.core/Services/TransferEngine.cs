@@ -17,6 +17,7 @@ namespace syncer.core.Services
         private readonly ITransferClientFactory _clientFactory;
         private readonly ILogService _logService;
         private readonly EnhancedSettingsService _settingsService;
+        private readonly IFileFilterService _fileFilterService;
         private readonly Dictionary<string, TransferJob> _activeJobs;
         private readonly object _jobLock = new object();
         private volatile bool _disposed = false;
@@ -25,11 +26,13 @@ namespace syncer.core.Services
         public event EventHandler<TransferCompletedEventArgs> TransferCompleted;
         public event EventHandler<TransferStartedEventArgs> TransferStarted;
 
-        public TransferEngine(ITransferClientFactory clientFactory, ILogService logService, EnhancedSettingsService settingsService)
+        public TransferEngine(ITransferClientFactory clientFactory, ILogService logService, 
+                         EnhancedSettingsService settingsService, IFileFilterService fileFilterService)
         {
             _clientFactory = clientFactory ?? throw new ArgumentNullException("clientFactory");
             _logService = logService ?? throw new ArgumentNullException("logService");
             _settingsService = settingsService ?? throw new ArgumentNullException("settingsService");
+            _fileFilterService = fileFilterService ?? throw new ArgumentNullException("fileFilterService");
             _activeJobs = new Dictionary<string, TransferJob>();
         }
 
@@ -304,6 +307,20 @@ namespace syncer.core.Services
                 result.TransferredBytes += fileInfo.Length;
                 result.TotalBytes += fileInfo.Length;
 
+                // Basic file validation if local files
+                if (job.DestinationConnection.Protocol == ProtocolType.Local)
+                {
+                    var destFileInfo = new FileInfo(destinationFile);
+                    if (!destFileInfo.Exists)
+                    {
+                        result.Warnings.Add($"Transferred file not found at destination: {destinationFile}");
+                    }
+                    else if (fileInfo.Length != destFileInfo.Length)
+                    {
+                        result.Warnings.Add($"File size mismatch for {fileName}: Source={fileInfo.Length}, Dest={destFileInfo.Length}");
+                    }
+                }
+
                 return true;
             }
             catch (Exception ex)
@@ -348,6 +365,13 @@ namespace syncer.core.Services
                     {
                         _logService.LogJobError(job, $"Failed to list remote files: {error}", null);
                     }
+                }
+
+                // Apply filters if configured
+                if (job.Filters != null)
+                {
+                    files = _fileFilterService.ApplyFilters(files, job.Filters);
+                    _logService.LogJobProgress(job, $"Applied filters: {files.Count} files remain after filtering");
                 }
             }
             catch (Exception ex)

@@ -33,15 +33,24 @@ namespace syncer.core
         public string IncludePattern = "";
         public string ExcludePattern = "";
         public List<string> FileExtensions = new List<string>();
+        public List<string> IncludeExtensions = new List<string>();
+        public List<string> ExcludeExtensions = new List<string>();
         public long MinSizeBytes = -1;
         public long MaxSizeBytes = -1;
+        public long MinSizeKB = -1;
+        public long MaxSizeKB = -1;
         public bool IncludeHidden = false;
         public bool IncludeSystem = false;
         public bool IncludeReadOnly = true;
         public bool IncludeSubdirectories = false;
+        public bool RecursiveSearch = true;
         public List<string> ExcludePatterns = new List<string>();
         public DateTime? ModifiedAfter;
         public DateTime? ModifiedBefore;
+        public bool ValidateAfterTransfer = true;
+        public ValidationOptions ValidationOptions = ValidationOptions.Existence | ValidationOptions.FileSize;
+        public RelocationOptions SourceFileHandling = RelocationOptions.None;
+        public string CustomRelocationPath;
     }
 
     [Serializable]
