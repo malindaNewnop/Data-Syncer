@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.Timers;
+using System.Threading;
 
 namespace syncer.ui.Services
 {
@@ -10,12 +11,12 @@ namespace syncer.ui.Services
     public class SyncJobService : ISyncJobService
     {
         private List<SyncJob> _jobs;
-        private Dictionary<int, Timer> _jobTimers;
+        private Dictionary<int, System.Timers.Timer> _jobTimers;
 
         public SyncJobService()
         {
             _jobs = new List<SyncJob>();
-            _jobTimers = new Dictionary<int, Timer>();
+            _jobTimers = new Dictionary<int, System.Timers.Timer>();
             ServiceLocator.LogService.LogInfo("SyncJobService initialized with scheduling support");
         }
 
@@ -132,7 +133,7 @@ namespace syncer.ui.Services
                 millisecondsToNextRun = GetIntervalInMilliseconds(job);
             }
             
-            Timer timer = new Timer(millisecondsToNextRun);
+            System.Timers.Timer timer = new System.Timers.Timer(millisecondsToNextRun);
             timer.Elapsed += (sender, e) => OnTimerElapsed(job.Id);
             timer.AutoReset = false; // Single shot, we'll reschedule after execution
             timer.Start();
@@ -275,10 +276,141 @@ namespace syncer.ui.Services
 
         private void ExecuteUploadTransfer(SyncJob job)
         {
-            // This would require access to transfer clients
-            // For now, just log the operation
-            ServiceLocator.LogService.LogInfo(string.Format("Upload transfer from {0} to remote {1} (not fully implemented)", 
-                job.SourcePath, job.DestinationPath));
+            try
+            {
+                ServiceLocator.LogService.LogInfo(string.Format("Starting upload transfer job: {0}", job.Name));
+                
+                // Create appropriate transfer client based on destination protocol
+                syncer.core.ITransferClient transferClient = null;
+                var destConnection = job.DestinationConnection;
+                
+                if (destConnection == null)
+                {
+                    throw new Exception("Destination connection settings are missing");
+                }
+                
+                // Initialize transfer client based on protocol
+                switch (destConnection.Protocol.ToUpper())
+                {
+                    case "FTP":
+                        transferClient = new syncer.core.Transfers.EnhancedFtpTransferClient();
+                        break;
+                    case "SFTP":
+                        transferClient = new syncer.core.Transfers.ProductionSftpTransferClient();
+                        break;
+                    default:
+                        throw new Exception(string.Format("Unsupported destination protocol: {0}", destConnection.Protocol));
+                }
+                
+                // Convert UI connection settings to core connection settings
+                var coreDestConnection = ConvertToConnectionSettings(destConnection);
+                
+                // Test connection first
+                string testError;
+                if (!transferClient.TestConnection(coreDestConnection, out testError))
+                {
+                    throw new Exception(string.Format("Connection test failed: {0}", testError));
+                }
+                
+                // Get files to upload
+                string[] filesToUpload;
+                if (Directory.Exists(job.SourcePath))
+                {
+                    // Upload directory contents
+                    filesToUpload = job.IncludeSubFolders ? 
+                        Directory.GetFiles(job.SourcePath, "*", SearchOption.AllDirectories) :
+                        Directory.GetFiles(job.SourcePath, "*", SearchOption.TopDirectoryOnly);
+                }
+                else if (File.Exists(job.SourcePath))
+                {
+                    // Upload single file
+                    filesToUpload = new string[] { job.SourcePath };
+                }
+                else
+                {
+                    throw new Exception(string.Format("Source path does not exist: {0}", job.SourcePath));
+                }
+                
+                ServiceLocator.LogService.LogInfo(string.Format("Found {0} files to upload", filesToUpload.Length));
+                
+                int successCount = 0;
+                long totalBytes = 0;
+                
+                foreach (string localFile in filesToUpload)
+                {
+                    try
+                    {
+                        // Calculate relative remote path
+                        string relativePath = job.IncludeSubFolders ? 
+                            localFile.Substring(job.SourcePath.Length).TrimStart('\\', '/') :
+                            Path.GetFileName(localFile);
+                        
+                        string remoteFile = job.DestinationPath.TrimEnd('/', '\\') + "/" + relativePath.Replace('\\', '/');
+                        
+                        ServiceLocator.LogService.LogInfo(string.Format("Uploading: {0} -> {1}", localFile, remoteFile));
+                        
+                        string uploadError;
+                        if (transferClient.UploadFile(coreDestConnection, localFile, remoteFile, job.OverwriteExisting, out uploadError))
+                        {
+                            successCount++;
+                            totalBytes += new FileInfo(localFile).Length;
+                            ServiceLocator.LogService.LogInfo(string.Format("Successfully uploaded: {0}", Path.GetFileName(localFile)));
+                        }
+                        else
+                        {
+                            ServiceLocator.LogService.LogError(string.Format("Failed to upload {0}: {1}", Path.GetFileName(localFile), uploadError));
+                        }
+                    }
+                    catch (Exception fileEx)
+                    {
+                        ServiceLocator.LogService.LogError(string.Format("Error uploading {0}: {1}", Path.GetFileName(localFile), fileEx.Message));
+                    }
+                }
+                
+                // Update job statistics
+                job.LastFileCount = successCount;
+                job.LastTransferSize = totalBytes;
+                
+                if (successCount == filesToUpload.Length)
+                {
+                    ServiceLocator.LogService.LogInfo(string.Format("Upload job completed successfully. Uploaded {0} files ({1} bytes)", successCount, totalBytes));
+                }
+                else
+                {
+                    throw new Exception(string.Format("Upload partially failed. {0} of {1} files uploaded successfully", successCount, filesToUpload.Length));
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError(string.Format("Upload transfer job failed: {0}", ex.Message));
+                throw; // Re-throw to update job status
+            }
+        }
+
+        private syncer.core.ConnectionSettings ConvertToConnectionSettings(ConnectionSettings uiSettings)
+        {
+            return new syncer.core.ConnectionSettings
+            {
+                Protocol = ConvertProtocolType(uiSettings.Protocol),
+                Host = uiSettings.Host,
+                Port = uiSettings.Port,
+                Username = uiSettings.Username,
+                Password = uiSettings.Password,
+                UsePassiveMode = uiSettings.UsePassiveMode,
+                SshKeyPath = uiSettings.SshKeyPath,
+                Timeout = uiSettings.Timeout
+            };
+        }
+        
+        private syncer.core.ProtocolType ConvertProtocolType(string protocol)
+        {
+            switch (protocol.ToUpper())
+            {
+                case "LOCAL": return syncer.core.ProtocolType.Local;
+                case "FTP": return syncer.core.ProtocolType.Ftp;
+                case "SFTP": return syncer.core.ProtocolType.Sftp;
+                default: return syncer.core.ProtocolType.Local;
+            }
         }
 
         private void ExecuteDownloadTransfer(SyncJob job)
@@ -333,6 +465,50 @@ namespace syncer.ui.Services
                     return job.IntervalValue * 24 * 60 * 60 * 1000;
                 default:
                     return job.IntervalValue * 60 * 1000; // Default to minutes
+            }
+        }
+        
+        // Public methods for service manager to control the scheduler
+        public void StartScheduler()
+        {
+            try
+            {
+                // Start all enabled jobs that have scheduling configured
+                foreach (var job in _jobs)
+                {
+                    if (job.IsEnabled && job.IntervalValue > 0 && !string.IsNullOrEmpty(job.IntervalType))
+                    {
+                        ScheduleJob(job);
+                    }
+                }
+                ServiceLocator.LogService.LogInfo("Job scheduler started");
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Failed to start scheduler: " + ex.Message);
+            }
+        }
+        
+        public void StopScheduler()
+        {
+            try
+            {
+                // Stop all job timers
+                foreach (var kvp in _jobTimers)
+                {
+                    try
+                    {
+                        kvp.Value.Stop();
+                        kvp.Value.Dispose();
+                    }
+                    catch { }
+                }
+                _jobTimers.Clear();
+                ServiceLocator.LogService.LogInfo("Job scheduler stopped");
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Failed to stop scheduler: " + ex.Message);
             }
         }
     }
@@ -555,18 +731,71 @@ namespace syncer.ui.Services
         }
     }
 
-    // Stub implementation of service manager - will be replaced with actual backend implementation
+    // Full implementation of service manager that properly manages job scheduling
     public class ServiceManager : IServiceManager
     {
         private bool _isRunning;
-        public bool StartService() { _isRunning = true; return true; }
-        public bool StopService() { _isRunning = false; return true; }
+        private SyncJobService _jobService;
+        
+        public ServiceManager()
+        {
+            _jobService = ServiceLocator.SyncJobService as SyncJobService;
+        }
+        
+        public bool StartService() 
+        { 
+            try
+            {
+                if (!_isRunning)
+                {
+                    _isRunning = true;
+                    
+                    // Start the job scheduler if we have jobs
+                    if (_jobService != null)
+                    {
+                        _jobService.StartScheduler();
+                        ServiceLocator.LogService.LogInfo("Data Syncer service started - job scheduling active");
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Failed to start service: " + ex.Message);
+                return false;
+            }
+        }
+        
+        public bool StopService() 
+        { 
+            try
+            {
+                if (_isRunning)
+                {
+                    _isRunning = false;
+                    
+                    // Stop the job scheduler
+                    if (_jobService != null)
+                    {
+                        _jobService.StopScheduler();
+                        ServiceLocator.LogService.LogInfo("Data Syncer service stopped - job scheduling inactive");
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Failed to stop service: " + ex.Message);
+                return false;
+            }
+        }
+        
         public bool IsServiceRunning() { return _isRunning; }
         public string GetServiceStatus() { return _isRunning ? "Running" : "Stopped"; }
         
         public void Dispose()
         {
-            // Nothing to dispose in stub implementation
+            StopService();
         }
     }
 

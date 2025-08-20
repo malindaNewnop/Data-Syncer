@@ -442,10 +442,44 @@ namespace syncer.ui.Forms
         
         private void BtnOK_Click(object sender, EventArgs e)
         {
-            SelectedLocalPath = _currentLocalPath;
-            SelectedRemotePath = _currentRemotePath;
-            this.DialogResult = DialogResult.OK;
-            this.Close();
+            // For download mode, we need to select a specific file, not just the directory
+            if (!IsUploadMode)
+            {
+                if (_lstRemote.SelectedItems.Count > 0)
+                {
+                    ListViewItem selectedItem = _lstRemote.SelectedItems[0];
+                    if (selectedItem.Text != ".." && selectedItem.SubItems[1].Text != "Folder")
+                    {
+                        // Selected item is a file
+                        string selectedFileName = selectedItem.Text;
+                        SelectedRemotePath = _currentRemotePath.TrimEnd('/') + "/" + selectedFileName;
+                        SelectedLocalPath = _currentLocalPath;
+                        this.DialogResult = DialogResult.OK;
+                        this.Close();
+                        return;
+                    }
+                    else
+                    {
+                        MessageBox.Show("Please select a file to download, not a folder.", "Invalid Selection",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Please select a file to download.", "No Selection",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+            else
+            {
+                // Upload mode - just return the current directory
+                SelectedLocalPath = _currentLocalPath;
+                SelectedRemotePath = _currentRemotePath;
+                this.DialogResult = DialogResult.OK;
+                this.Close();
+            }
         }
         
         private void LstLocal_DoubleClick(object sender, EventArgs e)
