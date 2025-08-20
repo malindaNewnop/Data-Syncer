@@ -3,6 +3,8 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.IO;
 using System.ComponentModel;
+using System.Timers;
+using System.Collections.Generic;
 using syncer.core;
 using syncer.core.Configuration;
 using syncer.ui.Forms;
@@ -17,6 +19,14 @@ namespace syncer.ui
         private bool _isEditMode;
         private ITransferClient _currentTransferClient;
         private syncer.core.ConnectionSettings _coreConnectionSettings;
+        
+        // Timer-based upload functionality
+        private System.Timers.Timer _uploadTimer;
+        private bool _isTimerRunning = false;
+        private DateTime _lastUploadTime;
+        private string[] _selectedFilesForTimer; // Store files selected for timer upload
+        private string _selectedFolderForTimer; // Base folder path for relative path calculation
+        private string _timerUploadDestination = "/"; // Default destination path
 
         public FormSchedule() : this(null) { }
 
@@ -37,23 +47,89 @@ namespace syncer.ui
 
         private void InitializeCustomComponents()
         {
-            this.Text = _isEditMode ? "Edit Schedule Settings" : "Add Schedule Settings";
-            this.Size = new Size(600, 580);
+            this.Text = _isEditMode ? "Edit Upload Timer Settings" : "Add Upload Timer Settings";
+            this.Size = new Size(779, 440); // Reduced height since we're removing source/destination
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
+            
+            // Hide source and destination section - we don't need it anymore
+            if (gbPaths != null) gbPaths.Visible = false;
+            
+            // Move timer controls up since we're hiding source/destination section
+            if (gbTimerSettings != null)
+            {
+                gbTimerSettings.Location = new Point(gbTimerSettings.Location.X, 97);
+            }
+            
+            // Move file manager controls up too
+            if (gbFileManager != null)
+            {
+                gbFileManager.Location = new Point(gbFileManager.Location.X, 
+                    gbTimerSettings != null ? gbTimerSettings.Location.Y + gbTimerSettings.Height + 10 : 300);
+            }
+            
             SetDefaultValues();
             if (_isEditMode) LoadJobSettings();
             InitializeTransferClient();
+            InitializeTimerControls();
+        }
+
+        private void InitializeTimerControls()
+        {
+            // Set up timer unit dropdown
+            if (cmbTimerUnit != null)
+            {
+                cmbTimerUnit.Items.Clear();
+                cmbTimerUnit.Items.AddRange(new string[] { "Seconds", "Minutes", "Hours" });
+                cmbTimerUnit.SelectedIndex = 1; // Default to Minutes
+            }
+
+            // Set up timer interval limits
+            if (numTimerInterval != null)
+            {
+                numTimerInterval.Minimum = 1;
+                numTimerInterval.Maximum = 9999;
+                numTimerInterval.Value = 5; // Default 5 minutes
+            }
+
+            // Initialize timer status
+            if (lblTimerStatus != null) lblTimerStatus.Text = "Timer stopped";
+            if (lblLastUpload != null) lblLastUpload.Text = "Never";
+            
+            // Initialize button states
+            if (btnStartTimer != null) btnStartTimer.Enabled = false;
+            if (btnStopTimer != null) btnStopTimer.Enabled = false;
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            // Clean up timer when form is closed
+            if (_uploadTimer != null)
+            {
+                _uploadTimer.Stop();
+                _uploadTimer.Elapsed -= OnTimerElapsed;
+                _uploadTimer.Dispose();
+                _uploadTimer = null;
+            }
+            
+            base.OnFormClosed(e);
         }
 
         private void SetDefaultValues()
         {
             if (chkEnabled != null) chkEnabled.Checked = true;
-            if (dtpStartTime != null) dtpStartTime.Value = DateTime.Now.Date.AddHours(9);
-            if (numInterval != null) numInterval.Value = 60;
-            if (cmbIntervalType != null) cmbIntervalType.SelectedIndex = 1;
+            if (chkEnableTimer != null) chkEnableTimer.Checked = false;
+            if (numTimerInterval != null) numTimerInterval.Value = 5;
+            if (cmbTimerUnit != null) cmbTimerUnit.SelectedIndex = 1; // Minutes
+            if (lblTimerStatus != null) lblTimerStatus.Text = "Timer stopped";
+            if (lblLastUpload != null) lblLastUpload.Text = "Never";
+            if (lblSelectedFiles != null) lblSelectedFiles.Text = "No files selected";
+            
+            // Initialize timer upload settings
+            _selectedFilesForTimer = null;
+            _timerUploadDestination = "/";
         }
 
         private void LoadJobSettings()
@@ -64,24 +140,11 @@ namespace syncer.ui
                 if (chkEnabled != null) chkEnabled.Checked = _currentJob.IsEnabled;
                 if (txtSourcePath != null) txtSourcePath.Text = _currentJob.SourcePath;
                 if (txtDestinationPath != null) txtDestinationPath.Text = _currentJob.DestinationPath;
-                if (dtpStartTime != null) dtpStartTime.Value = _currentJob.StartTime;
-                if (numInterval != null) numInterval.Value = _currentJob.IntervalValue;
-                if (cmbIntervalType != null)
-                {
-                    string[] items = new string[] { "Minutes", "Hours", "Days" };
-                    for (int i = 0; i < items.Length; i++)
-                    {
-                        if (items[i] == _currentJob.IntervalType)
-                        {
-                            cmbIntervalType.SelectedIndex = i;
-                            break;
-                        }
-                    }
-                }
-                if (cmbTransferMode != null && !UIStringExtensions.IsNullOrWhiteSpace(_currentJob.TransferMode))
-                {
-                    cmbTransferMode.Text = _currentJob.TransferMode;
-                }
+                
+                // Load timer settings (if available from job data)
+                if (chkEnableTimer != null) chkEnableTimer.Checked = false; // Default for new timer feature
+                if (numTimerInterval != null) numTimerInterval.Value = 5; // Default 5 minute interval
+                if (cmbTimerUnit != null) cmbTimerUnit.SelectedIndex = 1; // Minutes
             }
         }
 
@@ -279,22 +342,13 @@ namespace syncer.ui
                 txtJobName.Focus();
                 return false;
             }
-            if (UIStringExtensions.IsNullOrWhiteSpace(txtSourcePath.Text))
+            
+            // Skip source and destination validation as we're using files/folders selected directly
+            
+            if (chkEnableTimer != null && chkEnableTimer.Checked && numTimerInterval != null && numTimerInterval.Value <= 0)
             {
-                MessageBox.Show("Please select a source folder.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                btnBrowseSource.Focus();
-                return false;
-            }
-            if (UIStringExtensions.IsNullOrWhiteSpace(txtDestinationPath.Text))
-            {
-                MessageBox.Show("Please enter a destination path.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtDestinationPath.Focus();
-                return false;
-            }
-            if (numInterval.Value <= 0)
-            {
-                MessageBox.Show("Please enter a valid interval.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                numInterval.Focus();
+                MessageBox.Show("Please enter a valid timer interval.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                numTimerInterval.Focus();
                 return false;
             }
             return true;
@@ -307,32 +361,39 @@ namespace syncer.ui
             _currentJob.IsEnabled = chkEnabled.Checked;
             _currentJob.SourcePath = txtSourcePath.Text.Trim();
             _currentJob.DestinationPath = txtDestinationPath.Text.Trim();
-            _currentJob.StartTime = dtpStartTime.Value;
-            _currentJob.IntervalValue = (int)numInterval.Value;
-            _currentJob.IntervalType = cmbIntervalType.SelectedItem != null ? cmbIntervalType.SelectedItem.ToString() : "Minutes";
-            _currentJob.TransferMode = cmbTransferMode.SelectedItem != null ? cmbTransferMode.SelectedItem.ToString() : "Copy (Keep both files)";
+            _currentJob.StartTime = DateTime.Now; // Set to current time for timer-based uploads
+            
+            // For timer functionality, store interval in minutes for consistency
+            if (numTimerInterval != null && cmbTimerUnit != null && cmbTimerUnit.SelectedItem != null)
+            {
+                int intervalValue = (int)numTimerInterval.Value;
+                string unit = cmbTimerUnit.SelectedItem.ToString();
+                
+                // Convert to minutes for storage
+                if (unit == "Seconds")
+                    _currentJob.IntervalValue = intervalValue / 60; // Convert seconds to minutes
+                else if (unit == "Minutes")
+                    _currentJob.IntervalValue = intervalValue;
+                else if (unit == "Hours")
+                    _currentJob.IntervalValue = intervalValue * 60;
+                
+                _currentJob.IntervalType = "Minutes"; // Always store as minutes internally
+            }
+            else
+            {
+                _currentJob.IntervalValue = 5; // Default 5 minutes
+                _currentJob.IntervalType = "Minutes";
+            }
+            
+            _currentJob.TransferMode = "Upload"; // Timer-based uploads
             
             // Set connection settings for source and destination
             var currentConnection = _connectionService.GetConnectionSettings();
             if (currentConnection != null && currentConnection.IsRemoteConnection)
             {
-                // If we have a remote connection configured, use it as source or destination
-                // For FTP sender scenario: local source, remote destination
-                // For FTP receiver scenario: remote source, local destination
-                
-                if (_currentJob.DestinationPath.StartsWith("ftp://") || _currentJob.DestinationPath.StartsWith("sftp://") || 
-                    (currentConnection.Protocol == "FTP" || currentConnection.Protocol == "SFTP"))
-                {
-                    // Upload scenario: local to remote
-                    _currentJob.SourceConnection = new ConnectionSettings(); // Local
-                    _currentJob.DestinationConnection = currentConnection; // Remote
-                }
-                else
-                {
-                    // Download scenario: remote to local
-                    _currentJob.SourceConnection = currentConnection; // Remote
-                    _currentJob.DestinationConnection = new ConnectionSettings(); // Local
-                }
+                // Timer upload scenario: local source, remote destination
+                _currentJob.SourceConnection = new ConnectionSettings(); // Local
+                _currentJob.DestinationConnection = currentConnection; // Remote
             }
             else
             {
@@ -355,17 +416,270 @@ namespace syncer.ui
 
         private void chkEnabled_CheckedChanged(object sender, EventArgs e)
         {
-            if (gbScheduleSettings != null) gbScheduleSettings.Enabled = chkEnabled.Checked;
+            // Enable/disable the main form functionality
         }
 
-        private void cmbIntervalType_SelectedIndexChanged(object sender, EventArgs e)
+        private void chkEnableTimer_CheckedChanged(object sender, EventArgs e)
         {
-            if (cmbIntervalType.SelectedItem != null)
+            if (chkEnableTimer != null)
             {
-                string val = cmbIntervalType.SelectedItem.ToString();
-                if (val == "Minutes") { numInterval.Minimum = 1; numInterval.Maximum = 1440; }
-                else if (val == "Hours") { numInterval.Minimum = 1; numInterval.Maximum = 24; }
-                else if (val == "Days") { numInterval.Minimum = 1; numInterval.Maximum = 365; }
+                bool enabled = chkEnableTimer.Checked;
+                
+                // Enable/disable timer controls
+                if (numTimerInterval != null) numTimerInterval.Enabled = enabled;
+                if (cmbTimerUnit != null) cmbTimerUnit.Enabled = enabled;
+                if (btnStartTimer != null) btnStartTimer.Enabled = enabled && !_isTimerRunning;
+                if (btnStopTimer != null) btnStopTimer.Enabled = enabled && _isTimerRunning;
+                if (btnBrowseFilesForTimer != null) btnBrowseFilesForTimer.Enabled = enabled;
+            }
+        }
+
+        private void btnBrowseFilesForTimer_Click(object sender, EventArgs e)
+        {
+            using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+            {
+                dialog.Description = "Select folder for timed uploads";
+                dialog.ShowNewFolderButton = true;
+                
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    string folderPath = dialog.SelectedPath;
+                    
+                    // Get all files in the selected folder (including subfolders)
+                    string[] files = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories);
+                    _selectedFilesForTimer = files;
+                    
+                    // Store the base folder path for relative path calculations during upload
+                    _selectedFolderForTimer = folderPath;
+                    
+                    // Update the label to show selected folder and file count
+                    if (lblSelectedFiles != null)
+                    {
+                        if (files.Length == 1)
+                        {
+                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (1 file)";
+                        }
+                        else
+                        {
+                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (" + files.Length + " files)";
+                        }
+                    }
+                    
+                    ServiceLocator.LogService.LogInfo(string.Format("Selected folder '{0}' with {1} files for timer upload", 
+                        folderPath, files.Length));
+                    
+                    // Ask for upload destination for timer uploads
+                    AskForTimerUploadDestination();
+                }
+            }
+        }
+
+        private void AskForTimerUploadDestination()
+        {
+            using (Form inputForm = new Form())
+            {
+                inputForm.Text = "Timer Upload Destination";
+                inputForm.Size = new Size(450, 180);
+                inputForm.StartPosition = FormStartPosition.CenterParent;
+                inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                inputForm.MaximizeBox = false;
+                inputForm.MinimizeBox = false;
+                
+                Label label = new Label(); 
+                label.Left = 10; 
+                label.Top = 20; 
+                label.Text = "Enter remote destination path for timer uploads:"; 
+                label.AutoSize = true;
+                
+                TextBox textBox = new TextBox(); 
+                textBox.Left = 10; 
+                textBox.Top = 50; 
+                textBox.Width = 400;
+                textBox.Text = _timerUploadDestination;
+                
+                Button buttonOk = new Button(); 
+                buttonOk.Text = "Set Destination"; 
+                buttonOk.Left = 220; 
+                buttonOk.Top = 90; 
+                buttonOk.DialogResult = DialogResult.OK;
+                
+                Button buttonCancel = new Button(); 
+                buttonCancel.Text = "Cancel"; 
+                buttonCancel.Left = 330; 
+                buttonCancel.Top = 90; 
+                buttonCancel.DialogResult = DialogResult.Cancel;
+                
+                inputForm.Controls.Add(label);
+                inputForm.Controls.Add(textBox);
+                inputForm.Controls.Add(buttonOk);
+                inputForm.Controls.Add(buttonCancel);
+                inputForm.AcceptButton = buttonOk;
+                inputForm.CancelButton = buttonCancel;
+                
+                if (inputForm.ShowDialog() == DialogResult.OK)
+                {
+                    string destination = textBox.Text.Trim();
+                    if (!string.IsNullOrEmpty(destination))
+                    {
+                        _timerUploadDestination = destination;
+                        ServiceLocator.LogService.LogInfo("Timer upload destination set to: " + _timerUploadDestination);
+                    }
+                }
+            }
+        }
+
+        private void btnStartTimer_Click(object sender, EventArgs e)
+        {
+            if (!ValidateConnection() || !ValidateTimerSettings()) return;
+
+            try
+            {
+                // Calculate interval in milliseconds
+                double intervalMs = CalculateTimerInterval();
+                
+                if (_uploadTimer == null)
+                {
+                    _uploadTimer = new System.Timers.Timer();
+                    _uploadTimer.Elapsed += OnTimerElapsed;
+                    _uploadTimer.AutoReset = true;
+                }
+                
+                _uploadTimer.Interval = intervalMs;
+                _uploadTimer.Start();
+                _isTimerRunning = true;
+                
+                // Update UI
+                if (lblTimerStatus != null) lblTimerStatus.Text = "Timer running";
+                if (btnStartTimer != null) btnStartTimer.Enabled = false;
+                if (btnStopTimer != null) btnStopTimer.Enabled = true;
+                
+                MessageBox.Show("Upload timer started successfully!", "Timer Started", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                
+                ServiceLocator.LogService.LogInfo(string.Format("Upload timer started with interval: {0} ms", intervalMs));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error starting timer: " + ex.Message, "Timer Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error starting timer: " + ex.Message);
+            }
+        }
+
+        private void btnStopTimer_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_uploadTimer != null)
+                {
+                    _uploadTimer.Stop();
+                    _isTimerRunning = false;
+                    
+                    // Update UI
+                    if (lblTimerStatus != null) lblTimerStatus.Text = "Timer stopped";
+                    if (btnStartTimer != null) btnStartTimer.Enabled = chkEnableTimer != null && chkEnableTimer.Checked;
+                    if (btnStopTimer != null) btnStopTimer.Enabled = false;
+                    
+                    MessageBox.Show("Upload timer stopped.", "Timer Stopped", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    
+                    ServiceLocator.LogService.LogInfo("Upload timer stopped");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error stopping timer: " + ex.Message, "Timer Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error stopping timer: " + ex.Message);
+            }
+        }
+
+        private bool ValidateTimerSettings()
+        {
+            if (numTimerInterval == null || numTimerInterval.Value <= 0)
+            {
+                MessageBox.Show("Please enter a valid timer interval.", "Validation Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                if (numTimerInterval != null) numTimerInterval.Focus();
+                return false;
+            }
+            
+            if (_selectedFilesForTimer == null || _selectedFilesForTimer.Length == 0)
+            {
+                MessageBox.Show("Please select files for timer upload using 'Browse Files' button.", "Validation Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                if (btnBrowseFilesForTimer != null) btnBrowseFilesForTimer.Focus();
+                return false;
+            }
+            
+            return true;
+        }
+
+        private double CalculateTimerInterval()
+        {
+            if (numTimerInterval == null || cmbTimerUnit == null || cmbTimerUnit.SelectedItem == null)
+                return 300000; // Default 5 minutes
+
+            double value = (double)numTimerInterval.Value;
+            string unit = cmbTimerUnit.SelectedItem.ToString();
+            
+            switch (unit)
+            {
+                case "Seconds":
+                    return value * 1000;
+                case "Minutes":
+                    return value * 60 * 1000;
+                case "Hours":
+                    return value * 60 * 60 * 1000;
+                default:
+                    return value * 60 * 1000; // Default to minutes
+            }
+        }
+
+        private void OnTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            try
+            {
+                ServiceLocator.LogService.LogInfo("Timer elapsed - starting automatic upload");
+                
+                // Run upload on UI thread
+                this.Invoke(new Action(() =>
+                {
+                    PerformAutomaticUpload();
+                }));
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Timer elapsed error: " + ex.Message);
+            }
+        }
+
+        private void PerformAutomaticUpload()
+        {
+            try
+            {
+                if (_selectedFilesForTimer == null || _selectedFilesForTimer.Length == 0 || string.IsNullOrEmpty(_selectedFolderForTimer))
+                {
+                    ServiceLocator.LogService.LogError("No folder/files selected for automatic upload");
+                    return;
+                }
+                
+                ServiceLocator.LogService.LogInfo(string.Format("Starting automatic upload of folder '{0}' with {1} files", 
+                    _selectedFolderForTimer, _selectedFilesForTimer.Length));
+                
+                // Upload the pre-selected files to the default destination, preserving folder structure
+                PerformFolderUpload(_selectedFolderForTimer, _selectedFilesForTimer, _timerUploadDestination);
+                
+                // Update last upload time
+                _lastUploadTime = DateTime.Now;
+                if (lblLastUpload != null)
+                {
+                    lblLastUpload.Text = _lastUploadTime.ToString("yyyy-MM-dd HH:mm:ss");
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Automatic upload error: " + ex.Message);
             }
         }
 
@@ -373,23 +687,33 @@ namespace syncer.ui
         {
             if (ValidateInputs())
             {
-                string scheduleInfo = GenerateSchedulePreview();
-                MessageBox.Show(scheduleInfo, "Schedule Preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                string previewInfo = GenerateTimerPreview();
+                MessageBox.Show(previewInfo, "Timer Settings Preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
-        private string GenerateSchedulePreview()
+        private string GenerateTimerPreview()
         {
             string enabled = chkEnabled.Checked ? "Enabled" : "Disabled";
-            string interval = "Every " + numInterval.Value + " " + (cmbIntervalType.SelectedItem != null ? cmbIntervalType.SelectedItem.ToString() : "Minutes");
-            string startTime = dtpStartTime.Value.ToString("yyyy-MM-dd HH:mm");
+            string timerEnabled = (chkEnableTimer != null && chkEnableTimer.Checked) ? "Enabled" : "Disabled";
+            
+            string interval = "Not set";
+            if (numTimerInterval != null && cmbTimerUnit != null && cmbTimerUnit.SelectedItem != null)
+            {
+                interval = string.Format("Every {0} {1}", numTimerInterval.Value, cmbTimerUnit.SelectedItem.ToString());
+            }
+            
+            string timerStatus = _isTimerRunning ? "Running" : "Stopped";
+            string lastUpload = _lastUploadTime == DateTime.MinValue ? "Never" : _lastUploadTime.ToString("yyyy-MM-dd HH:mm:ss");
+            
             return "Job Name: " + txtJobName.Text + "\n" +
                    "Status: " + enabled + "\n" +
                    "Source: " + txtSourcePath.Text + "\n" +
                    "Destination: " + txtDestinationPath.Text + "\n" +
-                   "Schedule: " + interval + "\n" +
-                   "Start Time: " + startTime + "\n" +
-                   "Transfer Mode: " + (cmbTransferMode.SelectedItem != null ? cmbTransferMode.SelectedItem.ToString() : "Copy (Keep both files)");
+                   "Timer: " + timerEnabled + "\n" +
+                   "Upload Interval: " + interval + "\n" +
+                   "Timer Status: " + timerStatus + "\n" +
+                   "Last Upload: " + lastUpload;
         }
 
         #region File Manager and Transfer Operations
@@ -614,6 +938,119 @@ namespace syncer.ui
                     }
                 }
             }
+        }
+
+        private void PerformFolderUpload(string baseLocalFolder, string[] localFilePaths, string baseRemotePath)
+        {
+            BackgroundWorker worker = new BackgroundWorker();
+            worker.WorkerReportsProgress = true;
+            worker.DoWork += (sender, e) =>
+            {
+                try
+                {
+                    ServiceLocator.LogService.LogInfo(string.Format("Starting upload of folder '{0}' with {1} files to {2}", 
+                        baseLocalFolder, localFilePaths.Length, baseRemotePath));
+                    ServiceLocator.LogService.LogInfo(string.Format("Connection: {0}@{1}:{2}", 
+                        _coreConnectionSettings.Username, _coreConnectionSettings.Host, _coreConnectionSettings.Port));
+                        
+                    // Create dictionary to track created remote folders
+                    Dictionary<string, bool> createdRemoteFolders = new Dictionary<string, bool>();
+                    
+                    for (int i = 0; i < localFilePaths.Length; i++)
+                    {
+                        string localFile = localFilePaths[i];
+                        
+                        // Calculate relative path from base folder
+                        string relativePath = localFile.Substring(baseLocalFolder.Length).TrimStart('\\', '/');
+                        string relativeDirectory = Path.GetDirectoryName(relativePath);
+                        
+                        // Fix path separators for remote path
+                        string normalizedRelativePath = relativePath.Replace('\\', '/');
+                        string normalizedBaseRemotePath = baseRemotePath.Replace('\\', '/');
+                        if (!normalizedBaseRemotePath.EndsWith("/")) normalizedBaseRemotePath += "/";
+                        
+                        // Construct full remote path (preserving folder structure)
+                        string remoteFile = normalizedBaseRemotePath + normalizedRelativePath;
+                        
+                        // Create remote directory structure if needed
+                        if (!string.IsNullOrEmpty(relativeDirectory))
+                        {
+                            string[] pathParts = relativeDirectory.Split('\\', '/');
+                            string currentPath = normalizedBaseRemotePath;
+                            
+                            foreach (string part in pathParts)
+                            {
+                                currentPath += part + "/";
+                                
+                                // Only create directory if we haven't already done so
+                                if (!createdRemoteFolders.ContainsKey(currentPath))
+                                {
+                                    // Try to ensure remote directory exists
+                                    string error;
+                                    if (!_currentTransferClient.EnsureDirectory(_coreConnectionSettings, currentPath, out error))
+                                    {
+                                        ServiceLocator.LogService.LogWarning(string.Format("Could not create directory: {0} - {1}", 
+                                            currentPath, error ?? "Unknown error"));
+                                    }
+                                    
+                                    createdRemoteFolders[currentPath] = true;
+                                }
+                            }
+                        }
+                        
+                        worker.ReportProgress((i * 100) / localFilePaths.Length, 
+                            string.Format("Uploading {0}...", relativePath));
+                        
+                        ServiceLocator.LogService.LogInfo(string.Format("Uploading: {0} -> {1}", localFile, remoteFile));
+                        
+                        // Continue with normal file upload
+                        string uploadError;
+                        bool success = _currentTransferClient.UploadFile(_coreConnectionSettings, localFile, remoteFile, true, out uploadError);
+                        
+                        if (!success)
+                        {
+                            ServiceLocator.LogService.LogError(string.Format("Failed to upload: {0} - {1}", 
+                                relativePath, uploadError ?? "Unknown error"));
+                        }
+                        else
+                        {
+                            ServiceLocator.LogService.LogInfo(string.Format("Successfully uploaded: {0}", relativePath));
+                        }
+                    }
+                    
+                    worker.ReportProgress(100, "Folder upload completed");
+                }
+                catch (Exception ex)
+                {
+                    ServiceLocator.LogService.LogError("Error during folder upload: " + ex.Message);
+                    e.Result = ex;
+                }
+            };
+            
+            worker.ProgressChanged += (sender, e) =>
+            {
+                if (e.UserState != null)
+                {
+                    ServiceLocator.LogService.LogInfo(e.UserState.ToString());
+                }
+            };
+            
+            worker.RunWorkerCompleted += (sender, e) =>
+            {
+                if (e.Result is Exception)
+                {
+                    Exception ex = (Exception)e.Result;
+                    MessageBox.Show("Upload failed: " + ex.Message, "Upload Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else
+                {
+                    MessageBox.Show("Folder uploaded successfully!", "Upload Complete", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            };
+            
+            worker.RunWorkerAsync();
         }
 
         private void PerformUpload(string[] localFilePaths, string remotePath)

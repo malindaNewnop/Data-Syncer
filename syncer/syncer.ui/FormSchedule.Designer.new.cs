@@ -354,7 +354,7 @@ namespace syncer.ui
             this.btnBrowseFilesForTimer.Name = "btnBrowseFilesForTimer";
             this.btnBrowseFilesForTimer.Size = new System.Drawing.Size(120, 32);
             this.btnBrowseFilesForTimer.TabIndex = 8;
-            this.btnBrowseFilesForTimer.Text = "Browse Folder...";
+            this.btnBrowseFilesForTimer.Text = "Browse Files...";
             this.btnBrowseFilesForTimer.UseVisualStyleBackColor = true;
             this.btnBrowseFilesForTimer.Click += new System.EventHandler(this.btnBrowseFilesForTimer_Click);
             // 
