@@ -21,6 +21,12 @@ namespace syncer.ui
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
         
+        // SSH Key Authentication controls (for SFTP)
+        private System.Windows.Forms.CheckBox chkUseSSHKey;
+        private System.Windows.Forms.Label lblSSHKeyPath;
+        private System.Windows.Forms.TextBox txtSSHKeyPath;
+        private System.Windows.Forms.Button btnBrowseSSHKey;
+        
         // SSH Key Generation tab controls
         private System.Windows.Forms.Label lblKeyPath;
         private System.Windows.Forms.TextBox txtKeyPath;
@@ -56,6 +62,10 @@ namespace syncer.ui
             this.btnTestConnection = new System.Windows.Forms.Button();
             this.btnSave = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
+            this.chkUseSSHKey = new System.Windows.Forms.CheckBox();
+            this.lblSSHKeyPath = new System.Windows.Forms.Label();
+            this.txtSSHKeyPath = new System.Windows.Forms.TextBox();
+            this.btnBrowseSSHKey = new System.Windows.Forms.Button();
             this.lblKeyPath = new System.Windows.Forms.Label();
             this.txtKeyPath = new System.Windows.Forms.TextBox();
             this.btnBrowseKey = new System.Windows.Forms.Button();
@@ -76,7 +86,7 @@ namespace syncer.ui
             this.tabControl.Location = new System.Drawing.Point(12, 12);
             this.tabControl.Name = "tabControl";
             this.tabControl.SelectedIndex = 0;
-            this.tabControl.Size = new System.Drawing.Size(450, 350);
+            this.tabControl.Size = new System.Drawing.Size(450, 400);
             this.tabControl.TabIndex = 0;
             
             // 
@@ -93,11 +103,15 @@ namespace syncer.ui
             this.tabConnectionSettings.Controls.Add(this.lblPassword);
             this.tabConnectionSettings.Controls.Add(this.txtPassword);
             this.tabConnectionSettings.Controls.Add(this.chkShowPassword);
+            this.tabConnectionSettings.Controls.Add(this.chkUseSSHKey);
+            this.tabConnectionSettings.Controls.Add(this.lblSSHKeyPath);
+            this.tabConnectionSettings.Controls.Add(this.txtSSHKeyPath);
+            this.tabConnectionSettings.Controls.Add(this.btnBrowseSSHKey);
             this.tabConnectionSettings.Controls.Add(this.btnTestConnection);
             this.tabConnectionSettings.Location = new System.Drawing.Point(4, 22);
             this.tabConnectionSettings.Name = "tabConnectionSettings";
             this.tabConnectionSettings.Padding = new System.Windows.Forms.Padding(3);
-            this.tabConnectionSettings.Size = new System.Drawing.Size(442, 324);
+            this.tabConnectionSettings.Size = new System.Drawing.Size(442, 374);
             this.tabConnectionSettings.TabIndex = 0;
             this.tabConnectionSettings.Text = "Connection Settings";
             this.tabConnectionSettings.UseVisualStyleBackColor = true;
@@ -240,14 +254,60 @@ namespace syncer.ui
             this.chkShowPassword.CheckedChanged += new System.EventHandler(this.chkShowPassword_CheckedChanged);
             
             // 
+            // chkUseSSHKey
+            // 
+            this.chkUseSSHKey.AutoSize = true;
+            this.chkUseSSHKey.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.chkUseSSHKey.Location = new System.Drawing.Point(15, 170);
+            this.chkUseSSHKey.Name = "chkUseSSHKey";
+            this.chkUseSSHKey.Size = new System.Drawing.Size(180, 19);
+            this.chkUseSSHKey.TabIndex = 11;
+            this.chkUseSSHKey.Text = "Use SSH Key Authentication";
+            this.chkUseSSHKey.UseVisualStyleBackColor = true;
+            this.chkUseSSHKey.CheckedChanged += new System.EventHandler(this.chkUseSSHKey_CheckedChanged);
+            
+            // 
+            // lblSSHKeyPath
+            // 
+            this.lblSSHKeyPath.AutoSize = true;
+            this.lblSSHKeyPath.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblSSHKeyPath.Location = new System.Drawing.Point(15, 205);
+            this.lblSSHKeyPath.Name = "lblSSHKeyPath";
+            this.lblSSHKeyPath.Size = new System.Drawing.Size(79, 15);
+            this.lblSSHKeyPath.TabIndex = 12;
+            this.lblSSHKeyPath.Text = "SSH Key File:";
+            
+            // 
+            // txtSSHKeyPath
+            // 
+            this.txtSSHKeyPath.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.txtSSHKeyPath.Location = new System.Drawing.Point(100, 202);
+            this.txtSSHKeyPath.Name = "txtSSHKeyPath";
+            this.txtSSHKeyPath.ReadOnly = true;
+            this.txtSSHKeyPath.Size = new System.Drawing.Size(250, 21);
+            this.txtSSHKeyPath.TabIndex = 13;
+            
+            // 
+            // btnBrowseSSHKey
+            // 
+            this.btnBrowseSSHKey.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
+            this.btnBrowseSSHKey.Location = new System.Drawing.Point(360, 201);
+            this.btnBrowseSSHKey.Name = "btnBrowseSSHKey";
+            this.btnBrowseSSHKey.Size = new System.Drawing.Size(65, 23);
+            this.btnBrowseSSHKey.TabIndex = 14;
+            this.btnBrowseSSHKey.Text = "Browse...";
+            this.btnBrowseSSHKey.UseVisualStyleBackColor = true;
+            this.btnBrowseSSHKey.Click += new System.EventHandler(this.btnBrowseSSHKey_Click);
+            
+            // 
             // btnTestConnection
             // 
             this.btnTestConnection.BackColor = System.Drawing.Color.LightBlue;
             this.btnTestConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.btnTestConnection.Location = new System.Drawing.Point(100, 170);
+            this.btnTestConnection.Location = new System.Drawing.Point(100, 240);
             this.btnTestConnection.Name = "btnTestConnection";
             this.btnTestConnection.Size = new System.Drawing.Size(120, 30);
-            this.btnTestConnection.TabIndex = 11;
+            this.btnTestConnection.TabIndex = 15;
             this.btnTestConnection.Text = "Test Connection";
             this.btnTestConnection.UseVisualStyleBackColor = false;
             this.btnTestConnection.Click += new System.EventHandler(this.btnTestConnection_Click);
@@ -324,7 +384,7 @@ namespace syncer.ui
             // 
             this.btnSave.BackColor = System.Drawing.Color.LightGreen;
             this.btnSave.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.btnSave.Location = new System.Drawing.Point(280, 380);
+            this.btnSave.Location = new System.Drawing.Point(280, 430);
             this.btnSave.Name = "btnSave";
             this.btnSave.Size = new System.Drawing.Size(80, 30);
             this.btnSave.TabIndex = 12;
@@ -337,7 +397,7 @@ namespace syncer.ui
             // 
             this.btnCancel.BackColor = System.Drawing.Color.LightCoral;
             this.btnCancel.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.btnCancel.Location = new System.Drawing.Point(380, 380);
+            this.btnCancel.Location = new System.Drawing.Point(380, 430);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(80, 30);
             this.btnCancel.TabIndex = 13;
@@ -350,7 +410,7 @@ namespace syncer.ui
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(474, 425);
+            this.ClientSize = new System.Drawing.Size(474, 475);
             this.Controls.Add(this.tabControl);
             this.Controls.Add(this.btnSave);
             this.Controls.Add(this.btnCancel);

@@ -63,6 +63,10 @@ namespace syncer.ui
                 if (txtUsername != null) txtUsername.Text = _currentSettings.Username ?? string.Empty;
                 if (txtPassword != null) txtPassword.Text = _currentSettings.Password ?? string.Empty;
                 
+                // SSH Key Authentication controls
+                if (txtSSHKeyPath != null) txtSSHKeyPath.Text = _currentSettings.SshKeyPath ?? string.Empty;
+                if (chkUseSSHKey != null) chkUseSSHKey.Checked = !string.IsNullOrEmpty(_currentSettings.SshKeyPath);
+                
                 // SSH Key Generation tab
                 if (txtKeyPath != null) txtKeyPath.Text = _currentSettings.SshKeyPath ?? string.Empty;
                 if (numTimeout != null) numTimeout.Value = _currentSettings.Timeout > 0 ? _currentSettings.Timeout : 30;
@@ -110,8 +114,19 @@ namespace syncer.ui
             _currentSettings.Username = txtUsername != null ? txtUsername.Text.Trim() : string.Empty;
             _currentSettings.Password = txtPassword != null ? txtPassword.Text : string.Empty;
             
+            // SSH Key Authentication - use the path from either the main tab or SSH key tab
+            string sshKeyPath = string.Empty;
+            if (chkUseSSHKey != null && chkUseSSHKey.Checked && txtSSHKeyPath != null)
+            {
+                sshKeyPath = txtSSHKeyPath.Text.Trim();
+            }
+            else if (txtKeyPath != null)
+            {
+                sshKeyPath = txtKeyPath.Text.Trim();
+            }
+            _currentSettings.SshKeyPath = sshKeyPath;
+            
             // SSH Key Generation tab
-            if (txtKeyPath != null) _currentSettings.SshKeyPath = txtKeyPath.Text.Trim();
             if (numTimeout != null) _currentSettings.Timeout = (int)numTimeout.Value;
             
             _connectionService.SaveConnectionSettings(_currentSettings);
@@ -124,6 +139,7 @@ namespace syncer.ui
             {
                 btnTestConnection.Enabled = false;
                 btnTestConnection.Text = "Testing...";
+                this.Cursor = Cursors.WaitCursor;
                 
                 try
                 {
@@ -159,40 +175,91 @@ namespace syncer.ui
                     testSettings.Port = p;
                     testSettings.Username = txtUsername != null ? txtUsername.Text.Trim() : string.Empty;
                     testSettings.Password = txtPassword != null ? txtPassword.Text : string.Empty;
+                    testSettings.SshKeyPath = txtKeyPath != null ? txtKeyPath.Text.Trim() : string.Empty;
+                    testSettings.Timeout = numTimeout != null ? (int)numTimeout.Value : 30;
 
-                    // Use the actual transfer engines for REAL credential validation
+                    // Use the actual transfer engines for REAL credential validation like FileZilla
+                    ServiceLocator.LogService.LogInfo(string.Format("Starting connection test for {0}://{1}:{2}", testSettings.Protocol, testSettings.Host, testSettings.Port));
+                    
                     bool success = TestConnectionWithTransferEngines(testSettings);
                     
                     if (success)
                     {
-                        string connectionInfo = testSettings.ProtocolType == 0 ? "Local File System" : 
-                                              $"{testSettings.Protocol}://{testSettings.Host}:{testSettings.Port}";
-                        MessageBox.Show($"Connection test successful!\n\nConnection: {connectionInfo}", 
-                                      "Test Result", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        ServiceLocator.LogService.LogInfo("Connection test successful to " + connectionInfo);
+                        string connectionInfo;
+                        if (testSettings.ProtocolType == 0)
+                        {
+                            connectionInfo = "Local File System";
+                        }
+                        else
+                        {
+                            connectionInfo = string.Format("{0}://{1}@{2}:{3}", testSettings.Protocol, testSettings.Username, testSettings.Host, testSettings.Port);
+                        }
+                        
+                        string successMessage = "✓ Connection successful!\n\n" +
+                                              string.Format("Connection: {0}\n", connectionInfo) +
+                                              string.Format("Protocol: {0}\n", testSettings.Protocol);
+                        
+                        if (testSettings.ProtocolType != 0)
+                        {
+                            successMessage += "Authentication: Verified\n" +
+                                            "File listing: Successful";
+                        }
+                        else
+                        {
+                            successMessage += "File system access: Verified";
+                        }
+                        
+                        MessageBox.Show(successMessage, "Connection Test Successful", 
+                                      MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ServiceLocator.LogService.LogInfo("Connection test completed successfully");
                     }
                     else
                     {
-                        MessageBox.Show("Connection test failed. Please verify your credentials and settings.", 
-                                      "Test Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        ServiceLocator.LogService.LogWarning("Connection test failed to " + testSettings.Host + ":" + testSettings.Port);
+                        string failureMessage = "✗ Connection test failed!\n\n";
+                        
+                        if (testSettings.ProtocolType == 0)
+                        {
+                            failureMessage += "Cannot access local file system.\n" +
+                                            "Please check file system permissions.";
+                        }
+                        else
+                        {
+                            failureMessage += "Please verify the following:\n" +
+                                            "• Host address and port number\n" +
+                                            "• Username and password\n" +
+                                            "• Network connectivity\n" +
+                                            "• Server is running and accessible\n" +
+                                            "• Firewall settings\n\n" +
+                                            string.Format("Connection: {0}://{1}:{2}", testSettings.Protocol, testSettings.Host, testSettings.Port);
+                        }
+                        
+                        MessageBox.Show(failureMessage, "Connection Test Failed", 
+                                      MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ServiceLocator.LogService.LogWarning(string.Format("Connection test failed for {0}://{1}:{2}", testSettings.Protocol, testSettings.Host, testSettings.Port));
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Connection test failed: " + ex.Message, "Test Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    ServiceLocator.LogService.LogError("Connection test error: " + ex.Message);
+                    string errorMessage = "✗ Connection test error!\n\n" +
+                                        string.Format("Error: {0}\n\n", ex.Message) +
+                                        "Please check your settings and try again.";
+                    
+                    MessageBox.Show(errorMessage, "Connection Test Error", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ServiceLocator.LogService.LogError(string.Format("Connection test exception: {0}", ex.Message));
                 }
                 finally
                 {
                     btnTestConnection.Enabled = true;
                     btnTestConnection.Text = "Test Connection";
+                    this.Cursor = Cursors.Default;
                 }
             }
         }
         
         /// <summary>
         /// Test connection using actual transfer engines to ensure proper credential validation
+        /// This method works like FileZilla's connection mechanism - it actually connects to the server
         /// </summary>
         private bool TestConnectionWithTransferEngines(ConnectionSettings uiSettings)
         {
@@ -205,59 +272,171 @@ namespace syncer.ui
                 {
                     case 0: // LOCAL
                         coreSettings.Protocol = syncer.core.ProtocolType.Local;
-                        break;
+                        return TestLocalConnection(); // Special handling for local
                     case 1: // FTP
                         coreSettings.Protocol = syncer.core.ProtocolType.Ftp;
                         break;
                     case 2: // SFTP
                         coreSettings.Protocol = syncer.core.ProtocolType.Sftp;
                         break;
+                    default:
+                        return false;
                 }
                 
+                // Set connection parameters
                 coreSettings.Host = uiSettings.Host;
                 coreSettings.Port = uiSettings.Port;
                 coreSettings.Username = uiSettings.Username;
                 coreSettings.Password = uiSettings.Password;
+                coreSettings.SshKeyPath = uiSettings.SshKeyPath; // Include SSH key path
                 coreSettings.UsePassiveMode = true; // Default for FTP
+                coreSettings.Timeout = 30; // 30 second timeout
+                
+                // Set default ports if not specified
+                if (coreSettings.Port <= 0)
+                {
+                    coreSettings.Port = (coreSettings.Protocol == syncer.core.ProtocolType.Ftp) ? 21 : 22;
+                }
+                
+                // Validate required fields for remote connections
+                if (string.IsNullOrEmpty(coreSettings.Host))
+                {
+                    ServiceLocator.LogService.LogError("Host is required for remote connections");
+                    return false;
+                }
+                
+                if (string.IsNullOrEmpty(coreSettings.Username))
+                {
+                    ServiceLocator.LogService.LogError("Username is required for remote connections");
+                    return false;
+                }
                 
                 // Create the appropriate transfer client
-                syncer.core.ITransferClient client;
-                switch (coreSettings.Protocol)
+                syncer.core.ITransferClient client = null;
+                try
                 {
-                    case syncer.core.ProtocolType.Local:
-                        client = new syncer.core.LocalTransferClient();
-                        break;
-                    case syncer.core.ProtocolType.Ftp:
-                        client = new syncer.core.Transfers.EnhancedFtpTransferClient();
-                        break;
-                    case syncer.core.ProtocolType.Sftp:
-                        client = new syncer.core.Transfers.ProductionSftpTransferClient();
-                        break;
-                    default:
-                        client = new syncer.core.LocalTransferClient();
-                        break;
-                }
-                
-                // Test the connection with the actual transfer engine
-                string error;
-                bool connectionSuccess = client.TestConnection(coreSettings, out error);
-                
-                if (connectionSuccess)
-                {
-                    // Additional validation: try to list files to ensure credentials work
-                    System.Collections.Generic.List<string> files;
-                    string testPath = coreSettings.Protocol == syncer.core.ProtocolType.Local ? 
-                                    System.IO.Path.GetTempPath() : "/";
+                    switch (coreSettings.Protocol)
+                    {
+                        case syncer.core.ProtocolType.Ftp:
+                            client = new syncer.core.Transfers.EnhancedFtpTransferClient();
+                            ServiceLocator.LogService.LogInfo(string.Format("Testing FTP connection to {0}:{1}", coreSettings.Host, coreSettings.Port));
+                            break;
+                        case syncer.core.ProtocolType.Sftp:
+                            client = new syncer.core.Transfers.ProductionSftpTransferClient();
+                            ServiceLocator.LogService.LogInfo(string.Format("Testing SFTP connection to {0}:{1}", coreSettings.Host, coreSettings.Port));
+                            break;
+                        default:
+                            ServiceLocator.LogService.LogError("Unsupported protocol for remote connection");
+                            return false;
+                    }
                     
-                    bool listSuccess = client.ListFiles(coreSettings, testPath, out files, out error);
-                    return listSuccess; // Only return success if both connection AND listing work
+                    if (client == null)
+                    {
+                        ServiceLocator.LogService.LogError("Failed to create transfer client");
+                        return false;
+                    }
+                    
+                    // Step 1: Test basic connection
+                    string connectionError;
+                    bool connectionSuccess = client.TestConnection(coreSettings, out connectionError);
+                    
+                    if (!connectionSuccess)
+                    {
+                        ServiceLocator.LogService.LogError(string.Format("Connection test failed: {0}", connectionError));
+                        return false;
+                    }
+                    
+                    ServiceLocator.LogService.LogInfo("Basic connection test successful");
+                    
+                    // Step 2: Test credential validation by attempting to list files
+                    // This is crucial - just like FileZilla, we verify credentials by performing an actual operation
+                    System.Collections.Generic.List<string> files;
+                    string listError;
+                    string testPath = "/"; // Start with root directory
+                    
+                    bool listSuccess = client.ListFiles(coreSettings, testPath, out files, out listError);
+                    
+                    if (!listSuccess)
+                    {
+                        // Try home directory if root fails
+                        testPath = "~";
+                        listSuccess = client.ListFiles(coreSettings, testPath, out files, out listError);
+                        
+                        if (!listSuccess)
+                        {
+                            // Try empty path (working directory)
+                            testPath = "";
+                            listSuccess = client.ListFiles(coreSettings, testPath, out files, out listError);
+                        }
+                    }
+                    
+                    if (listSuccess)
+                    {
+                        ServiceLocator.LogService.LogInfo(string.Format("Credential validation successful - listed {0} items in '{1}'", files.Count, testPath));
+                        return true;
+                    }
+                    else
+                    {
+                        ServiceLocator.LogService.LogError(string.Format("Credential validation failed: {0}", listError));
+                        return false;
+                    }
                 }
-                
+                finally
+                {
+                    // Clean up - transfer clients don't implement IDisposable, so no disposal needed
+                    client = null;
+                }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                ServiceLocator.LogService.LogError(string.Format("Authentication failed: {0}", ex.Message));
+                return false;
+            }
+            catch (System.Net.WebException ex)
+            {
+                ServiceLocator.LogService.LogError(string.Format("Network error: {0}", ex.Message));
                 return false;
             }
             catch (Exception ex)
             {
-                ServiceLocator.LogService.LogError("Transfer engine test failed: " + ex.Message);
+                ServiceLocator.LogService.LogError(string.Format("Connection test error: {0}", ex.Message));
+                return false;
+            }
+        }
+        
+        /// <summary>
+        /// Test local file system access
+        /// </summary>
+        private bool TestLocalConnection()
+        {
+            try
+            {
+                // Test local file system access
+                string tempPath = System.IO.Path.GetTempPath();
+                if (!System.IO.Directory.Exists(tempPath))
+                {
+                    ServiceLocator.LogService.LogError("Cannot access local temp directory");
+                    return false;
+                }
+                
+                // Try to create a test file to verify write permissions
+                string testFile = System.IO.Path.Combine(tempPath, "syncer_test_" + DateTime.Now.Ticks + ".tmp");
+                try
+                {
+                    System.IO.File.WriteAllText(testFile, "test");
+                    System.IO.File.Delete(testFile);
+                    ServiceLocator.LogService.LogInfo("Local file system access test successful");
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    ServiceLocator.LogService.LogError(string.Format("Local file system write test failed: {0}", ex.Message));
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError(string.Format("Local connection test failed: {0}", ex.Message));
                 return false;
             }
         }
@@ -296,44 +475,147 @@ namespace syncer.ui
                     string tempPath = System.IO.Path.GetTempPath();
                     if (!System.IO.Directory.Exists(tempPath))
                     {
-                        MessageBox.Show("Cannot access local file system.", "Local Access Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show("Cannot access local file system.", "Local Access Error", 
+                                      MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return false;
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Local file system access error: " + ex.Message, "Local Access Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(string.Format("Local file system access error: {0}", ex.Message), "Local Access Error", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;
                 }
                 return true;
             }
             
-            // Validation for remote protocols (FTP/SFTP)
+            // Validation for remote protocols (FTP/SFTP) - like FileZilla's validation
+            
+            // Host validation
             if (UIStringExtensions.IsNullOrWhiteSpace(txtHost != null ? txtHost.Text : null))
             {
-                MessageBox.Show("Please enter a host address.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Please enter a host address.\n\nExample: ftp.example.com or 192.168.1.100", 
+                              "Host Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 if (txtHost != null) txtHost.Focus();
                 return false;
             }
-            if (UIStringExtensions.IsNullOrWhiteSpace(txtPort != null ? txtPort.Text : null))
+            
+            string host = txtHost.Text.Trim();
+            if (host.Contains(" "))
             {
-                MessageBox.Show("Please enter a port number.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                if (txtPort != null) txtPort.Focus();
+                MessageBox.Show("Host address cannot contain spaces.", "Invalid Host", 
+                              MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                if (txtHost != null) txtHost.Focus();
                 return false;
             }
+            
+            // Port validation
+            if (UIStringExtensions.IsNullOrWhiteSpace(txtPort != null ? txtPort.Text : null))
+            {
+                // Set default port based on protocol
+                if (cmbProtocol != null)
+                {
+                    switch (cmbProtocol.SelectedIndex)
+                    {
+                        case 1: // FTP
+                            txtPort.Text = "21";
+                            break;
+                        case 2: // SFTP
+                            txtPort.Text = "22";
+                            break;
+                        default:
+                            MessageBox.Show("Please enter a port number.\n\nCommon ports:\nFTP: 21\nSFTP: 22", 
+                                          "Port Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            if (txtPort != null) txtPort.Focus();
+                            return false;
+                    }
+                }
+            }
+            
             int port; 
             if (!int.TryParse(txtPort.Text, out port) || port < 1 || port > 65535)
             {
-                MessageBox.Show("Please enter a valid port number (1-65535).", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Please enter a valid port number between 1 and 65535.\n\nCommon ports:\nFTP: 21\nSFTP: 22", 
+                              "Invalid Port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 if (txtPort != null) txtPort.Focus();
                 return false;
             }
+            
+            // Username validation
             if (UIStringExtensions.IsNullOrWhiteSpace(txtUsername != null ? txtUsername.Text : null))
             {
-                MessageBox.Show("Please enter a username.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Please enter a username.\n\nThis is required to authenticate with the server.", 
+                              "Username Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 if (txtUsername != null) txtUsername.Focus();
                 return false;
             }
+            
+            // Password validation (warn but don't require, especially for SSH key auth)
+            bool usingSSHKey = chkUseSSHKey != null && chkUseSSHKey.Checked && 
+                               txtSSHKeyPath != null && !string.IsNullOrEmpty(txtSSHKeyPath.Text.Trim());
+            
+            if (UIStringExtensions.IsNullOrWhiteSpace(txtPassword != null ? txtPassword.Text : null))
+            {
+                if (usingSSHKey)
+                {
+                    // SSH key authentication - password is optional
+                }
+                else
+                {
+                    DialogResult result = MessageBox.Show(
+                        "No password entered. Do you want to continue?\n\n" +
+                        "Note: Some servers allow key-based authentication or anonymous access.",
+                        "No Password", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    
+                    if (result == DialogResult.No)
+                    {
+                        if (txtPassword != null) txtPassword.Focus();
+                        return false;
+                    }
+                }
+            }
+            
+            // SSH Key validation for SFTP
+            if (cmbProtocol != null && cmbProtocol.SelectedIndex == 2 && usingSSHKey) // SFTP with SSH key
+            {
+                if (!System.IO.File.Exists(txtSSHKeyPath.Text.Trim()))
+                {
+                    MessageBox.Show("SSH key file not found. Please select a valid SSH private key file.", 
+                                  "SSH Key File Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    if (txtSSHKeyPath != null) txtSSHKeyPath.Focus();
+                    return false;
+                }
+            }
+            
+            // Protocol-specific validation
+            if (cmbProtocol != null)
+            {
+                switch (cmbProtocol.SelectedIndex)
+                {
+                    case 1: // FTP
+                        // FTP-specific validation
+                        if (port != 21 && port < 1024)
+                        {
+                            DialogResult result = MessageBox.Show(
+                                string.Format("Port {0} is unusual for FTP (standard is 21).\n\nDo you want to continue?", port),
+                                "Unusual FTP Port", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                            if (result == DialogResult.No) return false;
+                        }
+                        break;
+                        
+                    case 2: // SFTP
+                        // SFTP-specific validation
+                        if (port != 22 && port < 1024)
+                        {
+                            DialogResult result = MessageBox.Show(
+                                string.Format("Port {0} is unusual for SFTP (standard is 22).\n\nDo you want to continue?", port),
+                                "Unusual SFTP Port", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                            if (result == DialogResult.No) return false;
+                        }
+                        break;
+                }
+            }
+            
             return true;
         }
 
@@ -354,16 +636,31 @@ namespace syncer.ui
                     case 1: // FTP
                         EnableRemoteFields(true);
                         if (txtPort != null) txtPort.Text = "21";
-                        if (txtHost != null && (txtHost.Text == "localhost" || txtHost.Text == "")) txtHost.Text = "";
+                        if (txtHost != null && (txtHost.Text == "localhost" || txtHost.Text == "")) 
+                        {
+                            txtHost.Text = "";
+                            txtHost.Focus(); // Focus for user convenience
+                        }
                         if (txtUsername != null && txtUsername.Text == "local") txtUsername.Text = "";
                         break;
                         
                     case 2: // SFTP
                         EnableRemoteFields(true);
                         if (txtPort != null) txtPort.Text = "22";
-                        if (txtHost != null && (txtHost.Text == "localhost" || txtHost.Text == "")) txtHost.Text = "";
+                        if (txtHost != null && (txtHost.Text == "localhost" || txtHost.Text == "")) 
+                        {
+                            txtHost.Text = "";
+                            txtHost.Focus(); // Focus for user convenience
+                        }
                         if (txtUsername != null && txtUsername.Text == "local") txtUsername.Text = "";
                         break;
+                }
+                
+                // Update the form title to show current protocol
+                if (cmbProtocol.SelectedIndex >= 0)
+                {
+                    string[] protocols = { "Local", "FTP", "SFTP" };
+                    this.Text = string.Format("Connection Settings - {0}", protocols[cmbProtocol.SelectedIndex]);
                 }
             }
         }
@@ -376,6 +673,23 @@ namespace syncer.ui
             if (txtPassword != null) txtPassword.Enabled = enabled;
             if (chkShowPassword != null) chkShowPassword.Enabled = enabled;
             if (btnTestConnection != null) btnTestConnection.Text = enabled ? "Test Connection" : "Test Local Access";
+            
+            // Handle SSH key controls visibility based on protocol
+            bool isSFTP = cmbProtocol != null && cmbProtocol.SelectedIndex == 2;
+            if (chkUseSSHKey != null) 
+            {
+                chkUseSSHKey.Visible = enabled && isSFTP;
+                chkUseSSHKey.Enabled = enabled && isSFTP;
+            }
+            if (lblSSHKeyPath != null) lblSSHKeyPath.Visible = enabled && isSFTP;
+            if (txtSSHKeyPath != null) txtSSHKeyPath.Visible = enabled && isSFTP;
+            if (btnBrowseSSHKey != null) btnBrowseSSHKey.Visible = enabled && isSFTP;
+            
+            // Update SSH key controls based on checkbox state
+            if (enabled && isSFTP)
+            {
+                chkUseSSHKey_CheckedChanged(null, EventArgs.Empty);
+            }
         }
 
         private void chkShowPassword_CheckedChanged(object sender, EventArgs e)
@@ -399,6 +713,50 @@ namespace syncer.ui
                     if (txtKeyPath != null)
                     {
                         txtKeyPath.Text = openFileDialog.FileName;
+                    }
+                }
+            }
+        }
+
+        private void chkUseSSHKey_CheckedChanged(object sender, EventArgs e)
+        {
+            bool useSSHKey = chkUseSSHKey != null && chkUseSSHKey.Checked;
+            bool isSFTP = cmbProtocol != null && cmbProtocol.SelectedIndex == 2; // SFTP
+            
+            // Enable SSH key controls only for SFTP
+            if (lblSSHKeyPath != null) lblSSHKeyPath.Enabled = useSSHKey && isSFTP;
+            if (txtSSHKeyPath != null) txtSSHKeyPath.Enabled = useSSHKey && isSFTP;
+            if (btnBrowseSSHKey != null) btnBrowseSSHKey.Enabled = useSSHKey && isSFTP;
+            
+            // When using SSH key, password becomes optional
+            if (txtPassword != null && lblPassword != null)
+            {
+                if (useSSHKey && isSFTP)
+                {
+                    lblPassword.Text = "Password (optional):";
+                    txtPassword.BackColor = System.Drawing.Color.LightYellow;
+                }
+                else
+                {
+                    lblPassword.Text = "Password:";
+                    txtPassword.BackColor = System.Drawing.SystemColors.Window;
+                }
+            }
+        }
+
+        private void btnBrowseSSHKey_Click(object sender, EventArgs e)
+        {
+            using (OpenFileDialog openFileDialog = new OpenFileDialog())
+            {
+                openFileDialog.Title = "Select SSH Private Key File";
+                openFileDialog.Filter = "SSH Key Files (*.pem;*.ppk;*.key;*.rsa)|*.pem;*.ppk;*.key;*.rsa|PEM Files (*.pem)|*.pem|PuTTY Key Files (*.ppk)|*.ppk|All Files (*.*)|*.*";
+                openFileDialog.Multiselect = false;
+                
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    if (txtSSHKeyPath != null)
+                    {
+                        txtSSHKeyPath.Text = openFileDialog.FileName;
                     }
                 }
             }
