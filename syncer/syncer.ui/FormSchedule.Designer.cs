@@ -25,6 +25,11 @@ namespace syncer.ui
         private System.Windows.Forms.Button btnPreview;
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
+        private System.Windows.Forms.GroupBox gbFileManager;
+        private System.Windows.Forms.Button btnUploadFile;
+        private System.Windows.Forms.Button btnDownloadFile;
+        private System.Windows.Forms.Button btnOpenFileManager;
+        private System.Windows.Forms.Label lblFileOperations;
 
         protected override void Dispose(bool disposing)
         {
@@ -59,9 +64,15 @@ namespace syncer.ui
             this.btnPreview = new System.Windows.Forms.Button();
             this.btnSave = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
+            this.gbFileManager = new System.Windows.Forms.GroupBox();
+            this.lblFileOperations = new System.Windows.Forms.Label();
+            this.btnUploadFile = new System.Windows.Forms.Button();
+            this.btnDownloadFile = new System.Windows.Forms.Button();
+            this.btnOpenFileManager = new System.Windows.Forms.Button();
             this.gbJobDetails.SuspendLayout();
             this.gbPaths.SuspendLayout();
             this.gbScheduleSettings.SuspendLayout();
+            this.gbFileManager.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numInterval)).BeginInit();
             this.SuspendLayout();
             // gbJobDetails
@@ -253,43 +264,85 @@ namespace syncer.ui
             this.cmbTransferMode.Name = "cmbTransferMode";
             this.cmbTransferMode.Size = new System.Drawing.Size(200, 23);
             this.cmbTransferMode.TabIndex = 6;
+            // gbFileManager
+            this.gbFileManager.Controls.Add(this.lblFileOperations);
+            this.gbFileManager.Controls.Add(this.btnUploadFile);
+            this.gbFileManager.Controls.Add(this.btnDownloadFile);
+            this.gbFileManager.Controls.Add(this.btnOpenFileManager);
+            this.gbFileManager.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            this.gbFileManager.Location = new System.Drawing.Point(12, 390);
+            this.gbFileManager.Name = "gbFileManager";
+            this.gbFileManager.Size = new System.Drawing.Size(560, 100);
+            this.gbFileManager.TabIndex = 3;
+            this.gbFileManager.TabStop = false;
+            this.gbFileManager.Text = "File Manager (FTP/SFTP Operations)";
+            // lblFileOperations
+            this.lblFileOperations.AutoSize = true;
+            this.lblFileOperations.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblFileOperations.Location = new System.Drawing.Point(15, 25);
+            this.lblFileOperations.Name = "lblFileOperations";
+            this.lblFileOperations.Size = new System.Drawing.Size(350, 15);
+            this.lblFileOperations.TabIndex = 0;
+            this.lblFileOperations.Text = "Upload/Download files to/from remote server (requires connection):";
+            // btnUploadFile
+            this.btnUploadFile.BackColor = System.Drawing.Color.LightBlue;
+            this.btnUploadFile.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnUploadFile.Location = new System.Drawing.Point(15, 50);
+            this.btnUploadFile.Name = "btnUploadFile";
+            this.btnUploadFile.Size = new System.Drawing.Size(120, 30);
+            this.btnUploadFile.TabIndex = 1;
+            this.btnUploadFile.Text = "Upload File(s)";
+            this.btnUploadFile.UseVisualStyleBackColor = false;
+            this.btnUploadFile.Click += new System.EventHandler(this.btnUploadFile_Click);
+            // btnDownloadFile
+            this.btnDownloadFile.BackColor = System.Drawing.Color.LightGreen;
+            this.btnDownloadFile.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnDownloadFile.Location = new System.Drawing.Point(150, 50);
+            this.btnDownloadFile.Name = "btnDownloadFile";
+            this.btnDownloadFile.Size = new System.Drawing.Size(120, 30);
+            this.btnDownloadFile.TabIndex = 2;
+            this.btnDownloadFile.Text = "Download File(s)";
+            this.btnDownloadFile.UseVisualStyleBackColor = false;
+            this.btnDownloadFile.Click += new System.EventHandler(this.btnDownloadFile_Click);
+           
             // btnPreview
             this.btnPreview.BackColor = System.Drawing.Color.LightYellow;
             this.btnPreview.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.btnPreview.Location = new System.Drawing.Point(12, 400);
+            this.btnPreview.Location = new System.Drawing.Point(12, 500);
             this.btnPreview.Name = "btnPreview";
             this.btnPreview.Size = new System.Drawing.Size(100, 30);
-            this.btnPreview.TabIndex = 3;
+            this.btnPreview.TabIndex = 4;
             this.btnPreview.Text = "Preview";
             this.btnPreview.UseVisualStyleBackColor = false;
             this.btnPreview.Click += new System.EventHandler(this.btnPreview_Click);
             // btnSave
             this.btnSave.BackColor = System.Drawing.Color.LightGreen;
             this.btnSave.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.btnSave.Location = new System.Drawing.Point(450, 470);
+            this.btnSave.Location = new System.Drawing.Point(450, 500);
             this.btnSave.Name = "btnSave";
             this.btnSave.Size = new System.Drawing.Size(80, 30);
-            this.btnSave.TabIndex = 4;
+            this.btnSave.TabIndex = 5;
             this.btnSave.Text = "Save";
             this.btnSave.UseVisualStyleBackColor = false;
             this.btnSave.Click += new System.EventHandler(this.btnSave_Click);
             // btnCancel
             this.btnCancel.BackColor = System.Drawing.Color.LightCoral;
             this.btnCancel.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.btnCancel.Location = new System.Drawing.Point(540, 470);
+            this.btnCancel.Location = new System.Drawing.Point(540, 500);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(80, 30);
-            this.btnCancel.TabIndex = 5;
+            this.btnCancel.TabIndex = 6;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = false;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
             // FormSchedule
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(584, 511);
+            this.ClientSize = new System.Drawing.Size(584, 540);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnSave);
             this.Controls.Add(this.btnPreview);
+            this.Controls.Add(this.gbFileManager);
             this.Controls.Add(this.gbScheduleSettings);
             this.Controls.Add(this.gbPaths);
             this.Controls.Add(this.gbJobDetails);
@@ -301,6 +354,8 @@ namespace syncer.ui
             this.gbPaths.PerformLayout();
             this.gbScheduleSettings.ResumeLayout(false);
             this.gbScheduleSettings.PerformLayout();
+            this.gbFileManager.ResumeLayout(false);
+            this.gbFileManager.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numInterval)).EndInit();
             this.ResumeLayout(false);
         }

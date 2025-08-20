@@ -111,6 +111,9 @@
       <DependentUpon>FormRemoteDirectoryBrowser.cs</DependentUpon>
     </Compile>
     <Compile Include="Examples\ConnectionFormUsageExample.cs" />
+    <EmbeddedResource Include="FormSchedule.resx">
+      <DependentUpon>FormSchedule.cs</DependentUpon>
+    </EmbeddedResource>
     <!-- Resources -->
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
