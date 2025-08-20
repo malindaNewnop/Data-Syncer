@@ -18,8 +18,13 @@ namespace syncer.ui
         private System.Windows.Forms.TextBox txtPassword;
         private System.Windows.Forms.CheckBox chkShowPassword;
         private System.Windows.Forms.Button btnTestConnection;
+        private System.Windows.Forms.Button btnSaveConnection;
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
+        
+        // Connection Name for saving
+        private System.Windows.Forms.Label lblConnectionName;
+        private System.Windows.Forms.TextBox txtConnectionName;
         
         // SSH Key Authentication controls (for SFTP)
         private System.Windows.Forms.CheckBox chkUseSSHKey;
@@ -60,6 +65,9 @@ namespace syncer.ui
             this.txtPassword = new System.Windows.Forms.TextBox();
             this.chkShowPassword = new System.Windows.Forms.CheckBox();
             this.btnTestConnection = new System.Windows.Forms.Button();
+            this.btnSaveConnection = new System.Windows.Forms.Button();
+            this.lblConnectionName = new System.Windows.Forms.Label();
+            this.txtConnectionName = new System.Windows.Forms.TextBox();
             this.btnSave = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
             this.chkUseSSHKey = new System.Windows.Forms.CheckBox();
@@ -103,11 +111,14 @@ namespace syncer.ui
             this.tabConnectionSettings.Controls.Add(this.lblPassword);
             this.tabConnectionSettings.Controls.Add(this.txtPassword);
             this.tabConnectionSettings.Controls.Add(this.chkShowPassword);
+            this.tabConnectionSettings.Controls.Add(this.lblConnectionName);
+            this.tabConnectionSettings.Controls.Add(this.txtConnectionName);
             this.tabConnectionSettings.Controls.Add(this.chkUseSSHKey);
             this.tabConnectionSettings.Controls.Add(this.lblSSHKeyPath);
             this.tabConnectionSettings.Controls.Add(this.txtSSHKeyPath);
             this.tabConnectionSettings.Controls.Add(this.btnBrowseSSHKey);
             this.tabConnectionSettings.Controls.Add(this.btnTestConnection);
+            this.tabConnectionSettings.Controls.Add(this.btnSaveConnection);
             this.tabConnectionSettings.Location = new System.Drawing.Point(4, 22);
             this.tabConnectionSettings.Name = "tabConnectionSettings";
             this.tabConnectionSettings.Padding = new System.Windows.Forms.Padding(3);
@@ -254,14 +265,34 @@ namespace syncer.ui
             this.chkShowPassword.CheckedChanged += new System.EventHandler(this.chkShowPassword_CheckedChanged);
             
             // 
+            // lblConnectionName
+            // 
+            this.lblConnectionName.AutoSize = true;
+            this.lblConnectionName.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblConnectionName.Location = new System.Drawing.Point(15, 170);
+            this.lblConnectionName.Name = "lblConnectionName";
+            this.lblConnectionName.Size = new System.Drawing.Size(105, 15);
+            this.lblConnectionName.TabIndex = 11;
+            this.lblConnectionName.Text = "Connection Name:";
+            
+            // 
+            // txtConnectionName
+            // 
+            this.txtConnectionName.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.txtConnectionName.Location = new System.Drawing.Point(125, 167);
+            this.txtConnectionName.Name = "txtConnectionName";
+            this.txtConnectionName.Size = new System.Drawing.Size(200, 21);
+            this.txtConnectionName.TabIndex = 12;
+            
+            // 
             // chkUseSSHKey
             // 
             this.chkUseSSHKey.AutoSize = true;
             this.chkUseSSHKey.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.chkUseSSHKey.Location = new System.Drawing.Point(15, 170);
+            this.chkUseSSHKey.Location = new System.Drawing.Point(15, 200);
             this.chkUseSSHKey.Name = "chkUseSSHKey";
             this.chkUseSSHKey.Size = new System.Drawing.Size(180, 19);
-            this.chkUseSSHKey.TabIndex = 11;
+            this.chkUseSSHKey.TabIndex = 13;
             this.chkUseSSHKey.Text = "Use SSH Key Authentication";
             this.chkUseSSHKey.UseVisualStyleBackColor = true;
             this.chkUseSSHKey.CheckedChanged += new System.EventHandler(this.chkUseSSHKey_CheckedChanged);
@@ -271,30 +302,30 @@ namespace syncer.ui
             // 
             this.lblSSHKeyPath.AutoSize = true;
             this.lblSSHKeyPath.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.lblSSHKeyPath.Location = new System.Drawing.Point(15, 205);
+            this.lblSSHKeyPath.Location = new System.Drawing.Point(15, 235);
             this.lblSSHKeyPath.Name = "lblSSHKeyPath";
             this.lblSSHKeyPath.Size = new System.Drawing.Size(79, 15);
-            this.lblSSHKeyPath.TabIndex = 12;
+            this.lblSSHKeyPath.TabIndex = 14;
             this.lblSSHKeyPath.Text = "SSH Key File:";
             
             // 
             // txtSSHKeyPath
             // 
             this.txtSSHKeyPath.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.txtSSHKeyPath.Location = new System.Drawing.Point(100, 202);
+            this.txtSSHKeyPath.Location = new System.Drawing.Point(100, 232);
             this.txtSSHKeyPath.Name = "txtSSHKeyPath";
             this.txtSSHKeyPath.ReadOnly = true;
             this.txtSSHKeyPath.Size = new System.Drawing.Size(250, 21);
-            this.txtSSHKeyPath.TabIndex = 13;
+            this.txtSSHKeyPath.TabIndex = 15;
             
             // 
             // btnBrowseSSHKey
             // 
             this.btnBrowseSSHKey.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
-            this.btnBrowseSSHKey.Location = new System.Drawing.Point(360, 201);
+            this.btnBrowseSSHKey.Location = new System.Drawing.Point(360, 231);
             this.btnBrowseSSHKey.Name = "btnBrowseSSHKey";
             this.btnBrowseSSHKey.Size = new System.Drawing.Size(65, 23);
-            this.btnBrowseSSHKey.TabIndex = 14;
+            this.btnBrowseSSHKey.TabIndex = 16;
             this.btnBrowseSSHKey.Text = "Browse...";
             this.btnBrowseSSHKey.UseVisualStyleBackColor = true;
             this.btnBrowseSSHKey.Click += new System.EventHandler(this.btnBrowseSSHKey_Click);
@@ -304,13 +335,27 @@ namespace syncer.ui
             // 
             this.btnTestConnection.BackColor = System.Drawing.Color.LightBlue;
             this.btnTestConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.btnTestConnection.Location = new System.Drawing.Point(100, 240);
+            this.btnTestConnection.Location = new System.Drawing.Point(15, 270);
             this.btnTestConnection.Name = "btnTestConnection";
             this.btnTestConnection.Size = new System.Drawing.Size(120, 30);
-            this.btnTestConnection.TabIndex = 15;
+            this.btnTestConnection.TabIndex = 17;
             this.btnTestConnection.Text = "Test Connection";
             this.btnTestConnection.UseVisualStyleBackColor = false;
             this.btnTestConnection.Click += new System.EventHandler(this.btnTestConnection_Click);
+            
+            // 
+            // btnSaveConnection
+            // 
+            this.btnSaveConnection.BackColor = System.Drawing.Color.LightGreen;
+            this.btnSaveConnection.Enabled = false;
+            this.btnSaveConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            this.btnSaveConnection.Location = new System.Drawing.Point(145, 270);
+            this.btnSaveConnection.Name = "btnSaveConnection";
+            this.btnSaveConnection.Size = new System.Drawing.Size(120, 30);
+            this.btnSaveConnection.TabIndex = 18;
+            this.btnSaveConnection.Text = "Save Connection";
+            this.btnSaveConnection.UseVisualStyleBackColor = false;
+            this.btnSaveConnection.Click += new System.EventHandler(this.btnSaveConnection_Click);
             
             // 
             // lblKeyPath

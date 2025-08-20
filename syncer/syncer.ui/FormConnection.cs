@@ -27,7 +27,7 @@ namespace syncer.ui
         private void InitializeCustomComponents()
         {
             this.Text = "Connection Settings";
-            this.Size = new Size(500, 470);
+            this.Size = new Size(490, 510);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -66,6 +66,19 @@ namespace syncer.ui
                 // SSH Key Authentication controls
                 if (txtSSHKeyPath != null) txtSSHKeyPath.Text = _currentSettings.SshKeyPath ?? string.Empty;
                 if (chkUseSSHKey != null) chkUseSSHKey.Checked = !string.IsNullOrEmpty(_currentSettings.SshKeyPath);
+                
+                // Connection name field
+                if (txtConnectionName != null) 
+                {
+                    if (!string.IsNullOrEmpty(_currentSettings.Host))
+                    {
+                        txtConnectionName.Text = GenerateConnectionName(_currentSettings);
+                    }
+                    else
+                    {
+                        txtConnectionName.Text = "";
+                    }
+                }
                 
                 // SSH Key Generation tab
                 if (txtKeyPath != null) txtKeyPath.Text = _currentSettings.SshKeyPath ?? string.Empty;
@@ -212,6 +225,9 @@ namespace syncer.ui
                         MessageBox.Show(successMessage, "Connection Test Successful", 
                                       MessageBoxButtons.OK, MessageBoxIcon.Information);
                         ServiceLocator.LogService.LogInfo("Connection test completed successfully");
+                        
+                        // Enable Save Connection button after successful test
+                        EnableSaveConnection();
                     }
                     else
                     {
@@ -674,6 +690,10 @@ namespace syncer.ui
             if (chkShowPassword != null) chkShowPassword.Enabled = enabled;
             if (btnTestConnection != null) btnTestConnection.Text = enabled ? "Test Connection" : "Test Local Access";
             
+            // Connection name is always enabled for naming saved connections
+            if (lblConnectionName != null) lblConnectionName.Enabled = true;
+            if (txtConnectionName != null) txtConnectionName.Enabled = true;
+            
             // Handle SSH key controls visibility based on protocol
             bool isSFTP = cmbProtocol != null && cmbProtocol.SelectedIndex == 2;
             if (chkUseSSHKey != null) 
@@ -684,6 +704,14 @@ namespace syncer.ui
             if (lblSSHKeyPath != null) lblSSHKeyPath.Visible = enabled && isSFTP;
             if (txtSSHKeyPath != null) txtSSHKeyPath.Visible = enabled && isSFTP;
             if (btnBrowseSSHKey != null) btnBrowseSSHKey.Visible = enabled && isSFTP;
+            
+            // Disable Save Connection button when changing protocols - user needs to test first
+            if (btnSaveConnection != null)
+            {
+                btnSaveConnection.Enabled = false;
+                btnSaveConnection.Text = "Save Connection";
+                btnSaveConnection.BackColor = System.Drawing.Color.LightGray;
+            }
             
             // Update SSH key controls based on checkbox state
             if (enabled && isSFTP)
@@ -761,5 +789,220 @@ namespace syncer.ui
                 }
             }
         }
+
+        #region Connection Management
+
+        private void btnSaveConnection_Click(object sender, EventArgs e)
+        {
+            if (!ValidateConnectionForSave()) return;
+
+            try
+            {
+                // Create connection settings from form
+                ConnectionSettings connectionToSave = CreateConnectionSettingsFromForm();
+                
+                // Get connection name
+                string connectionName = txtConnectionName != null ? txtConnectionName.Text.Trim() : "";
+                if (string.IsNullOrEmpty(connectionName))
+                {
+                    connectionName = GenerateConnectionName(connectionToSave);
+                    if (txtConnectionName != null) txtConnectionName.Text = connectionName;
+                }
+
+                // Save the connection
+                bool saved = SaveConnectionToStorage(connectionName, connectionToSave);
+                
+                if (saved)
+                {
+                    string successMessage = string.Format("Connection '{0}' saved successfully!\n\n" +
+                                                         "You can now use this connection for upload/download operations.",
+                                                         connectionName);
+                    MessageBox.Show(successMessage, "Connection Saved", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    
+                    ServiceLocator.LogService.LogInfo(string.Format("Connection '{0}' saved successfully", connectionName));
+                    
+                    // Disable save button after successful save
+                    if (btnSaveConnection != null)
+                    {
+                        btnSaveConnection.Enabled = false;
+                        btnSaveConnection.Text = "Saved";
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Failed to save connection. Please try again.", "Save Failed", 
+                                  MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(string.Format("Error saving connection: {0}", ex.Message), "Save Error", 
+                              MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError(string.Format("Error saving connection: {0}", ex.Message));
+            }
+        }
+
+        private bool ValidateConnectionForSave()
+        {
+            // First validate basic connection inputs
+            if (!ValidateInputs()) return false;
+
+            // Additional validation for saving
+            if (cmbProtocol != null && cmbProtocol.SelectedIndex != 0) // Not LOCAL
+            {
+                // Check if connection name is reasonable
+                string connectionName = txtConnectionName != null ? txtConnectionName.Text.Trim() : "";
+                if (string.IsNullOrEmpty(connectionName))
+                {
+                    DialogResult result = MessageBox.Show(
+                        "No connection name specified. Do you want to auto-generate one?", 
+                        "Connection Name", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    
+                    if (result == DialogResult.No) return false;
+                }
+                
+                // Warn about password storage
+                if (txtPassword != null && !string.IsNullOrEmpty(txtPassword.Text))
+                {
+                    if (chkUseSSHKey == null || !chkUseSSHKey.Checked)
+                    {
+                        DialogResult result = MessageBox.Show(
+                            "This will save your password in the application.\n\n" +
+                            "For better security, consider using SSH key authentication.\n\n" +
+                            "Do you want to continue?", 
+                            "Password Security Warning", 
+                            MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                        
+                        if (result == DialogResult.No) return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        private ConnectionSettings CreateConnectionSettingsFromForm()
+        {
+            ConnectionSettings settings = new ConnectionSettings();
+            
+            if (cmbProtocol != null)
+            {
+                switch (cmbProtocol.SelectedIndex)
+                {
+                    case 0: // LOCAL
+                        settings.Protocol = "LOCAL";
+                        settings.ProtocolType = 0;
+                        break;
+                    case 1: // FTP
+                        settings.Protocol = "FTP";
+                        settings.ProtocolType = 1;
+                        break;
+                    case 2: // SFTP
+                        settings.Protocol = "SFTP";
+                        settings.ProtocolType = 2;
+                        break;
+                }
+            }
+            
+            settings.Host = txtHost != null ? txtHost.Text.Trim() : "";
+            int port;
+            if (!int.TryParse(txtPort != null ? txtPort.Text : "0", out port)) port = 0;
+            settings.Port = port;
+            settings.Username = txtUsername != null ? txtUsername.Text.Trim() : "";
+            settings.Password = txtPassword != null ? txtPassword.Text : "";
+            settings.SshKeyPath = txtSSHKeyPath != null ? txtSSHKeyPath.Text.Trim() : "";
+            settings.Timeout = numTimeout != null ? (int)numTimeout.Value : 30;
+            
+            return settings;
+        }
+
+        private string GenerateConnectionName(ConnectionSettings settings)
+        {
+            if (settings.ProtocolType == 0)
+            {
+                return "Local File System";
+            }
+            else
+            {
+                return string.Format("{0} - {1}@{2}:{3}", 
+                                   settings.Protocol, 
+                                   settings.Username, 
+                                   settings.Host, 
+                                   settings.Port);
+            }
+        }
+
+        private bool SaveConnectionToStorage(string connectionName, ConnectionSettings settings)
+        {
+            try
+            {
+                // Use the existing connection service to save
+                // For now, we'll save as the current connection
+                // In a full implementation, you'd want a connection manager that stores multiple connections
+                
+                _connectionService.SaveConnectionSettings(settings);
+                
+                // Also save to a dedicated connections file/registry for multiple connections
+                SaveToConnectionsRegistry(connectionName, settings);
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError(string.Format("Failed to save connection: {0}", ex.Message));
+                return false;
+            }
+        }
+
+        private void SaveToConnectionsRegistry(string connectionName, ConnectionSettings settings)
+        {
+            try
+            {
+                // Save connection to Windows Registry or config file
+                // This is a simplified implementation - in production you'd want encrypted storage
+                
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey("Software\\DataSyncer\\Connections"))
+                {
+                    using (Microsoft.Win32.RegistryKey connectionKey = key.CreateSubKey(connectionName))
+                    {
+                        connectionKey.SetValue("Protocol", settings.Protocol);
+                        connectionKey.SetValue("ProtocolType", settings.ProtocolType);
+                        connectionKey.SetValue("Host", settings.Host ?? "");
+                        connectionKey.SetValue("Port", settings.Port);
+                        connectionKey.SetValue("Username", settings.Username ?? "");
+                        
+                        // For security, don't save password in plain text in production
+                        // This is just for demo purposes
+                        connectionKey.SetValue("Password", settings.Password ?? "");
+                        connectionKey.SetValue("SshKeyPath", settings.SshKeyPath ?? "");
+                        connectionKey.SetValue("Timeout", settings.Timeout);
+                        connectionKey.SetValue("SavedDate", DateTime.Now.ToString());
+                    }
+                }
+                
+                ServiceLocator.LogService.LogInfo(string.Format("Connection '{0}' saved to registry", connectionName));
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError(string.Format("Failed to save connection to registry: {0}", ex.Message));
+                // Non-fatal error, don't throw
+            }
+        }
+
+        /// <summary>
+        /// Enable the Save Connection button when a successful test is completed
+        /// </summary>
+        private void EnableSaveConnection()
+        {
+            if (btnSaveConnection != null)
+            {
+                btnSaveConnection.Enabled = true;
+                btnSaveConnection.Text = "Save Connection";
+                btnSaveConnection.BackColor = System.Drawing.Color.LightGreen;
+            }
+        }
+
+        #endregion
     }
 }

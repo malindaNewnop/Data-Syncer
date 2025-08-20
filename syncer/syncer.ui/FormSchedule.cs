@@ -624,28 +624,73 @@ namespace syncer.ui
             {
                 try
                 {
+                    ServiceLocator.LogService.LogInfo(string.Format("Starting upload of {0} files to {1}", localFilePaths.Length, remotePath));
+                    ServiceLocator.LogService.LogInfo(string.Format("Connection: {0}@{1}:{2}", _coreConnectionSettings.Username, _coreConnectionSettings.Host, _coreConnectionSettings.Port));
+                    
                     for (int i = 0; i < localFilePaths.Length; i++)
                     {
                         string localFile = localFilePaths[i];
                         string fileName = Path.GetFileName(localFile);
-                        string remoteFile = remotePath.TrimEnd('/') + "/" + fileName;
+                        
+                        // Fix path separator - ensure remote path uses forward slashes
+                        string normalizedRemotePath = remotePath.Replace('\\', '/');
+                        if (!normalizedRemotePath.EndsWith("/")) normalizedRemotePath += "/";
+                        string remoteFile = normalizedRemotePath + fileName;
                         
                         worker.ReportProgress((i * 100) / localFilePaths.Length, 
                             string.Format("Uploading {0}...", fileName));
+                        
+                        ServiceLocator.LogService.LogInfo(string.Format("Uploading: {0} -> {1}", localFile, remoteFile));
+                        
+                        // Check if local file exists and is accessible
+                        if (!File.Exists(localFile))
+                        {
+                            throw new Exception(string.Format("Local file does not exist: {0}", localFile));
+                        }
+                        
+                        FileInfo fileInfo = new FileInfo(localFile);
+                        ServiceLocator.LogService.LogInfo(string.Format("Local file size: {0} bytes", fileInfo.Length));
                         
                         string error;
                         bool success = _currentTransferClient.UploadFile(_coreConnectionSettings, localFile, remoteFile, true, out error);
                         
                         if (!success)
                         {
-                            throw new Exception(string.Format("Failed to upload {0}: {1}", fileName, error));
+                            string errorMsg = string.Format("Failed to upload {0}: {1}", fileName, error ?? "Unknown error");
+                            ServiceLocator.LogService.LogError(errorMsg);
+                            throw new Exception(errorMsg);
+                        }
+                        else
+                        {
+                            ServiceLocator.LogService.LogInfo(string.Format("Successfully uploaded: {0}", fileName));
+                            
+                            // Try to verify the upload by checking if file exists on remote
+                            bool remoteExists;
+                            string verifyError;
+                            if (_currentTransferClient.FileExists(_coreConnectionSettings, remoteFile, out remoteExists, out verifyError))
+                            {
+                                if (remoteExists)
+                                {
+                                    ServiceLocator.LogService.LogInfo(string.Format("Upload verified: {0} exists on remote server", fileName));
+                                }
+                                else
+                                {
+                                    ServiceLocator.LogService.LogWarning(string.Format("Upload completed but file not found on remote: {0}", fileName));
+                                }
+                            }
+                            else
+                            {
+                                ServiceLocator.LogService.LogWarning(string.Format("Could not verify remote file existence: {0}", verifyError ?? "Unknown error"));
+                            }
                         }
                     }
                     
                     worker.ReportProgress(100, "Upload completed successfully!");
+                    ServiceLocator.LogService.LogInfo("All uploads completed successfully");
                 }
                 catch (Exception ex)
                 {
+                    ServiceLocator.LogService.LogError("Upload failed: " + ex.Message);
                     e.Result = ex;
                 }
             };
