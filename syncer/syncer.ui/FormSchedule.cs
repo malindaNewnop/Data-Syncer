@@ -168,6 +168,15 @@ namespace syncer.ui
                 numTimerInterval.Maximum = 9999;
                 numTimerInterval.Value = 5; // Default 5 minutes
             }
+            
+            // Initialize the Save Timer Job button
+            if (btnSaveTimerJob != null)
+            {
+                btnSaveTimerJob.BackColor = System.Drawing.Color.LightBlue;
+                btnSaveTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+                btnSaveTimerJob.Text = "Save Timer Job Configuration";
+                btnSaveTimerJob.Enabled = true;
+            }
 
             // Initialize timer status
             if (lblTimerStatus != null) lblTimerStatus.Text = "Timer stopped";
@@ -856,6 +865,54 @@ namespace syncer.ui
                    "Upload Interval: " + interval + "\n" +
                    "Timer Status: " + timerStatus + "\n" +
                    "Last Upload: " + lastUpload;
+        }
+        
+        private void btnSaveTimerJob_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(_selectedFolderForTimer))
+            {
+                MessageBox.Show("Please select a folder for timer upload first.", 
+                    "No Folder Selected", 
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Warning);
+                return;
+            }
+            
+            if (UIStringExtensions.IsNullOrWhiteSpace(txtJobName.Text))
+            {
+                MessageBox.Show("Please enter a job name.", 
+                    "Job Name Required", 
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Warning);
+                txtJobName.Focus();
+                return;
+            }
+            
+            try
+            {
+                // Save the job without closing the form
+                SaveJob();
+                
+                MessageBox.Show(
+                    "Timer job saved successfully! The job will continue running even if you close this window.",
+                    "Timer Job Saved",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                
+                ServiceLocator.LogService.LogInfo(string.Format(
+                    "Timer job '{0}' saved for folder: {1}", 
+                    txtJobName.Text, 
+                    _selectedFolderForTimer));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Error saving timer job: " + ex.Message,
+                    "Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error saving timer job: " + ex.Message);
+            }
         }
 
         #region File Manager and Transfer Operations

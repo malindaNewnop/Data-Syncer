@@ -26,6 +26,11 @@ namespace syncer.ui
         private System.Windows.Forms.ToolStripStatusLabel lblConnectionStatus;
         private System.Windows.Forms.GroupBox gbJobs;
         private System.Windows.Forms.GroupBox gbControls;
+        private System.Windows.Forms.GroupBox gbTimerJobs;
+        private System.Windows.Forms.DataGridView dgvTimerJobs;
+        private System.Windows.Forms.Button btnRefreshTimerJobs;
+        private System.Windows.Forms.Button btnStopTimerJob;
+        private System.Windows.Forms.Label lblRunningTimerJobs;
 
         protected override void Dispose(bool disposing)
         {
@@ -59,27 +64,34 @@ namespace syncer.ui
             this.lblConnectionStatus = new System.Windows.Forms.ToolStripStatusLabel();
             this.gbJobs = new System.Windows.Forms.GroupBox();
             this.gbControls = new System.Windows.Forms.GroupBox();
+            this.gbTimerJobs = new System.Windows.Forms.GroupBox();
+            this.dgvTimerJobs = new System.Windows.Forms.DataGridView();
+            this.btnRefreshTimerJobs = new System.Windows.Forms.Button();
+            this.btnStopTimerJob = new System.Windows.Forms.Button();
+            this.lblRunningTimerJobs = new System.Windows.Forms.Label();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvJobs)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dgvTimerJobs)).BeginInit();
             this.statusStrip1.SuspendLayout();
             this.gbJobs.SuspendLayout();
             this.gbControls.SuspendLayout();
+            this.gbTimerJobs.SuspendLayout();
             this.SuspendLayout();
-            
+
             // Initialize enhancedSftpSettingsToolStripMenuItem
             this.enhancedSftpSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.enhancedSftpSettingsToolStripMenuItem.Name = "enhancedSftpSettingsToolStripMenuItem";
             this.enhancedSftpSettingsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
             this.enhancedSftpSettingsToolStripMenuItem.Text = "Enhanced SFTP Settings";
             this.enhancedSftpSettingsToolStripMenuItem.Click += new System.EventHandler(this.enhancedSftpSettingsToolStripMenuItem_Click);
-            
+
             // Initialize sshKeyGenerationToolStripMenuItem
             this.sshKeyGenerationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.sshKeyGenerationToolStripMenuItem.Name = "sshKeyGenerationToolStripMenuItem";
             this.sshKeyGenerationToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
             this.sshKeyGenerationToolStripMenuItem.Text = "SSH Key Generation";
             this.sshKeyGenerationToolStripMenuItem.Click += new System.EventHandler(this.sshKeyGenerationToolStripMenuItem_Click);
-            
+
             // menuStrip1
             this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.fileToolStripMenuItem,
@@ -120,7 +132,7 @@ namespace syncer.ui
             // scheduleSettingsToolStripMenuItem
             this.scheduleSettingsToolStripMenuItem.Name = "scheduleSettingsToolStripMenuItem";
             this.scheduleSettingsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
-            this.scheduleSettingsToolStripMenuItem.Text = "Schedule Settings";
+            this.scheduleSettingsToolStripMenuItem.Text = "Timer Jobs";
             this.scheduleSettingsToolStripMenuItem.Click += new System.EventHandler(this.scheduleSettingsToolStripMenuItem_Click);
             // filterSettingsToolStripMenuItem
             this.filterSettingsToolStripMenuItem.Name = "filterSettingsToolStripMenuItem";
@@ -146,8 +158,8 @@ namespace syncer.ui
             // dgvJobs
             this.dgvJobs.AllowUserToAddRows = false;
             this.dgvJobs.AllowUserToDeleteRows = false;
-            this.dgvJobs.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
+            this.dgvJobs.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
+            | System.Windows.Forms.AnchorStyles.Left)
             | System.Windows.Forms.AnchorStyles.Right)));
             this.dgvJobs.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.dgvJobs.Location = new System.Drawing.Point(6, 19);
@@ -226,19 +238,19 @@ namespace syncer.ui
             this.lblConnectionStatus.Size = new System.Drawing.Size(128, 17);
             this.lblConnectionStatus.Text = "Connection: Disconnected";
             // gbJobs
-            this.gbJobs.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
+            this.gbJobs.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
+            | System.Windows.Forms.AnchorStyles.Left)
             | System.Windows.Forms.AnchorStyles.Right)));
             this.gbJobs.Controls.Add(this.dgvJobs);
             this.gbJobs.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.gbJobs.Location = new System.Drawing.Point(12, 100);
             this.gbJobs.Name = "gbJobs";
-            this.gbJobs.Size = new System.Drawing.Size(868, 525);
+            this.gbJobs.Size = new System.Drawing.Size(868, 330);
             this.gbJobs.TabIndex = 6;
             this.gbJobs.TabStop = false;
-            this.gbJobs.Text = "Scheduled Sync Jobs";
+            this.gbJobs.Text = "Sync Jobs";
             // gbControls
-            this.gbControls.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            this.gbControls.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
             | System.Windows.Forms.AnchorStyles.Right)));
             this.gbControls.Controls.Add(this.btnAddJob);
             this.gbControls.Controls.Add(this.btnStartStop);
@@ -252,10 +264,73 @@ namespace syncer.ui
             this.gbControls.TabIndex = 7;
             this.gbControls.TabStop = false;
             this.gbControls.Text = "Controls";
+            // gbTimerJobs
+            this.gbTimerJobs.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.gbTimerJobs.Controls.Add(this.dgvTimerJobs);
+            this.gbTimerJobs.Controls.Add(this.btnRefreshTimerJobs);
+            this.gbTimerJobs.Controls.Add(this.btnStopTimerJob);
+            this.gbTimerJobs.Controls.Add(this.lblRunningTimerJobs);
+            this.gbTimerJobs.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            this.gbTimerJobs.Location = new System.Drawing.Point(12, 440);
+            this.gbTimerJobs.Name = "gbTimerJobs";
+            this.gbTimerJobs.Size = new System.Drawing.Size(868, 185);
+            this.gbTimerJobs.TabIndex = 8;
+            this.gbTimerJobs.TabStop = false;
+            this.gbTimerJobs.Text = "Running Timer Jobs";
+
+            // dgvTimerJobs
+            this.dgvTimerJobs.AllowUserToAddRows = false;
+            this.dgvTimerJobs.AllowUserToDeleteRows = false;
+            this.dgvTimerJobs.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
+            | System.Windows.Forms.AnchorStyles.Left)
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.dgvTimerJobs.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
+            this.dgvTimerJobs.BackgroundColor = System.Drawing.SystemColors.Control;
+            this.dgvTimerJobs.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dgvTimerJobs.Location = new System.Drawing.Point(6, 58);
+            this.dgvTimerJobs.Name = "dgvTimerJobs";
+            this.dgvTimerJobs.ReadOnly = true;
+            this.dgvTimerJobs.RowHeadersWidth = 51;
+            this.dgvTimerJobs.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.dgvTimerJobs.Size = new System.Drawing.Size(856, 121);
+            this.dgvTimerJobs.TabIndex = 0;
+
+            // btnRefreshTimerJobs
+            this.btnRefreshTimerJobs.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnRefreshTimerJobs.Location = new System.Drawing.Point(220, 22);
+            this.btnRefreshTimerJobs.Name = "btnRefreshTimerJobs";
+            this.btnRefreshTimerJobs.Size = new System.Drawing.Size(120, 28);
+            this.btnRefreshTimerJobs.TabIndex = 1;
+            this.btnRefreshTimerJobs.Text = "Refresh List";
+            this.btnRefreshTimerJobs.UseVisualStyleBackColor = true;
+            this.btnRefreshTimerJobs.Click += new System.EventHandler(this.btnRefreshTimerJobs_Click);
+
+            // btnStopTimerJob
+            this.btnStopTimerJob.BackColor = System.Drawing.Color.LightCoral;
+            this.btnStopTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnStopTimerJob.Location = new System.Drawing.Point(346, 22);
+            this.btnStopTimerJob.Name = "btnStopTimerJob";
+            this.btnStopTimerJob.Size = new System.Drawing.Size(120, 28);
+            this.btnStopTimerJob.TabIndex = 2;
+            this.btnStopTimerJob.Text = "Stop Selected Job";
+            this.btnStopTimerJob.UseVisualStyleBackColor = false;
+            this.btnStopTimerJob.Click += new System.EventHandler(this.btnStopTimerJob_Click);
+
+            // lblRunningTimerJobs
+            this.lblRunningTimerJobs.AutoSize = true;
+            this.lblRunningTimerJobs.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblRunningTimerJobs.Location = new System.Drawing.Point(6, 28);
+            this.lblRunningTimerJobs.Name = "lblRunningTimerJobs";
+            this.lblRunningTimerJobs.Size = new System.Drawing.Size(191, 15);
+            this.lblRunningTimerJobs.TabIndex = 3;
+            this.lblRunningTimerJobs.Text = "Running Timer Jobs: 0";
+
             // FormMain
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(884, 661);
+            this.Controls.Add(this.gbTimerJobs);
             this.Controls.Add(this.gbControls);
             this.Controls.Add(this.gbJobs);
             this.Controls.Add(this.statusStrip1);
@@ -266,10 +341,13 @@ namespace syncer.ui
             this.menuStrip1.ResumeLayout(false);
             this.menuStrip1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvJobs)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dgvTimerJobs)).EndInit();
             this.statusStrip1.ResumeLayout(false);
             this.statusStrip1.PerformLayout();
             this.gbJobs.ResumeLayout(false);
             this.gbControls.ResumeLayout(false);
+            this.gbTimerJobs.ResumeLayout(false);
+            this.gbTimerJobs.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
         }

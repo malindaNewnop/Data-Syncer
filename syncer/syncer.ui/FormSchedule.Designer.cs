@@ -27,6 +27,7 @@ namespace syncer.ui
         private System.Windows.Forms.Label lblLastUpload;
         private System.Windows.Forms.Button btnBrowseFilesForTimer;
         private System.Windows.Forms.Label lblSelectedFiles;
+        private System.Windows.Forms.Button btnSaveTimerJob;
         private System.Windows.Forms.Button btnPreview;
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
@@ -90,6 +91,7 @@ namespace syncer.ui
             this.chkEnableTimer = new System.Windows.Forms.CheckBox();
             this.btnBrowseFilesForTimer = new System.Windows.Forms.Button();
             this.lblSelectedFiles = new System.Windows.Forms.Label();
+            this.btnSaveTimerJob = new System.Windows.Forms.Button();
             this.btnPreview = new System.Windows.Forms.Button();
             this.btnSave = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
@@ -244,6 +246,7 @@ namespace syncer.ui
             this.gbTimerSettings.Controls.Add(this.lblTimerStatus);
             this.gbTimerSettings.Controls.Add(this.btnStopTimer);
             this.gbTimerSettings.Controls.Add(this.btnStartTimer);
+            this.gbTimerSettings.Controls.Add(this.btnSaveTimerJob);
             this.gbTimerSettings.Controls.Add(this.cmbTimerUnit);
             this.gbTimerSettings.Controls.Add(this.numTimerInterval);
             this.gbTimerSettings.Controls.Add(this.lblTimerInterval);
@@ -335,6 +338,19 @@ namespace syncer.ui
             this.btnStopTimer.UseVisualStyleBackColor = false;
             this.btnStopTimer.Click += new System.EventHandler(this.btnStopTimer_Click);
             // 
+            // btnSaveTimerJob
+            // 
+            this.btnSaveTimerJob.BackColor = System.Drawing.Color.LightBlue;
+            this.btnSaveTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnSaveTimerJob.Location = new System.Drawing.Point(135, 185);
+            this.btnSaveTimerJob.Margin = new System.Windows.Forms.Padding(4);
+            this.btnSaveTimerJob.Name = "btnSaveTimerJob";
+            this.btnSaveTimerJob.Size = new System.Drawing.Size(248, 32);
+            this.btnSaveTimerJob.TabIndex = 10;
+            this.btnSaveTimerJob.Text = "Save Timer Job Configuration";
+            this.btnSaveTimerJob.UseVisualStyleBackColor = false;
+            this.btnSaveTimerJob.Click += new System.EventHandler(this.btnSaveTimerJob_Click);
+            // 
             // lblTimerStatus
             // 
             this.lblTimerStatus.AutoSize = true;
@@ -393,6 +409,19 @@ namespace syncer.ui
             this.lblSelectedFiles.Size = new System.Drawing.Size(113, 18);
             this.lblSelectedFiles.TabIndex = 9;
             this.lblSelectedFiles.Text = "No files selected";
+            // 
+            // btnSaveTimerJob
+            // 
+            this.btnSaveTimerJob.BackColor = System.Drawing.Color.LightBlue;
+            this.btnSaveTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnSaveTimerJob.Location = new System.Drawing.Point(135, 185);
+            this.btnSaveTimerJob.Margin = new System.Windows.Forms.Padding(4);
+            this.btnSaveTimerJob.Name = "btnSaveTimerJob";
+            this.btnSaveTimerJob.Size = new System.Drawing.Size(248, 32);
+            this.btnSaveTimerJob.TabIndex = 10;
+            this.btnSaveTimerJob.Text = "Save Timer Job Configuration";
+            this.btnSaveTimerJob.UseVisualStyleBackColor = false;
+            this.btnSaveTimerJob.Click += new System.EventHandler(this.btnSaveTimerJob_Click);
             // 
             // btnPreview
             // 

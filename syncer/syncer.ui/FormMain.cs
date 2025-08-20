@@ -1,7 +1,10 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Collections.Generic;
 using syncer.ui.Services;
+using syncer.ui.Interfaces;
+using syncer.ui.Forms;
 
 namespace syncer.ui
 {
@@ -102,9 +105,11 @@ namespace syncer.ui
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new Size(800, 600);
             InitializeJobsGrid();
+            InitializeTimerJobsGrid();
             UpdateServiceStatus();
             UpdateConnectionStatus();
             RefreshJobsGrid();
+            RefreshTimerJobsGrid();
         }
 
         private void InitializeJobsGrid()
@@ -261,6 +266,9 @@ namespace syncer.ui
         {
             using (FormSchedule scheduleForm = new FormSchedule())
             {
+                // Set form title to reflect it's now for timer jobs
+                scheduleForm.Text = "Timer Job Settings";
+                
                 if (scheduleForm.ShowDialog() == DialogResult.OK)
                 {
                     RefreshJobsGrid();
@@ -786,5 +794,123 @@ namespace syncer.ui
                 Console.WriteLine("Error during application exit: " + ex.Message);
             }
         }
+        
+        #region Timer Jobs Management
+        
+        private void InitializeTimerJobsGrid()
+        {
+            dgvTimerJobs.Columns.Clear();
+            dgvTimerJobs.Columns.Add("JobId", "ID");
+            dgvTimerJobs.Columns.Add("JobName", "Job Name");
+            dgvTimerJobs.Columns.Add("FolderPath", "Folder Path");
+            dgvTimerJobs.Columns.Add("RemotePath", "Remote Path");
+            dgvTimerJobs.Columns.Add("Interval", "Upload Interval");
+            dgvTimerJobs.Columns.Add("LastUpload", "Last Upload");
+            dgvTimerJobs.Columns.Add("Status", "Status");
+            
+            dgvTimerJobs.Columns["JobId"].Width = 40;
+            dgvTimerJobs.Columns["JobName"].Width = 120;
+            dgvTimerJobs.Columns["FolderPath"].Width = 200;
+            dgvTimerJobs.Columns["RemotePath"].Width = 120;
+            dgvTimerJobs.Columns["Interval"].Width = 100;
+            dgvTimerJobs.Columns["LastUpload"].Width = 150;
+            dgvTimerJobs.Columns["Status"].Width = 80;
+            
+            // Add selection changed event
+            dgvTimerJobs.SelectionChanged += dgvTimerJobs_SelectionChanged;
+        }
+        
+        private void dgvTimerJobs_SelectionChanged(object sender, EventArgs e)
+        {
+            // Enable or disable the stop button based on selection
+            btnStopTimerJob.Enabled = dgvTimerJobs.SelectedRows.Count > 0;
+        }
+        
+        private void RefreshTimerJobsGrid()
+        {
+            try
+            {
+                // Clear existing rows
+                dgvTimerJobs.Rows.Clear();
+                
+                // Get timer jobs from the manager
+                ITimerJobManager timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager == null) return;
+                
+                List<long> runningJobs = timerJobManager.GetRegisteredTimerJobs();
+                lblRunningTimerJobs.Text = string.Format("Running Timer Jobs: {0}", runningJobs.Count);
+                
+                // Get job details from SyncJobService
+                foreach (long jobId in runningJobs)
+                {
+                    // Get job status
+                    bool isRunning = timerJobManager.IsTimerJobRunning(jobId);
+                    DateTime? lastUpload = timerJobManager.GetLastUploadTime(jobId);
+                    
+                    // Try to get job details from SyncJobService
+                    SyncJob job = _jobService.GetJobById((int)jobId);
+                    if (job != null)
+                    {
+                        int rowIndex = dgvTimerJobs.Rows.Add();
+                        DataGridViewRow row = dgvTimerJobs.Rows[rowIndex];
+                        
+                        row.Cells["JobId"].Value = jobId;
+                        row.Cells["JobName"].Value = job.Name;
+                        row.Cells["FolderPath"].Value = job.SourcePath;
+                        row.Cells["RemotePath"].Value = job.DestinationPath;
+                        row.Cells["Interval"].Value = job.IntervalValue + " " + job.IntervalType;
+                        row.Cells["LastUpload"].Value = lastUpload.HasValue ? lastUpload.Value.ToString("yyyy-MM-dd HH:mm:ss") : "Never";
+                        row.Cells["Status"].Value = isRunning ? "Running" : "Stopped";
+                        
+                        // Set row color based on status
+                        row.DefaultCellStyle.BackColor = isRunning ? Color.LightGreen : Color.LightGray;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error refreshing timer jobs: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                try { ServiceLocator.LogService.LogError("Error refreshing timer jobs: " + ex.Message); } catch { }
+            }
+        }
+        
+        private void btnRefreshTimerJobs_Click(object sender, EventArgs e)
+        {
+            RefreshTimerJobsGrid();
+        }
+        
+        private void btnStopTimerJob_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (dgvTimerJobs.SelectedRows.Count == 0) return;
+                
+                // Get selected job ID
+                DataGridViewRow selectedRow = dgvTimerJobs.SelectedRows[0];
+                long jobId = Convert.ToInt64(selectedRow.Cells["JobId"].Value);
+                
+                // Get the timer job manager
+                ITimerJobManager timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager == null) return;
+                
+                // Stop the job
+                if (timerJobManager.StopTimerJob(jobId))
+                {
+                    MessageBox.Show("Timer job stopped successfully.", "Job Stopped", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    RefreshTimerJobsGrid();
+                }
+                else
+                {
+                    MessageBox.Show("Failed to stop timer job.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error stopping timer job: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                try { ServiceLocator.LogService.LogError("Error stopping timer job: " + ex.Message); } catch { }
+            }
+        }
+        
+        #endregion
     }
 }
