@@ -1,3 +1,5 @@
+using System;
+
 namespace syncer.ui
 {
     partial class FormSchedule
@@ -35,9 +37,31 @@ namespace syncer.ui
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing && (components != null))
+            if (disposing)
             {
-                components.Dispose();
+                // Dispose standard components
+                if (components != null)
+                {
+                    components.Dispose();
+                }
+                
+                // Clean up the timer if it exists
+                if (_uploadTimer != null)
+                {
+                    try
+                    {
+                        _uploadTimer.Stop();
+                        _uploadTimer.Elapsed -= OnTimerElapsed;
+                        _uploadTimer.Dispose();
+                        _uploadTimer = null;
+                        _isTimerRunning = false;
+                    }
+                    catch (Exception ex)
+                    {
+                        if (ServiceLocator.LogService != null)
+                            ServiceLocator.LogService.LogError("Error disposing timer: " + ex.Message);
+                    }
+                }
             }
             base.Dispose(disposing);
         }

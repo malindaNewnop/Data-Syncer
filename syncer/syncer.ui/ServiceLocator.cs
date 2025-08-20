@@ -1,4 +1,5 @@
 using syncer.ui.Services;
+using syncer.ui.Interfaces;
 using System;
 using System.IO;
 using System.Reflection;
@@ -15,6 +16,7 @@ namespace syncer.ui
         private static ILogService _logService;
         private static IServiceManager _serviceManager;
         private static IConfigurationService _configurationService;
+        private static ITimerJobManager _timerJobManager; // New service for managing timer jobs
 
         // New field for log rotation
         private static bool _logRotationEnabled = true;
@@ -41,6 +43,9 @@ namespace syncer.ui
                 _filterService = new FilterService();
                 _serviceManager = new ServiceManager();
                 _configurationService = new ConfigurationService();
+                
+                // Create the timer job manager
+                _timerJobManager = new TimerJobManager();
                 
                 // Log initialization
                 _logService.LogInfo("Data Syncer UI started with core backend", "UI");
@@ -231,6 +236,11 @@ namespace syncer.ui
         public static IConfigurationService ConfigurationService
         {
             get { return _configurationService ?? (_configurationService = new ConfigurationService()); }
+        }
+        
+        public static ITimerJobManager TimerJobManager
+        {
+            get { return _timerJobManager ?? (_timerJobManager = new Services.TimerJobManager()); }
         }
 
         public static void SetSyncJobService(ISyncJobService service) { _syncJobService = service; }

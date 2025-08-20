@@ -31,7 +31,11 @@ namespace syncer.core
         
         // Events from IMultiJobRunner
         public event EventHandler<MultiJobStatusEventArgs> MultiJobStatusChanged;
+        
+        // This event is currently unused but kept for future use
+        #pragma warning disable 0067
         public event EventHandler<JobBatchCompletedEventArgs> JobBatchCompleted;
+        #pragma warning restore 0067
 
         public MultiJobRunner(
             IJobRepository jobRepository,

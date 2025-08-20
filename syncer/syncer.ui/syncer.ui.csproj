@@ -53,9 +53,11 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <!-- Core UI and services -->
     <Compile Include="Interfaces\IServices.cs" />
+    <Compile Include="Interfaces\ITimerJobManager.cs" />
     <Compile Include="Models.cs" />
     <Compile Include="Services\NotificationService.cs" />
     <Compile Include="Services\SystemTrayManager.cs" />
+    <Compile Include="Services\TimerJobManager.cs" />
     <Compile Include="StringExtensions.cs" />
     <Compile Include="ServiceLocator.cs" />
     <Compile Include="Services\ServiceImplementations.cs" />

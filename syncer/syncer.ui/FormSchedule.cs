@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using syncer.core;
 using syncer.core.Configuration;
 using syncer.ui.Forms;
+using syncer.ui.Interfaces;
 
 namespace syncer.ui
 {
@@ -37,6 +38,80 @@ namespace syncer.ui
             _currentJob = jobToEdit;
             _isEditMode = jobToEdit != null;
             InitializeCustomComponents();
+            
+            // Subscribe to form closing event to handle timers
+            this.FormClosing += FormSchedule_FormClosing;
+        }
+        
+        private void FormSchedule_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            // If a timer is running and no job has been saved, warn the user
+            if (_isTimerRunning && _currentJob?.Id == null)
+            {
+                DialogResult result = MessageBox.Show(
+                    "You have a timer running but haven't saved the job. The timer will stop when the form closes.\n\n" +
+                    "Would you like to save this job before closing?",
+                    "Timer Running",
+                    MessageBoxButtons.YesNoCancel,
+                    MessageBoxIcon.Warning);
+                
+                if (result == DialogResult.Yes)
+                {
+                    try
+                    {
+                        SaveJob();
+                        MessageBox.Show(
+                            "Job saved successfully. The timer will continue running in the background.",
+                            "Job Saved",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(
+                            "Failed to save job: " + ex.Message,
+                            "Error",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
+                        
+                        // Ask if they want to continue closing
+                        DialogResult continueResult = MessageBox.Show(
+                            "Do you still want to close this form? The timer will stop.",
+                            "Confirm Close",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Question);
+                        
+                        if (continueResult == DialogResult.No)
+                        {
+                            e.Cancel = true;
+                            return;
+                        }
+                    }
+                }
+                else if (result == DialogResult.Cancel)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+                // For "No" we'll just continue and close
+            }
+            
+            // Always stop and clean up the timer when form is closing
+            if (_uploadTimer != null)
+            {
+                try
+                {
+                    _uploadTimer.Stop();
+                    _uploadTimer.Elapsed -= OnTimerElapsed;
+                    _uploadTimer.Dispose();
+                    _isTimerRunning = false;
+                    ServiceLocator.LogService.LogInfo("Timer stopped and disposed during form closing");
+                }
+                catch (Exception ex)
+                {
+                    ServiceLocator.LogService.LogError("Error stopping timer during form closing: " + ex.Message);
+                }
+            }
         }
 
         private void InitializeServices()
@@ -412,6 +487,42 @@ namespace syncer.ui
                 _currentJob.Id = _jobService.CreateJob(_currentJob);
                 ServiceLocator.LogService.LogInfo("Job '" + _currentJob.Name + "' created");
             }
+            
+            // If the timer is enabled and we have a folder selected, register the job with the timer job manager
+            if (chkEnableTimer != null && chkEnableTimer.Checked && !string.IsNullOrEmpty(_selectedFolderForTimer))
+            {
+                try 
+                {
+                    // First, try to get the timer job manager from the service locator
+                    ITimerJobManager timerJobManager = ServiceLocator.TimerJobManager;
+                    
+                    // Register the job with the timer job manager
+                    if (timerJobManager != null)
+                    {
+                        double intervalMs = CalculateTimerInterval();
+                        bool registered = timerJobManager.RegisterTimerJob(_currentJob.Id, 
+                            _selectedFolderForTimer, _timerUploadDestination, intervalMs);
+                        
+                        if (registered && _isTimerRunning)
+                        {
+                            // If the timer is already running, start the job in the manager
+                            timerJobManager.StartTimerJob(_currentJob.Id);
+                            ServiceLocator.LogService.LogInfo(string.Format(
+                                "Job '{0}' registered and started in background timer service", _currentJob.Name));
+                        }
+                        else if (registered)
+                        {
+                            ServiceLocator.LogService.LogInfo(string.Format(
+                                "Job '{0}' registered in background timer service", _currentJob.Name));
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ServiceLocator.LogService.LogError(string.Format(
+                        "Failed to register job '{0}' with timer service: {1}", _currentJob.Name, ex.Message));
+                }
+            }
         }
 
         private void chkEnabled_CheckedChanged(object sender, EventArgs e)
@@ -438,7 +549,7 @@ namespace syncer.ui
         {
             using (FolderBrowserDialog dialog = new FolderBrowserDialog())
             {
-                dialog.Description = "Select folder for timed uploads";
+                dialog.Description = "Select folder for timed uploads (all files will be monitored)";
                 dialog.ShowNewFolderButton = true;
                 
                 if (dialog.ShowDialog() == DialogResult.OK)
@@ -457,15 +568,15 @@ namespace syncer.ui
                     {
                         if (files.Length == 1)
                         {
-                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (1 file)";
+                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (1 file, including new files added later)";
                         }
                         else
                         {
-                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (" + files.Length + " files)";
+                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (" + files.Length + " files, including new files added later)";
                         }
                     }
                     
-                    ServiceLocator.LogService.LogInfo(string.Format("Selected folder '{0}' with {1} files for timer upload", 
+                    ServiceLocator.LogService.LogInfo(string.Format("Selected folder '{0}' with {1} files for timer upload (will also include newly added files)", 
                         folderPath, files.Length));
                     
                     // Ask for upload destination for timer uploads
@@ -553,8 +664,30 @@ namespace syncer.ui
                 if (btnStartTimer != null) btnStartTimer.Enabled = false;
                 if (btnStopTimer != null) btnStopTimer.Enabled = true;
                 
-                MessageBox.Show("Upload timer started successfully!", "Timer Started", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                // Ask if user wants to save this job configuration
+                DialogResult saveResult = MessageBox.Show(
+                    "Timer started successfully! Do you want to save this job configuration for future use?", 
+                    "Save Job Configuration", 
+                    MessageBoxButtons.YesNo, 
+                    MessageBoxIcon.Question);
+                
+                if (saveResult == DialogResult.Yes)
+                {
+                    SaveJob();
+                    MessageBox.Show(
+                        "Job configuration saved. This timer will continue to run even if this window is closed.", 
+                        "Job Saved", 
+                        MessageBoxButtons.OK, 
+                        MessageBoxIcon.Information);
+                }
+                else
+                {
+                    MessageBox.Show(
+                        "Upload timer started successfully! Note: This timer will stop if the application is closed.",
+                        "Timer Started",
+                        MessageBoxButtons.OK, 
+                        MessageBoxIcon.Information);
+                }
                 
                 ServiceLocator.LogService.LogInfo(string.Format("Upload timer started with interval: {0} ms", intervalMs));
             }
@@ -658,17 +791,26 @@ namespace syncer.ui
         {
             try
             {
-                if (_selectedFilesForTimer == null || _selectedFilesForTimer.Length == 0 || string.IsNullOrEmpty(_selectedFolderForTimer))
+                if (string.IsNullOrEmpty(_selectedFolderForTimer))
                 {
-                    ServiceLocator.LogService.LogError("No folder/files selected for automatic upload");
+                    ServiceLocator.LogService.LogError("No folder selected for automatic upload");
                     return;
                 }
                 
-                ServiceLocator.LogService.LogInfo(string.Format("Starting automatic upload of folder '{0}' with {1} files", 
-                    _selectedFolderForTimer, _selectedFilesForTimer.Length));
+                // Get all files in the directory, including any newly added files
+                string[] currentFiles = Directory.GetFiles(_selectedFolderForTimer, "*", SearchOption.AllDirectories);
                 
-                // Upload the pre-selected files to the default destination, preserving folder structure
-                PerformFolderUpload(_selectedFolderForTimer, _selectedFilesForTimer, _timerUploadDestination);
+                if (currentFiles.Length == 0)
+                {
+                    ServiceLocator.LogService.LogError("No files found in selected folder for automatic upload");
+                    return;
+                }
+                
+                ServiceLocator.LogService.LogInfo(string.Format("Starting automatic upload of folder '{0}' with {1} files (including any newly added)", 
+                    _selectedFolderForTimer, currentFiles.Length));
+                
+                // Upload all files including newly added ones
+                PerformFolderUpload(_selectedFolderForTimer, currentFiles, _timerUploadDestination);
                 
                 // Update last upload time
                 _lastUploadTime = DateTime.Now;
