@@ -59,5 +59,33 @@ namespace syncer.ui.Interfaces
         /// <param name="jobId">The ID of the job</param>
         /// <returns>DateTime of the last upload or null if never uploaded</returns>
         DateTime? GetLastUploadTime(long jobId);
+        
+        /// <summary>
+        /// Gets the folder path for a timer job
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>The folder path or null if job not found</returns>
+        string GetTimerJobFolderPath(long jobId);
+        
+        /// <summary>
+        /// Gets the remote path for a timer job
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>The remote path or null if job not found</returns>
+        string GetTimerJobRemotePath(long jobId);
+        
+        /// <summary>
+        /// Gets the interval in milliseconds for a timer job
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>The interval in milliseconds or 0 if job not found</returns>
+        double GetTimerJobInterval(long jobId);
+        
+        /// <summary>
+        /// Gets the job name for a timer job
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>The job name or null if job not found</returns>
+        string GetTimerJobName(long jobId);
     }
 }

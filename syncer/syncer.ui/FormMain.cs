@@ -41,11 +41,82 @@ namespace syncer.ui
                 _jobService = ServiceLocator.SyncJobService;
                 _serviceManager = ServiceLocator.ServiceManager;
                 _connectionService = ServiceLocator.ConnectionService;
+                
+                // Try to auto-load default connection on application startup
+                AutoLoadDefaultConnection();
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Failed to initialize services: " + ex.Message + "\n\nSome functionality may be limited.",
                     "Service Initialization Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void AutoLoadDefaultConnection()
+        {
+            try
+            {
+                var currentSettings = _connectionService.GetConnectionSettings();
+                
+                // If current settings are just the default local connection, try to load a saved one
+                if (currentSettings != null && currentSettings.IsLocalConnection && 
+                    StringExtensions.IsNullOrWhiteSpace(currentSettings.Host))
+                {
+                    // Try to load default connection from saved connections
+                    var defaultConnection = FormConnection.LoadDefaultConnectionFromRegistry();
+                    if (defaultConnection != null)
+                    {
+                        _connectionService.SaveConnectionSettings(defaultConnection);
+                        
+                        // Log successful auto-load
+                        ServiceLocator.LogService?.LogInfo("Default connection auto-loaded on application startup");
+                        
+                        // Update status to show connection is loaded
+                        UpdateConnectionStatus(true);
+                    }
+                }
+                else if (currentSettings != null && !currentSettings.IsLocalConnection)
+                {
+                    // We already have a connection loaded, just update the status
+                    UpdateConnectionStatus(true);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Don't show error to user, just log it
+                ServiceLocator.LogService?.LogWarning($"Failed to auto-load default connection: {ex.Message}");
+            }
+        }
+
+        private void UpdateConnectionStatus(bool isConnected)
+        {
+            try
+            {
+                if (lblConnectionStatus != null)
+                {
+                    if (isConnected)
+                    {
+                        var settings = _connectionService.GetConnectionSettings();
+                        if (settings != null)
+                        {
+                            string connectionInfo = settings.IsLocalConnection ? 
+                                "Local File System" : 
+                                $"{settings.Protocol}://{settings.Host}:{settings.Port}";
+                            
+                            lblConnectionStatus.Text = $"Connection: {connectionInfo}";
+                            lblConnectionStatus.ForeColor = Color.DarkGreen;
+                        }
+                    }
+                    else
+                    {
+                        lblConnectionStatus.Text = "Connection: Not configured";
+                        lblConnectionStatus.ForeColor = Color.DarkRed;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService?.LogWarning($"Failed to update connection status: {ex.Message}");
             }
         }
         
@@ -104,40 +175,13 @@ namespace syncer.ui
             this.Size = new Size(900, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new Size(800, 600);
-            InitializeJobsGrid();
             InitializeTimerJobsGrid();
             UpdateServiceStatus();
             UpdateConnectionStatus();
-            RefreshJobsGrid();
             RefreshTimerJobsGrid();
         }
 
-        private void InitializeJobsGrid()
-        {
-            dgvJobs.Columns.Clear();
-            dgvJobs.Columns.Add("JobName", "Job Name");
-            dgvJobs.Columns.Add("Status", "Status");
-            dgvJobs.Columns.Add("SourcePath", "Source Path");
-            dgvJobs.Columns.Add("DestinationPath", "Destination Path");
-            dgvJobs.Columns.Add("Schedule", "Schedule");
-            dgvJobs.Columns.Add("LastRun", "Last Run");
-            dgvJobs.Columns.Add("NextRun", "Next Run");
-            dgvJobs.Columns["JobName"].Width = 120;
-            dgvJobs.Columns["Status"].Width = 80;
-            dgvJobs.Columns["SourcePath"].Width = 200;
-            dgvJobs.Columns["DestinationPath"].Width = 200;
-            dgvJobs.Columns["Schedule"].Width = 100;
-            dgvJobs.Columns["LastRun"].Width = 130;
-            dgvJobs.Columns["NextRun"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            
-            // Add selection changed event to update button states
-            dgvJobs.SelectionChanged += dgvJobs_SelectionChanged;
-        }
 
-        private void dgvJobs_SelectionChanged(object sender, EventArgs e)
-        {
-            UpdateJobControlButtons();
-        }
 
         private void UpdateServiceStatus()
         {
@@ -215,6 +259,28 @@ namespace syncer.ui
             }
         }
 
+        private void connectionManagerToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // TODO: Implement connection manager form
+                MessageBox.Show("Connection Manager feature is coming soon!\n\nFor now, use the Connection Settings menu to save and load connections.", 
+                    "Feature Coming Soon", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                
+                // Alternative: Open connection settings dialog
+                connectionSettingsToolStripMenuItem_Click(sender, e);
+                
+                // Update connection status after using connection manager
+                UpdateConnectionStatus();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening connection manager: {ex.Message}", 
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService?.LogError($"Error opening connection manager: {ex.Message}");
+            }
+        }
+
         private void enhancedSftpSettingsToolStripMenuItem_Click(object sender, EventArgs e)
         {
             try
@@ -271,8 +337,6 @@ namespace syncer.ui
                 
                 if (scheduleForm.ShowDialog() == DialogResult.OK)
                 {
-                    RefreshJobsGrid();
-                    
                     // Show notification
                     if (_notificationService != null)
                     {
@@ -319,8 +383,6 @@ namespace syncer.ui
             {
                 if (scheduleForm.ShowDialog() == DialogResult.OK)
                 {
-                    RefreshJobsGrid();
-                    
                     // Show notification
                     if (_notificationService != null)
                     {
@@ -333,121 +395,9 @@ namespace syncer.ui
             }
         }
 
-        private void btnPauseJob_Click(object sender, EventArgs e)
-        {
-            if (dgvJobs.SelectedRows.Count == 0)
-            {
-                MessageBox.Show("Please select a job to pause/resume.", "No Job Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
 
-            try
-            {
-                int jobId = (int)dgvJobs.SelectedRows[0].Tag;
-                SyncJob job = _jobService.GetJobById(jobId);
-                
-                if (job != null)
-                {
-                    string currentStatus = _jobService.GetJobStatus(jobId);
-                    bool isRunning = currentStatus.ToLower().Contains("running") || currentStatus.ToLower().Contains("active");
-                    
-                    if (isRunning)
-                    {
-                        // Pause the job
-                        if (_jobService.StopJob(jobId))
-                        {
-                            RefreshJobsGrid();
-                            
-                            if (_notificationService != null)
-                            {
-                                _notificationService.ShowNotification(
-                                    "Job Paused",
-                                    $"Job '{job.Name}' has been paused successfully.",
-                                    ToolTipIcon.Info);
-                            }
-                        }
-                        else
-                        {
-                            MessageBox.Show("Failed to pause the job. Please try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
-                    }
-                    else
-                    {
-                        // Resume the job
-                        if (_jobService.StartJob(jobId))
-                        {
-                            RefreshJobsGrid();
-                            
-                            if (_notificationService != null)
-                            {
-                                _notificationService.ShowNotification(
-                                    "Job Resumed",
-                                    $"Job '{job.Name}' has been resumed successfully.",
-                                    ToolTipIcon.Info);
-                            }
-                        }
-                        else
-                        {
-                            MessageBox.Show("Failed to resume the job. Please try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error managing job: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService.LogError("Error managing job: " + ex.Message);
-            }
-        }
 
-        private void btnDeleteJob_Click(object sender, EventArgs e)
-        {
-            if (dgvJobs.SelectedRows.Count == 0)
-            {
-                MessageBox.Show("Please select a job to delete.", "No Job Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
 
-            try
-            {
-                int jobId = (int)dgvJobs.SelectedRows[0].Tag;
-                SyncJob job = _jobService.GetJobById(jobId);
-                
-                if (job != null)
-                {
-                    DialogResult result = MessageBox.Show(
-                        $"Are you sure you want to delete the job '{job.Name}'?\n\nThis action cannot be undone.",
-                        "Confirm Deletion",
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Question);
-                    
-                    if (result == DialogResult.Yes)
-                    {
-                        if (_jobService.DeleteJob(jobId))
-                        {
-                            RefreshJobsGrid();
-                            
-                            if (_notificationService != null)
-                            {
-                                _notificationService.ShowNotification(
-                                    "Job Deleted",
-                                    $"Job '{job.Name}' has been deleted successfully.",
-                                    ToolTipIcon.Info);
-                            }
-                        }
-                        else
-                        {
-                            MessageBox.Show("Failed to delete the job. Please try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error deleting job: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService.LogError("Error deleting job: " + ex.Message);
-            }
-        }
 
         private void btnStartStop_Click(object sender, EventArgs e)
         {
@@ -496,191 +446,13 @@ namespace syncer.ui
             }
         }
 
-        private void btnRefresh_Click(object sender, EventArgs e)
-        {
-            RefreshJobsGrid();
-            UpdateServiceStatus();
-            UpdateConnectionStatus();
-        }
 
-        private void RefreshJobsGrid()
-        {
-            try
-            {
-                dgvJobs.Rows.Clear();
-                System.Collections.Generic.List<SyncJob> jobs = null;
-                
-                try 
-                {
-                    jobs = _jobService.GetAllJobs();
-                }
-                catch (Exception ex)
-                {
-                    // Handle the specific case where jobs can't be loaded
-                    MessageBox.Show("Cannot load jobs: " + ex.Message + "\n\nThe application will continue with an empty job list.", 
-                        "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    jobs = new System.Collections.Generic.List<SyncJob>();
-                }
-                
-                for (int i = 0; i < jobs.Count; i++)
-                {
-                    SyncJob job = jobs[i];
-                    string schedule = "Every " + job.IntervalValue + " " + job.IntervalType;
-                    
-                    // Improve LastRun display - show "Never" for both null and MinValue dates
-                    string lastRun = "Never";
-                    if (job.LastRun.HasValue && job.LastRun.Value != DateTime.MinValue)
-                    {
-                        lastRun = job.LastRun.Value.ToString("yyyy-MM-dd HH:mm");
-                    }
-                    
-                    string nextRun = job.GetNextRunTime();
-                    string status = job.IsEnabled ? "Enabled" : "Disabled";
-                    int rowIndex = dgvJobs.Rows.Add(new object[] { job.Name, status, job.SourcePath, job.DestinationPath, schedule, lastRun, nextRun });
-                    dgvJobs.Rows[rowIndex].Tag = job.Id;
-                }
-                
-                // Update button states based on selection
-                UpdateJobControlButtons();
-                
-                try
-                {
-                    ServiceLocator.LogService.LogInfo("Jobs grid refreshed. Found " + jobs.Count + " jobs.");
-                }
-                catch 
-                {
-                    // Ignore logging errors
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error loading jobs: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                try 
-                {
-                    ServiceLocator.LogService.LogError("Error loading jobs: " + ex.Message);
-                }
-                catch 
-                {
-                    // Ignore logging errors
-                }
-            }
-        }
 
-        private void UpdateJobControlButtons()
-        {
-            // Safely check if we have selected rows
-            bool hasSelectedJob = dgvJobs != null && dgvJobs.SelectedRows != null && dgvJobs.SelectedRows.Count > 0;
-            
-            // Make sure the buttons exist before trying to access them
-            if (btnPauseJob != null) btnPauseJob.Enabled = hasSelectedJob;
-            if (btnDeleteJob != null) btnDeleteJob.Enabled = hasSelectedJob;
-            
-            if (hasSelectedJob)
-            {
-                try
-                {
-                    // Check if Tag exists and is an integer
-                    if (dgvJobs.SelectedRows[0].Tag == null)
-                    {
-                        if (btnPauseJob != null)
-                        {
-                            btnPauseJob.Text = "Pause Job";
-                            btnPauseJob.BackColor = Color.Orange;
-                        }
-                        return;
-                    }
-                    
-                    int jobId = (int)dgvJobs.SelectedRows[0].Tag;
-                    
-                    // Check if job service is available
-                    if (_jobService == null)
-                    {
-                        if (btnPauseJob != null)
-                        {
-                            btnPauseJob.Text = "Pause Job";
-                            btnPauseJob.BackColor = Color.Orange;
-                        }
-                        return;
-                    }
-                    
-                    string currentStatus = _jobService.GetJobStatus(jobId);
-                    
-                    // Check if status is null or empty
-                    if (string.IsNullOrEmpty(currentStatus))
-                    {
-                        if (btnPauseJob != null)
-                        {
-                            btnPauseJob.Text = "Pause Job";
-                            btnPauseJob.BackColor = Color.Orange;
-                        }
-                        return;
-                    }
-                    
-                    bool isRunning = currentStatus.ToLower().Contains("running") || currentStatus.ToLower().Contains("active");
-                    
-                    if (btnPauseJob != null)
-                    {
-                        btnPauseJob.Text = isRunning ? "Pause Job" : "Resume Job";
-                        btnPauseJob.BackColor = isRunning ? Color.Orange : Color.LightGreen;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // Log the error for debugging
-                    Console.WriteLine($"Error in UpdateJobControlButtons: {ex.Message}");
-                    
-                    if (btnPauseJob != null)
-                    {
-                        btnPauseJob.Text = "Pause Job";
-                        btnPauseJob.BackColor = Color.Orange;
-                    }
-                }
-            }
-            else
-            {
-                if (btnPauseJob != null)
-                {
-                    btnPauseJob.Text = "Pause Job";
-                    btnPauseJob.BackColor = Color.Orange;
-                }
-            }
-        }
 
-        private void dgvJobs_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex >= 0)
-            {
-                try
-                {
-                    int jobId = (int)dgvJobs.Rows[e.RowIndex].Tag;
-                    SyncJob job = _jobService.GetJobById(jobId);
-                    if (job != null)
-                    {
-                        using (FormSchedule scheduleForm = new FormSchedule(job))
-                        {
-                            if (scheduleForm.ShowDialog() == DialogResult.OK)
-                            {
-                                RefreshJobsGrid();
-                                
-                                // Show notification
-                                if (_notificationService != null)
-                                {
-                                    _notificationService.ShowNotification(
-                                        "Job Updated",
-                                        $"Job '{job.Name}' has been updated successfully.",
-                                        ToolTipIcon.Info);
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Error opening job for editing: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    ServiceLocator.LogService.LogError("Error opening job for editing: " + ex.Message);
-                }
-            }
-        }
+
+
+
+
         
         // Handle form closing to minimize to system tray instead of exiting
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -810,8 +582,8 @@ namespace syncer.ui
             
             dgvTimerJobs.Columns["JobId"].Width = 40;
             dgvTimerJobs.Columns["JobName"].Width = 120;
-            dgvTimerJobs.Columns["FolderPath"].Width = 200;
-            dgvTimerJobs.Columns["RemotePath"].Width = 120;
+            dgvTimerJobs.Columns["FolderPath"].Width = 250;
+            dgvTimerJobs.Columns["RemotePath"].Width = 200;
             dgvTimerJobs.Columns["Interval"].Width = 100;
             dgvTimerJobs.Columns["LastUpload"].Width = 150;
             dgvTimerJobs.Columns["Status"].Width = 80;
@@ -840,37 +612,54 @@ namespace syncer.ui
                 List<long> runningJobs = timerJobManager.GetRegisteredTimerJobs();
                 lblRunningTimerJobs.Text = string.Format("Running Timer Jobs: {0}", runningJobs.Count);
                 
-                // Get job details from SyncJobService
+                // Get job details directly from TimerJobManager
                 foreach (long jobId in runningJobs)
                 {
-                    // Get job status
+                    // Get job status and details from TimerJobManager
                     bool isRunning = timerJobManager.IsTimerJobRunning(jobId);
                     DateTime? lastUpload = timerJobManager.GetLastUploadTime(jobId);
+                    string folderPath = timerJobManager.GetTimerJobFolderPath(jobId);
+                    string remotePath = timerJobManager.GetTimerJobRemotePath(jobId);
+                    string jobName = timerJobManager.GetTimerJobName(jobId);
+                    double intervalMs = timerJobManager.GetTimerJobInterval(jobId);
                     
-                    // Try to get job details from SyncJobService
-                    SyncJob job = _jobService.GetJobById((int)jobId);
-                    if (job != null)
+                    // Convert interval to readable format
+                    string interval = "";
+                    if (intervalMs > 0)
                     {
-                        int rowIndex = dgvTimerJobs.Rows.Add();
-                        DataGridViewRow row = dgvTimerJobs.Rows[rowIndex];
-                        
-                        row.Cells["JobId"].Value = jobId;
-                        row.Cells["JobName"].Value = job.Name;
-                        row.Cells["FolderPath"].Value = job.SourcePath;
-                        row.Cells["RemotePath"].Value = job.DestinationPath;
-                        row.Cells["Interval"].Value = job.IntervalValue + " " + job.IntervalType;
-                        row.Cells["LastUpload"].Value = lastUpload.HasValue ? lastUpload.Value.ToString("yyyy-MM-dd HH:mm:ss") : "Never";
-                        row.Cells["Status"].Value = isRunning ? "Running" : "Stopped";
-                        
-                        // Set row color based on status
-                        row.DefaultCellStyle.BackColor = isRunning ? Color.LightGreen : Color.LightGray;
+                        if (intervalMs < 60000) // Less than a minute
+                        {
+                            interval = (intervalMs / 1000).ToString("0") + " Seconds";
+                        }
+                        else if (intervalMs < 3600000) // Less than an hour
+                        {
+                            interval = (intervalMs / 60000).ToString("0") + " Minutes";
+                        }
+                        else // Hours
+                        {
+                            interval = (intervalMs / 3600000).ToString("0.0") + " Hours";
+                        }
                     }
+                    
+                    int rowIndex = dgvTimerJobs.Rows.Add();
+                    DataGridViewRow row = dgvTimerJobs.Rows[rowIndex];
+                    
+                    row.Cells["JobId"].Value = jobId;
+                    row.Cells["JobName"].Value = jobName;
+                    row.Cells["FolderPath"].Value = folderPath;
+                    row.Cells["RemotePath"].Value = remotePath;
+                    row.Cells["Interval"].Value = interval;
+                    row.Cells["LastUpload"].Value = lastUpload.HasValue ? lastUpload.Value.ToString("yyyy-MM-dd HH:mm:ss") : "Never";
+                    row.Cells["Status"].Value = isRunning ? "Running" : "Stopped";
+                    
+                    // Set row color based on status
+                    row.DefaultCellStyle.BackColor = isRunning ? Color.LightGreen : Color.LightGray;
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error refreshing timer jobs: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                try { ServiceLocator.LogService.LogError("Error refreshing timer jobs: " + ex.Message); } catch { }
+                MessageBox.Show("Error loading timer jobs: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error loading timer jobs: " + ex.Message);
             }
         }
         

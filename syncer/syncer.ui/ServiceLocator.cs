@@ -37,8 +37,8 @@ namespace syncer.ui
                 
                 // Create real service implementations using adapters
                 _syncJobService = new Services.CoreSyncJobServiceAdapter();
-                _connectionService = new Services.CoreConnectionServiceAdapter();
-                
+                _connectionService = new ConnectionService();
+
                 // Keep using UI implementations for these services for now
                 _filterService = new FilterService();
                 _serviceManager = new ServiceManager();

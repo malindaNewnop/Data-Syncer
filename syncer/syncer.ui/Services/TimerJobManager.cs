@@ -238,6 +238,48 @@ namespace syncer.ui.Services
             return _timerJobs[jobId].LastUploadTime;
         }
         
+        public string GetTimerJobFolderPath(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return null;
+            }
+            
+            return _timerJobs[jobId].FolderPath;
+        }
+        
+        public string GetTimerJobRemotePath(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return null;
+            }
+            
+            return _timerJobs[jobId].RemotePath;
+        }
+        
+        public double GetTimerJobInterval(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return 0;
+            }
+            
+            return _timerJobs[jobId].IntervalMs;
+        }
+        
+        public string GetTimerJobName(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return null;
+            }
+            
+            // For now, return a generated name based on the job ID
+            // In the future, we could store a custom name
+            return "Timer Job " + jobId.ToString();
+        }
+        
         private void OnTimerElapsed(long jobId)
         {
             try

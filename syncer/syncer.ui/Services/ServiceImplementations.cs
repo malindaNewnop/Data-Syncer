@@ -4,6 +4,7 @@ using System.Data;
 using System.IO;
 using System.Timers;
 using System.Threading;
+using System.Linq;
 
 namespace syncer.ui.Services
 {
@@ -17,7 +18,6 @@ namespace syncer.ui.Services
         {
             _jobs = new List<SyncJob>();
             _jobTimers = new Dictionary<int, System.Timers.Timer>();
-            ServiceLocator.LogService.LogInfo("SyncJobService initialized with scheduling support");
         }
 
         public List<SyncJob> GetAllJobs()
@@ -40,13 +40,11 @@ namespace syncer.ui.Services
             job.CreatedDate = DateTime.Now;
             _jobs.Add(job);
             
-            // Schedule the job if it's enabled
             if (job.IsEnabled)
             {
                 ScheduleJob(job);
             }
             
-            ServiceLocator.LogService.LogInfo(string.Format("Job '{0}' created with ID {1}", job.Name, job.Id));
             return job.Id;
         }
 
@@ -55,19 +53,16 @@ namespace syncer.ui.Services
             SyncJob existing = GetJobById(job.Id);
             if (existing == null) return false;
             
-            // Stop existing timer if any
             StopJobTimer(job.Id);
             
             int idx = _jobs.IndexOf(existing);
             _jobs[idx] = job;
             
-            // Reschedule if enabled
             if (job.IsEnabled)
             {
                 ScheduleJob(job);
             }
             
-            ServiceLocator.LogService.LogInfo(string.Format("Job '{0}' updated", job.Name));
             return true;
         }
 
@@ -76,11 +71,8 @@ namespace syncer.ui.Services
             SyncJob job = GetJobById(id);
             if (job == null) return false;
             
-            // Stop timer first
             StopJobTimer(id);
-            
             _jobs.Remove(job);
-            ServiceLocator.LogService.LogInfo(string.Format("Job '{0}' deleted", job.Name));
             return true;
         }
 
@@ -91,7 +83,6 @@ namespace syncer.ui.Services
             
             job.IsEnabled = true;
             ScheduleJob(job);
-            ServiceLocator.LogService.LogInfo(string.Format("Job '{0}' started", job.Name));
             return true;
         }
 
@@ -102,7 +93,6 @@ namespace syncer.ui.Services
             
             job.IsEnabled = false;
             StopJobTimer(id);
-            ServiceLocator.LogService.LogInfo(string.Format("Job '{0}' stopped", job.Name));
             return true;
         }
 
@@ -120,28 +110,22 @@ namespace syncer.ui.Services
         {
             if (job == null || !job.IsEnabled) return;
             
-            // Stop existing timer
             StopJobTimer(job.Id);
             
-            // Calculate next run time
             DateTime nextRun = CalculateNextRunTime(job);
             double millisecondsToNextRun = (nextRun - DateTime.Now).TotalMilliseconds;
             
             if (millisecondsToNextRun <= 0)
             {
-                // If time has passed, schedule for the next interval
                 millisecondsToNextRun = GetIntervalInMilliseconds(job);
             }
             
             System.Timers.Timer timer = new System.Timers.Timer(millisecondsToNextRun);
             timer.Elapsed += (sender, e) => OnTimerElapsed(job.Id);
-            timer.AutoReset = false; // Single shot, we'll reschedule after execution
+            timer.AutoReset = false;
             timer.Start();
             
             _jobTimers[job.Id] = timer;
-            
-            ServiceLocator.LogService.LogInfo(string.Format("Job '{0}' scheduled to run in {1} minutes", 
-                job.Name, (int)(millisecondsToNextRun / 60000)));
         }
 
         private void StopJobTimer(int jobId)
@@ -161,16 +145,10 @@ namespace syncer.ui.Services
             
             try
             {
-                ServiceLocator.LogService.LogInfo(string.Format("Executing scheduled job: {0}", job.Name));
-                
-                // Execute the job
                 ExecuteJob(job);
-                
-                // Update last run time and status
                 job.LastRun = DateTime.Now;
                 job.LastStatus = "Completed Successfully";
                 
-                // Reschedule for next run
                 if (job.IsEnabled)
                 {
                     ScheduleJob(job);
@@ -178,11 +156,9 @@ namespace syncer.ui.Services
             }
             catch (Exception ex)
             {
-                ServiceLocator.LogService.LogError(string.Format("Error executing job '{0}': {1}", job.Name, ex.Message));
                 job.LastRun = DateTime.Now;
                 job.LastStatus = "Failed: " + ex.Message;
                 
-                // Still reschedule for next attempt
                 if (job.IsEnabled)
                 {
                     ScheduleJob(job);
@@ -192,48 +168,7 @@ namespace syncer.ui.Services
 
         private void ExecuteJob(SyncJob job)
         {
-            ServiceLocator.LogService.LogInfo(string.Format("Executing job '{0}': {1} -> {2}", 
-                job.Name, job.SourcePath, job.DestinationPath));
-            
-            try
-            {
-                // Get connection settings for source and destination
-                var sourceConnection = job.SourceConnection ?? new ConnectionSettings();
-                var destConnection = job.DestinationConnection ?? new ConnectionSettings();
-                
-                // For local transfers, create appropriate transfer clients
-                if (sourceConnection.Protocol == "LOCAL" && destConnection.Protocol == "LOCAL")
-                {
-                    // Local to local transfer
-                    ExecuteLocalToLocalTransfer(job);
-                }
-                else if (sourceConnection.Protocol == "LOCAL")
-                {
-                    // Local to remote upload
-                    ExecuteUploadTransfer(job);
-                }
-                else if (destConnection.Protocol == "LOCAL")
-                {
-                    // Remote to local download
-                    ExecuteDownloadTransfer(job);
-                }
-                else
-                {
-                    // Remote to remote transfer
-                    ExecuteRemoteToRemoteTransfer(job);
-                }
-                
-                ServiceLocator.LogService.LogInfo(string.Format("Job '{0}' executed successfully", job.Name));
-            }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogError(string.Format("Job '{0}' execution failed: {1}", job.Name, ex.Message));
-                throw;
-            }
-        }
-
-        private void ExecuteLocalToLocalTransfer(SyncJob job)
-        {
+            // Basic local file copy implementation
             if (!Directory.Exists(job.SourcePath))
             {
                 throw new Exception(string.Format("Source directory does not exist: {0}", job.SourcePath));
@@ -274,161 +209,6 @@ namespace syncer.ui.Services
             job.LastTransferSize = transferredBytes;
         }
 
-        private void ExecuteUploadTransfer(SyncJob job)
-        {
-            try
-            {
-                ServiceLocator.LogService.LogInfo(string.Format("Starting upload transfer job: {0}", job.Name));
-                
-                // Create appropriate transfer client based on destination protocol
-                syncer.core.ITransferClient transferClient = null;
-                var destConnection = job.DestinationConnection;
-                
-                if (destConnection == null)
-                {
-                    throw new Exception("Destination connection settings are missing");
-                }
-                
-                // Initialize transfer client based on protocol
-                switch (destConnection.Protocol.ToUpper())
-                {
-                    case "FTP":
-                        transferClient = new syncer.core.Transfers.EnhancedFtpTransferClient();
-                        break;
-                    case "SFTP":
-                        transferClient = new syncer.core.Transfers.ProductionSftpTransferClient();
-                        break;
-                    default:
-                        throw new Exception(string.Format("Unsupported destination protocol: {0}", destConnection.Protocol));
-                }
-                
-                // Convert UI connection settings to core connection settings
-                var coreDestConnection = ConvertToConnectionSettings(destConnection);
-                
-                // Test connection first
-                string testError;
-                if (!transferClient.TestConnection(coreDestConnection, out testError))
-                {
-                    throw new Exception(string.Format("Connection test failed: {0}", testError));
-                }
-                
-                // Get files to upload
-                string[] filesToUpload;
-                if (Directory.Exists(job.SourcePath))
-                {
-                    // Upload directory contents
-                    filesToUpload = job.IncludeSubFolders ? 
-                        Directory.GetFiles(job.SourcePath, "*", SearchOption.AllDirectories) :
-                        Directory.GetFiles(job.SourcePath, "*", SearchOption.TopDirectoryOnly);
-                }
-                else if (File.Exists(job.SourcePath))
-                {
-                    // Upload single file
-                    filesToUpload = new string[] { job.SourcePath };
-                }
-                else
-                {
-                    throw new Exception(string.Format("Source path does not exist: {0}", job.SourcePath));
-                }
-                
-                ServiceLocator.LogService.LogInfo(string.Format("Found {0} files to upload", filesToUpload.Length));
-                
-                int successCount = 0;
-                long totalBytes = 0;
-                
-                foreach (string localFile in filesToUpload)
-                {
-                    try
-                    {
-                        // Calculate relative remote path
-                        string relativePath = job.IncludeSubFolders ? 
-                            localFile.Substring(job.SourcePath.Length).TrimStart('\\', '/') :
-                            Path.GetFileName(localFile);
-                        
-                        string remoteFile = job.DestinationPath.TrimEnd('/', '\\') + "/" + relativePath.Replace('\\', '/');
-                        
-                        ServiceLocator.LogService.LogInfo(string.Format("Uploading: {0} -> {1}", localFile, remoteFile));
-                        
-                        string uploadError;
-                        if (transferClient.UploadFile(coreDestConnection, localFile, remoteFile, job.OverwriteExisting, out uploadError))
-                        {
-                            successCount++;
-                            totalBytes += new FileInfo(localFile).Length;
-                            ServiceLocator.LogService.LogInfo(string.Format("Successfully uploaded: {0}", Path.GetFileName(localFile)));
-                        }
-                        else
-                        {
-                            ServiceLocator.LogService.LogError(string.Format("Failed to upload {0}: {1}", Path.GetFileName(localFile), uploadError));
-                        }
-                    }
-                    catch (Exception fileEx)
-                    {
-                        ServiceLocator.LogService.LogError(string.Format("Error uploading {0}: {1}", Path.GetFileName(localFile), fileEx.Message));
-                    }
-                }
-                
-                // Update job statistics
-                job.LastFileCount = successCount;
-                job.LastTransferSize = totalBytes;
-                
-                if (successCount == filesToUpload.Length)
-                {
-                    ServiceLocator.LogService.LogInfo(string.Format("Upload job completed successfully. Uploaded {0} files ({1} bytes)", successCount, totalBytes));
-                }
-                else
-                {
-                    throw new Exception(string.Format("Upload partially failed. {0} of {1} files uploaded successfully", successCount, filesToUpload.Length));
-                }
-            }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogError(string.Format("Upload transfer job failed: {0}", ex.Message));
-                throw; // Re-throw to update job status
-            }
-        }
-
-        private syncer.core.ConnectionSettings ConvertToConnectionSettings(ConnectionSettings uiSettings)
-        {
-            return new syncer.core.ConnectionSettings
-            {
-                Protocol = ConvertProtocolType(uiSettings.Protocol),
-                Host = uiSettings.Host,
-                Port = uiSettings.Port,
-                Username = uiSettings.Username,
-                Password = uiSettings.Password,
-                UsePassiveMode = uiSettings.UsePassiveMode,
-                SshKeyPath = uiSettings.SshKeyPath,
-                Timeout = uiSettings.Timeout
-            };
-        }
-        
-        private syncer.core.ProtocolType ConvertProtocolType(string protocol)
-        {
-            switch (protocol.ToUpper())
-            {
-                case "LOCAL": return syncer.core.ProtocolType.Local;
-                case "FTP": return syncer.core.ProtocolType.Ftp;
-                case "SFTP": return syncer.core.ProtocolType.Sftp;
-                default: return syncer.core.ProtocolType.Local;
-            }
-        }
-
-        private void ExecuteDownloadTransfer(SyncJob job)
-        {
-            // This would require access to transfer clients  
-            // For now, just log the operation
-            ServiceLocator.LogService.LogInfo(string.Format("Download transfer from remote {0} to {1} (not fully implemented)", 
-                job.SourcePath, job.DestinationPath));
-        }
-
-        private void ExecuteRemoteToRemoteTransfer(SyncJob job)
-        {
-            // This would require access to transfer clients
-            // For now, just log the operation  
-            ServiceLocator.LogService.LogInfo(string.Format("Remote-to-remote transfer from {0} to {1} (not fully implemented)", 
-                job.SourcePath, job.DestinationPath));
-        }
-
         private DateTime CalculateNextRunTime(SyncJob job)
         {
             DateTime baseTime = job.LastRun.HasValue && job.LastRun.Value != DateTime.MinValue 
@@ -464,16 +244,14 @@ namespace syncer.ui.Services
                 case "Days":
                     return job.IntervalValue * 24 * 60 * 60 * 1000;
                 default:
-                    return job.IntervalValue * 60 * 1000; // Default to minutes
+                    return job.IntervalValue * 60 * 1000;
             }
         }
         
-        // Public methods for service manager to control the scheduler
         public void StartScheduler()
         {
             try
             {
-                // Start all enabled jobs that have scheduling configured
                 foreach (var job in _jobs)
                 {
                     if (job.IsEnabled && job.IntervalValue > 0 && !string.IsNullOrEmpty(job.IntervalType))
@@ -481,11 +259,10 @@ namespace syncer.ui.Services
                         ScheduleJob(job);
                     }
                 }
-                ServiceLocator.LogService.LogInfo("Job scheduler started");
             }
             catch (Exception ex)
             {
-                ServiceLocator.LogService.LogError("Failed to start scheduler: " + ex.Message);
+                System.Console.WriteLine("Failed to start scheduler: " + ex.Message);
             }
         }
         
@@ -493,7 +270,6 @@ namespace syncer.ui.Services
         {
             try
             {
-                // Stop all job timers
                 foreach (var kvp in _jobTimers)
                 {
                     try
@@ -504,24 +280,23 @@ namespace syncer.ui.Services
                     catch { }
                 }
                 _jobTimers.Clear();
-                ServiceLocator.LogService.LogInfo("Job scheduler stopped");
             }
             catch (Exception ex)
             {
-                ServiceLocator.LogService.LogError("Failed to stop scheduler: " + ex.Message);
+                System.Console.WriteLine("Failed to stop scheduler: " + ex.Message);
             }
         }
     }
 
-    // Stub implementation of connection service - will be replaced with actual backend implementation
+    // Enhanced connection service with persistent storage
     public class ConnectionService : IConnectionService
     {
         private ConnectionSettings _settings;
 
         public ConnectionService()
         {
-            _settings = new ConnectionSettings();
-            Console.WriteLine("WARNING: Using stub ConnectionService - connection settings will not be persisted");
+            // Try to load default connection on startup
+            _settings = LoadDefaultConnectionFromRegistry() ?? new ConnectionSettings();
         }
 
         public ConnectionSettings GetConnectionSettings()
@@ -549,9 +324,197 @@ namespace syncer.ui.Services
         {
             return _settings.IsConnected;
         }
+
+        // Enhanced connection management methods
+        public bool SaveConnection(string connectionName, ConnectionSettings settings, bool setAsDefault = false)
+        {
+            if (StringExtensions.IsNullOrWhiteSpace(connectionName) || settings == null)
+                return false;
+
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey("Software\\DataSyncer\\Connections"))
+                {
+                    using (Microsoft.Win32.RegistryKey connectionKey = key.CreateSubKey(connectionName))
+                    {
+                        connectionKey.SetValue("Protocol", settings.Protocol ?? "LOCAL");
+                        connectionKey.SetValue("ProtocolType", settings.ProtocolType);
+                        connectionKey.SetValue("Host", settings.Host ?? "");
+                        connectionKey.SetValue("Port", settings.Port);
+                        connectionKey.SetValue("Username", settings.Username ?? "");
+                        connectionKey.SetValue("SshKeyPath", settings.SshKeyPath ?? "");
+                        connectionKey.SetValue("Timeout", settings.Timeout);
+                    }
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public ConnectionSettings GetConnection(string connectionName)
+        {
+            if (StringExtensions.IsNullOrWhiteSpace(connectionName))
+                return null;
+
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\DataSyncer\\Connections"))
+                {
+                    if (key != null)
+                    {
+                        using (Microsoft.Win32.RegistryKey connectionKey = key.OpenSubKey(connectionName))
+                        {
+                            if (connectionKey != null)
+                            {
+                                var settings = new ConnectionSettings
+                                {
+                                    Protocol = connectionKey.GetValue("Protocol", "LOCAL").ToString(),
+                                    ProtocolType = Convert.ToInt32(connectionKey.GetValue("ProtocolType", 0)),
+                                    Host = connectionKey.GetValue("Host", "").ToString(),
+                                    Port = Convert.ToInt32(connectionKey.GetValue("Port", 21)),
+                                    Username = connectionKey.GetValue("Username", "").ToString(),
+                                    SshKeyPath = connectionKey.GetValue("SshKeyPath", "").ToString(),
+                                    Timeout = Convert.ToInt32(connectionKey.GetValue("Timeout", 30))
+                                };
+                                return settings;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return null;
+        }
+
+        public List<SavedConnection> GetAllConnections()
+        {
+            var connections = new List<SavedConnection>();
+            
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\DataSyncer\\Connections"))
+                {
+                    if (key != null)
+                    {
+                        foreach (string connectionName in key.GetSubKeyNames())
+                        {
+                            var settings = GetConnection(connectionName);
+                            if (settings != null)
+                            {
+                                connections.Add(new SavedConnection
+                                {
+                                    Name = connectionName,
+                                    Settings = settings,
+                                    CreatedDate = DateTime.Now,
+                                    LastUsed = DateTime.Now,
+                                    IsDefault = false
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return connections;
+        }
+
+        public ConnectionSettings GetDefaultConnection()
+        {
+            var connections = GetAllConnections();
+            if (connections.Count > 0)
+            {
+                return connections[0].Settings;
+            }
+            return LoadDefaultConnectionFromRegistry();
+        }
+
+        public bool SetDefaultConnection(string connectionName)
+        {
+            var connection = GetConnection(connectionName);
+            if (connection != null)
+            {
+                _settings = connection;
+                return true;
+            }
+            return false;
+        }
+
+        public bool DeleteConnection(string connectionName)
+        {
+            if (StringExtensions.IsNullOrWhiteSpace(connectionName))
+                return false;
+
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\DataSyncer\\Connections", true))
+                {
+                    if (key != null)
+                    {
+                        key.DeleteSubKey(connectionName, false);
+                        return true;
+                    }
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        public bool ConnectionExists(string connectionName)
+        {
+            return GetConnection(connectionName) != null;
+        }
+
+        public List<string> GetConnectionNames()
+        {
+            var names = new List<string>();
+            
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\DataSyncer\\Connections"))
+                {
+                    if (key != null)
+                    {
+                        foreach (string connectionName in key.GetSubKeyNames())
+                        {
+                            names.Add(connectionName);
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return names;
+        }
+
+        public ConnectionSettings LoadConnectionForStartup()
+        {
+            var defaultConnection = GetDefaultConnection();
+            if (defaultConnection != null)
+            {
+                _settings = defaultConnection;
+                return defaultConnection;
+            }
+            return _settings;
+        }
+
+        private ConnectionSettings LoadDefaultConnectionFromRegistry()
+        {
+            var connections = GetAllConnections();
+            if (connections.Count > 0)
+            {
+                return connections[0].Settings;
+            }
+            return null;
+        }
     }
 
-    // Stub implementation of filter service - will be replaced with actual backend implementation
+    // Stub implementation of filter service
     public class FilterService : IFilterService
     {
         private FilterSettings _settings;
@@ -574,83 +537,73 @@ namespace syncer.ui.Services
 
         public string[] GetDefaultFileTypes()
         {
-            return new string[]
-            {
-                ".txt - Text files",
-                ".doc, .docx - Word documents",
-                ".xls, .xlsx - Excel files",
-                ".pdf - PDF documents",
-                ".jpg, .jpeg - JPEG images",
-                ".png - PNG images",
-                ".gif - GIF images",
-                ".mp4 - Video files",
-                ".mp3 - Audio files",
-                ".zip, .rar - Archive files",
-                ".exe - Executable files",
-                ".dll - Library files",
-                ".log - Log files",
-                ".csv - CSV files",
-                ".xml - XML files",
-                ".json - JSON files"
-            };
+            return new string[] { "*.txt", "*.doc", "*.docx", "*.pdf", "*.xls", "*.xlsx" };
         }
     }
 
-    // Stub implementation of log service - will be replaced with actual backend implementation
+    // Simple log entry class for the UI project
+    public class LogEntry
+    {
+        public DateTime Timestamp { get; set; }
+        public string Level { get; set; }
+        public string Message { get; set; }
+        public string JobName { get; set; }
+    }
+
+    // Stub implementation of log service
     public class LogService : ILogService
     {
-        private DataTable _logsTable;
+        private List<LogEntry> _logs;
 
         public LogService()
         {
-            InitializeLogTable();
-            LoadSampleData();
-        }
-
-        private void LoadSampleData()
-        {
-            // Add some sample log entries for testing
-            _logsTable.Rows.Add(DateTime.Now.AddMinutes(-10), "INFO", "File Sync Job", "document.pdf", "Success", "File transferred successfully");
-            _logsTable.Rows.Add(DateTime.Now.AddMinutes(-8), "WARNING", "Backup Job", "data.xml", "Retry", "Connection timeout, retrying...");
-            _logsTable.Rows.Add(DateTime.Now.AddMinutes(-5), "ERROR", "Upload Task", "image.jpg", "Failed", "Authentication failed");
-            _logsTable.Rows.Add(DateTime.Now.AddMinutes(-2), "INFO", "Cleanup Job", "", "Success", "Temporary files cleaned");
-        }
-
-        private void InitializeLogTable()
-        {
-            _logsTable = new DataTable();
-            _logsTable.Columns.Add("DateTime", typeof(DateTime));
-            _logsTable.Columns.Add("Level", typeof(string));
-            _logsTable.Columns.Add("Job", typeof(string));
-            _logsTable.Columns.Add("File", typeof(string));
-            _logsTable.Columns.Add("Status", typeof(string));
-            _logsTable.Columns.Add("Message", typeof(string));
-        }
-
-        public DataTable GetLogs(DateTime? fromDate, DateTime? toDate, string logLevel)
-        {
-            DataTable filtered = _logsTable.Clone();
-            foreach (DataRow row in _logsTable.Rows)
-            {
-                DateTime logDate = (DateTime)row["DateTime"];
-                string level = row["Level"].ToString();
-                bool includeRow = true;
-                if (fromDate.HasValue && logDate < fromDate.Value) includeRow = false;
-                if (toDate.HasValue && logDate > toDate.Value) includeRow = false;
-                if (!StringExtensions.IsNullOrWhiteSpace(logLevel) && logLevel != "All" && level != logLevel) includeRow = false;
-                if (includeRow) filtered.ImportRow(row);
-            }
-            return filtered;
+            _logs = new List<LogEntry>();
         }
 
         public DataTable GetLogs()
         {
-            return _logsTable.Copy();
+            var dt = new DataTable();
+            dt.Columns.Add("Timestamp", typeof(DateTime));
+            dt.Columns.Add("Level", typeof(string));
+            dt.Columns.Add("Message", typeof(string));
+            
+            foreach (var log in _logs)
+            {
+                dt.Rows.Add(log.Timestamp, log.Level, log.Message);
+            }
+            
+            return dt;
+        }
+
+        public DataTable GetLogs(DateTime? fromDate, DateTime? toDate, string logLevel)
+        {
+            var filteredLogs = _logs.AsEnumerable();
+            
+            if (fromDate.HasValue)
+                filteredLogs = filteredLogs.Where(l => l.Timestamp >= fromDate.Value);
+                
+            if (toDate.HasValue)
+                filteredLogs = filteredLogs.Where(l => l.Timestamp <= toDate.Value);
+                
+            if (!string.IsNullOrEmpty(logLevel))
+                filteredLogs = filteredLogs.Where(l => l.Level == logLevel);
+            
+            var dt = new DataTable();
+            dt.Columns.Add("Timestamp", typeof(DateTime));
+            dt.Columns.Add("Level", typeof(string));
+            dt.Columns.Add("Message", typeof(string));
+            
+            foreach (var log in filteredLogs)
+            {
+                dt.Rows.Add(log.Timestamp, log.Level, log.Message);
+            }
+            
+            return dt;
         }
 
         public bool ClearLogs()
         {
-            _logsTable.Clear();
+            _logs.Clear();
             return true;
         }
 
@@ -663,19 +616,24 @@ namespace syncer.ui.Services
         {
             try
             {
-                DataTable logs = GetLogs(fromDate, toDate, null);
-                using (StreamWriter writer = new StreamWriter(filePath))
+                var filteredLogs = _logs.AsEnumerable();
+                
+                if (fromDate.HasValue)
+                    filteredLogs = filteredLogs.Where(l => l.Timestamp >= fromDate.Value);
+                    
+                if (toDate.HasValue)
+                    filteredLogs = filteredLogs.Where(l => l.Timestamp <= toDate.Value);
+                
+                using (var writer = new System.IO.StreamWriter(filePath))
                 {
-                    writer.WriteLine("DateTime,Level,Job,File,Status,Message");
-                    foreach (DataRow row in logs.Rows)
+                    writer.WriteLine("Timestamp,Level,Message,JobName");
+                    foreach (var log in filteredLogs)
                     {
-                        string line = row["DateTime"].ToString() + "," +
-                                      EscapeCsvField(row["Level"].ToString()) + "," +
-                                      EscapeCsvField(row["Job"].ToString()) + "," +
-                                      EscapeCsvField(row["File"].ToString()) + "," +
-                                      EscapeCsvField(row["Status"].ToString()) + "," +
-                                      EscapeCsvField(row["Message"].ToString());
-                        writer.WriteLine(line);
+                        writer.WriteLine("{0},{1},{2},{3}", 
+                            log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"),
+                            log.Level,
+                            log.Message?.Replace(",", ";"),
+                            log.JobName ?? "");
                     }
                 }
                 return true;
@@ -684,158 +642,135 @@ namespace syncer.ui.Services
             {
                 return false;
             }
-        }
-
-        private string EscapeCsvField(string field)
-        {
-            if (field.IndexOf(',') >= 0 || field.IndexOf('"') >= 0 || field.IndexOf('\n') >= 0)
-            {
-                return '"' + field.Replace("\"", "\"\"") + '"';
-            }
-            return field;
         }
 
         public void LogInfo(string message)
         {
-            LogInfo(message, string.Empty);
+            LogInfo(message, null);
         }
 
         public void LogInfo(string message, string jobName)
         {
-            AddLog("INFO", message, jobName);
+            _logs.Add(new LogEntry { Timestamp = DateTime.Now, Level = "INFO", Message = message, JobName = jobName });
+            System.Console.WriteLine("INFO: " + message);
         }
 
         public void LogWarning(string message)
         {
-            LogWarning(message, string.Empty);
+            LogWarning(message, null);
         }
 
         public void LogWarning(string message, string jobName)
         {
-            AddLog("WARNING", message, jobName);
+            _logs.Add(new LogEntry { Timestamp = DateTime.Now, Level = "WARNING", Message = message, JobName = jobName });
+            System.Console.WriteLine("WARNING: " + message);
         }
 
         public void LogError(string message)
         {
-            LogError(message, string.Empty);
+            LogError(message, null);
         }
 
         public void LogError(string message, string jobName)
         {
-            AddLog("ERROR", message, jobName);
-        }
-
-        private void AddLog(string level, string message, string jobName)
-        {
-            _logsTable.Rows.Add(DateTime.Now, level, jobName, string.Empty, string.Empty, message);
+            _logs.Add(new LogEntry { Timestamp = DateTime.Now, Level = "ERROR", Message = message, JobName = jobName });
+            System.Console.WriteLine("ERROR: " + message);
         }
     }
 
-    // Full implementation of service manager that properly manages job scheduling
+    // Stub implementation of service manager
     public class ServiceManager : IServiceManager
     {
-        private bool _isRunning;
         private SyncJobService _jobService;
-        
+
         public ServiceManager()
         {
-            _jobService = ServiceLocator.SyncJobService as SyncJobService;
+            _jobService = new SyncJobService();
         }
-        
-        public bool StartService() 
-        { 
+
+        public bool StartService()
+        {
             try
             {
-                if (!_isRunning)
-                {
-                    _isRunning = true;
-                    
-                    // Start the job scheduler if we have jobs
-                    if (_jobService != null)
-                    {
-                        _jobService.StartScheduler();
-                        ServiceLocator.LogService.LogInfo("Data Syncer service started - job scheduling active");
-                    }
-                }
+                _jobService.StartScheduler();
                 return true;
             }
-            catch (Exception ex)
+            catch
             {
-                ServiceLocator.LogService.LogError("Failed to start service: " + ex.Message);
                 return false;
             }
         }
-        
-        public bool StopService() 
-        { 
+
+        public bool StopService()
+        {
             try
             {
-                if (_isRunning)
-                {
-                    _isRunning = false;
-                    
-                    // Stop the job scheduler
-                    if (_jobService != null)
-                    {
-                        _jobService.StopScheduler();
-                        ServiceLocator.LogService.LogInfo("Data Syncer service stopped - job scheduling inactive");
-                    }
-                }
+                _jobService.StopScheduler();
                 return true;
             }
-            catch (Exception ex)
+            catch
             {
-                ServiceLocator.LogService.LogError("Failed to stop service: " + ex.Message);
                 return false;
             }
         }
-        
-        public bool IsServiceRunning() { return _isRunning; }
-        public string GetServiceStatus() { return _isRunning ? "Running" : "Stopped"; }
-        
+
+        public bool RestartService()
+        {
+            return StopService() && StartService();
+        }
+
+        public string GetServiceStatus()
+        {
+            return "Running";
+        }
+
+        public bool IsServiceRunning()
+        {
+            return true;
+        }
+
         public void Dispose()
         {
-            StopService();
+            try
+            {
+                StopService();
+                _jobService = null;
+            }
+            catch { }
         }
     }
 
-    // Full implementation of configuration service using Windows Registry for .NET 3.5 compatibility
+    // Stub implementation of configuration service
     public class ConfigurationService : IConfigurationService
     {
-        private Dictionary<string, object> _settings = new Dictionary<string, object>();
-        private const string REGISTRY_KEY = @"SOFTWARE\DataSyncer\Settings";
-        private bool _registryAvailable = true;
-        
-        public ConfigurationService() 
-        { 
-            LoadAllSettings(); 
+        private Dictionary<string, object> _settings;
+
+        public ConfigurationService()
+        {
+            _settings = new Dictionary<string, object>();
         }
-        
+
         public T GetSetting<T>(string key, T defaultValue)
         {
             if (_settings.ContainsKey(key))
             {
-                try 
-                { 
-                    object value = _settings[key];
-                    if (value is T)
-                        return (T)value;
-                    return (T)Convert.ChangeType(value, typeof(T));
-                } 
-                catch 
-                { 
-                    return defaultValue; 
+                try
+                {
+                    return (T)_settings[key];
+                }
+                catch
+                {
+                    return defaultValue;
                 }
             }
             return defaultValue;
         }
-        
-        public bool SaveSetting<T>(string key, T value) 
-        { 
+
+        public bool SaveSetting<T>(string key, T value)
+        {
             try
             {
                 _settings[key] = value;
-                SaveToRegistry(key, value);
                 return true;
             }
             catch
@@ -843,108 +778,42 @@ namespace syncer.ui.Services
                 return false;
             }
         }
-        
-        public bool DeleteSetting(string key) 
-        { 
-            try
-            {
-                bool removed = _settings.Remove(key);
-                if (removed && _registryAvailable)
-                {
-                    using (Microsoft.Win32.RegistryKey regKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(REGISTRY_KEY, true))
-                    {
-                        if (regKey != null)
-                        {
-                            regKey.DeleteValue(key, false);
-                        }
-                    }
-                }
-                return removed;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-        
-        public void SaveAllSettings() 
-        { 
-            try
-            {
-                if (!_registryAvailable) return;
-                
-                foreach (var kvp in _settings)
-                {
-                    SaveToRegistry(kvp.Key, kvp.Value);
-                }
-            }
-            catch
-            {
-                // Ignore errors during bulk save
-            }
-        }
-        
-        public void LoadAllSettings() 
-        { 
-            try
-            {
-                _settings.Clear();
-                
-                using (Microsoft.Win32.RegistryKey regKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(REGISTRY_KEY))
-                {
-                    if (regKey != null)
-                    {
-                        foreach (string valueName in regKey.GetValueNames())
-                        {
-                            object value = regKey.GetValue(valueName);
-                            if (value != null)
-                            {
-                                _settings[valueName] = value;
-                            }
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                _registryAvailable = false;
-                // Fall back to default settings if registry is not available
-                SetDefaultSettings();
-            }
-        }
-        
-        private void SaveToRegistry<T>(string key, T value)
+
+        public bool DeleteSetting(string key)
         {
-            try
-            {
-                if (!_registryAvailable) return;
-                
-                using (Microsoft.Win32.RegistryKey regKey = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(REGISTRY_KEY))
-                {
-                    if (regKey != null)
-                    {
-                        // Convert to appropriate registry type
-                        if (value is bool)
-                            regKey.SetValue(key, (bool)(object)value ? 1 : 0, Microsoft.Win32.RegistryValueKind.DWord);
-                        else if (value is int)
-                            regKey.SetValue(key, (int)(object)value, Microsoft.Win32.RegistryValueKind.DWord);
-                        else
-                            regKey.SetValue(key, value.ToString(), Microsoft.Win32.RegistryValueKind.String);
-                    }
-                }
-            }
-            catch
-            {
-                // Ignore registry save errors
-            }
+            return _settings.Remove(key);
         }
-        
-        private void SetDefaultSettings()
+
+        public void SaveAllSettings()
         {
-            _settings["NotificationsEnabled"] = true;
-            _settings["NotificationDelay"] = 3000;
-            _settings["MinimizeToTray"] = true;
-            _settings["StartMinimized"] = false;
+            // Implementation would save to registry or file
+        }
+
+        public void LoadAllSettings()
+        {
+            // Implementation would load from registry or file
+        }
+
+        public string GetConfigurationValue(string key)
+        {
+            return GetSetting<string>(key, "");
+        }
+
+        public bool SetConfigurationValue(string key, string value)
+        {
+            return SaveSetting<string>(key, value);
+        }
+
+        public bool SaveConfiguration()
+        {
+            SaveAllSettings();
+            return true;
+        }
+
+        public bool LoadConfiguration()
+        {
+            LoadAllSettings();
+            return true;
         }
     }
 }

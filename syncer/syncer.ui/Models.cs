@@ -453,4 +453,40 @@ namespace syncer.ui
         public string TimeRemaining { get; set; }
         public string Status { get; set; }
     }
+
+    /// <summary>
+    /// Represents a saved connection with metadata
+    /// </summary>
+    public class SavedConnection
+    {
+        public string Name { get; set; }
+        public ConnectionSettings Settings { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public DateTime? LastUsed { get; set; }
+        public bool IsDefault { get; set; }
+        public string Description { get; set; }
+
+        public string DisplayName
+        {
+            get
+            {
+                if (IsDefault)
+                    return $"{Name} (Default)";
+                return Name;
+            }
+        }
+
+        public string ConnectionSummary
+        {
+            get
+            {
+                if (Settings == null) return "Invalid Connection";
+
+                if (Settings.IsLocalConnection)
+                    return "Local File System";
+
+                return $"{Settings.Protocol}://{Settings.Username}@{Settings.Host}:{Settings.Port}";
+            }
+        }
+    }
 }

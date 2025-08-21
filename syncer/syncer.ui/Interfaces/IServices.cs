@@ -28,6 +28,17 @@ namespace syncer.ui
         bool SaveConnectionSettings(ConnectionSettings settings);
         bool TestConnection(ConnectionSettings settings);
         bool IsConnected();
+        
+        // Enhanced connection management methods
+        bool SaveConnection(string connectionName, ConnectionSettings settings, bool setAsDefault = false);
+        ConnectionSettings GetConnection(string connectionName);
+        List<SavedConnection> GetAllConnections();
+        ConnectionSettings GetDefaultConnection();
+        bool SetDefaultConnection(string connectionName);
+        bool DeleteConnection(string connectionName);
+        bool ConnectionExists(string connectionName);
+        List<string> GetConnectionNames();
+        ConnectionSettings LoadConnectionForStartup();
     }
 
     /// <summary>
