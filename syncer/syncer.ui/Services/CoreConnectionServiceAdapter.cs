@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using syncer.core;
 
 namespace syncer.ui.Services
@@ -79,63 +78,5 @@ namespace syncer.ui.Services
             // For remote connections, actually test the connection
             return TestConnection(_settings);
         }
-
-        #region Enhanced Connection Management (Stub Implementation)
-
-        public bool SaveConnection(string connectionName, ConnectionSettings settings, bool setAsDefault = false)
-        {
-            // Stub implementation - actual implementation should use persistent storage
-            return SaveConnectionSettings(settings);
-        }
-
-        public ConnectionSettings GetConnection(string connectionName)
-        {
-            // Stub implementation - return current settings
-            return GetConnectionSettings();
-        }
-
-        public List<SavedConnection> GetAllConnections()
-        {
-            // Stub implementation - return empty list
-            return new List<SavedConnection>();
-        }
-
-        public ConnectionSettings GetDefaultConnection()
-        {
-            // Stub implementation - return current settings
-            return GetConnectionSettings();
-        }
-
-        public bool SetDefaultConnection(string connectionName)
-        {
-            // Stub implementation
-            return true;
-        }
-
-        public bool DeleteConnection(string connectionName)
-        {
-            // Stub implementation
-            return true;
-        }
-
-        public bool ConnectionExists(string connectionName)
-        {
-            // Stub implementation
-            return false;
-        }
-
-        public List<string> GetConnectionNames()
-        {
-            // Stub implementation - return empty list
-            return new List<string>();
-        }
-
-        public ConnectionSettings LoadConnectionForStartup()
-        {
-            // Stub implementation - return current settings
-            return GetConnectionSettings();
-        }
-
-        #endregion
     }
 }

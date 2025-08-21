@@ -41,82 +41,11 @@ namespace syncer.ui
                 _jobService = ServiceLocator.SyncJobService;
                 _serviceManager = ServiceLocator.ServiceManager;
                 _connectionService = ServiceLocator.ConnectionService;
-                
-                // Try to auto-load default connection on application startup
-                AutoLoadDefaultConnection();
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Failed to initialize services: " + ex.Message + "\n\nSome functionality may be limited.",
                     "Service Initialization Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
-
-        private void AutoLoadDefaultConnection()
-        {
-            try
-            {
-                var currentSettings = _connectionService.GetConnectionSettings();
-                
-                // If current settings are just the default local connection, try to load a saved one
-                if (currentSettings != null && currentSettings.IsLocalConnection && 
-                    StringExtensions.IsNullOrWhiteSpace(currentSettings.Host))
-                {
-                    // Try to load default connection from saved connections
-                    var defaultConnection = FormConnection.LoadDefaultConnectionFromRegistry();
-                    if (defaultConnection != null)
-                    {
-                        _connectionService.SaveConnectionSettings(defaultConnection);
-                        
-                        // Log successful auto-load
-                        ServiceLocator.LogService?.LogInfo("Default connection auto-loaded on application startup");
-                        
-                        // Update status to show connection is loaded
-                        UpdateConnectionStatus(true);
-                    }
-                }
-                else if (currentSettings != null && !currentSettings.IsLocalConnection)
-                {
-                    // We already have a connection loaded, just update the status
-                    UpdateConnectionStatus(true);
-                }
-            }
-            catch (Exception ex)
-            {
-                // Don't show error to user, just log it
-                ServiceLocator.LogService?.LogWarning($"Failed to auto-load default connection: {ex.Message}");
-            }
-        }
-
-        private void UpdateConnectionStatus(bool isConnected)
-        {
-            try
-            {
-                if (lblConnectionStatus != null)
-                {
-                    if (isConnected)
-                    {
-                        var settings = _connectionService.GetConnectionSettings();
-                        if (settings != null)
-                        {
-                            string connectionInfo = settings.IsLocalConnection ? 
-                                "Local File System" : 
-                                $"{settings.Protocol}://{settings.Host}:{settings.Port}";
-                            
-                            lblConnectionStatus.Text = $"Connection: {connectionInfo}";
-                            lblConnectionStatus.ForeColor = Color.DarkGreen;
-                        }
-                    }
-                    else
-                    {
-                        lblConnectionStatus.Text = "Connection: Not configured";
-                        lblConnectionStatus.ForeColor = Color.DarkRed;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService?.LogWarning($"Failed to update connection status: {ex.Message}");
             }
         }
         
@@ -263,15 +192,13 @@ namespace syncer.ui
         {
             try
             {
-                // TODO: Implement connection manager form
-                MessageBox.Show("Connection Manager feature is coming soon!\n\nFor now, use the Connection Settings menu to save and load connections.", 
-                    "Feature Coming Soon", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                
-                // Alternative: Open connection settings dialog
-                connectionSettingsToolStripMenuItem_Click(sender, e);
-                
-                // Update connection status after using connection manager
-                UpdateConnectionStatus();
+                using (var connectionManager = new FormConnectionManager())
+                {
+                    connectionManager.ShowDialog(this);
+                    
+                    // Update connection status after using connection manager
+                    UpdateConnectionStatus();
+                }
             }
             catch (Exception ex)
             {

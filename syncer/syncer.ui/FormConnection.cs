@@ -1,12 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
 using System.Windows.Forms;
 using syncer.core;
 using syncer.core.Transfers;
-using syncer.ui.Services;
-using System.Linq;
 using syncer.ui.Forms;
 
 namespace syncer.ui
@@ -27,17 +23,6 @@ namespace syncer.ui
         {
             _connectionService = ServiceLocator.ConnectionService;
             _currentSettings = _connectionService.GetConnectionSettings();
-            
-            // Try to auto-load a default connection if current settings are empty/default
-            if (_currentSettings != null && _currentSettings.IsLocalConnection && StringExtensions.IsNullOrWhiteSpace(_currentSettings.Host))
-            {
-                var defaultConnection = LoadDefaultConnectionFromRegistry();
-                if (defaultConnection != null)
-                {
-                    _currentSettings = defaultConnection;
-                    _connectionService.SaveConnectionSettings(_currentSettings);
-                }
-            }
         }
 
         private void InitializeCustomComponents()
@@ -954,13 +939,13 @@ namespace syncer.ui
             try
             {
                 // Use the existing connection service to save
+                // For now, we'll save as the current connection
+                // In a full implementation, you'd want a connection manager that stores multiple connections
+                
                 _connectionService.SaveConnectionSettings(settings);
                 
                 // Also save to a dedicated connections file/registry for multiple connections
                 SaveToConnectionsRegistry(connectionName, settings);
-                
-                // Additionally, save to JSON file for persistence
-                SaveConnectionToJsonFile(connectionName, settings);
                 
                 return true;
             }
@@ -969,152 +954,6 @@ namespace syncer.ui
                 ServiceLocator.LogService.LogError(string.Format("Failed to save connection: {0}", ex.Message));
                 return false;
             }
-        }
-
-        private void SaveConnectionToJsonFile(string connectionName, ConnectionSettings settings)
-        {
-            try
-            {
-                // For now, just log that we're saving the connection
-                // The registry method in SaveToConnectionsRegistry handles the actual persistence
-                ServiceLocator.LogService.LogInfo(string.Format("Connection '{0}' saved successfully. Will be available on next restart.", connectionName));
-            }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogWarning(string.Format("Failed to save connection metadata: {0}", ex.Message));
-            }
-        }
-
-        /// <summary>
-        /// Load saved connections from registry and populate a connection selector
-        /// </summary>
-        private void LoadSavedConnectionsFromRegistry()
-        {
-            try
-            {
-                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\DataSyncer\\Connections"))
-                {
-                    if (key != null)
-                    {
-                        foreach (string connectionName in key.GetSubKeyNames())
-                        {
-                            try
-                            {
-                                using (Microsoft.Win32.RegistryKey connectionKey = key.OpenSubKey(connectionName))
-                                {
-                                    if (connectionKey != null)
-                                    {
-                                        // This demonstrates that we can load connections
-                                        // In a full UI implementation, you'd populate a dropdown or list
-                                        ServiceLocator.LogService.LogInfo(string.Format("Found saved connection: {0}", connectionName));
-                                    }
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                ServiceLocator.LogService.LogWarning(string.Format("Failed to load connection '{0}': {1}", connectionName, ex.Message));
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogWarning(string.Format("Failed to load saved connections: {0}", ex.Message));
-            }
-        }
-
-        /// <summary>
-        /// Load a specific connection from registry by name
-        /// </summary>
-        public static ConnectionSettings LoadConnectionFromRegistry(string connectionName)
-        {
-            if (StringExtensions.IsNullOrWhiteSpace(connectionName))
-                return null;
-
-            try
-            {
-                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\DataSyncer\\Connections"))
-                {
-                    if (key != null)
-                    {
-                        using (Microsoft.Win32.RegistryKey connectionKey = key.OpenSubKey(connectionName))
-                        {
-                            if (connectionKey != null)
-                            {
-                                var settings = new ConnectionSettings
-                                {
-                                    Protocol = connectionKey.GetValue("Protocol", "LOCAL").ToString(),
-                                    ProtocolType = Convert.ToInt32(connectionKey.GetValue("ProtocolType", 0)),
-                                    Host = connectionKey.GetValue("Host", "").ToString(),
-                                    Port = Convert.ToInt32(connectionKey.GetValue("Port", 21)),
-                                    Username = connectionKey.GetValue("Username", "").ToString(),
-                                    SshKeyPath = connectionKey.GetValue("SshKeyPath", "").ToString(),
-                                    Timeout = Convert.ToInt32(connectionKey.GetValue("Timeout", 30))
-                                };
-
-                                return settings;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Log error if possible but don't crash
-                try
-                {
-                    ServiceLocator.LogService?.LogError(string.Format("Failed to load connection '{0}' from registry: {1}", connectionName, ex.Message));
-                }
-                catch { }
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Load the most recently saved connection (for auto-load on startup)
-        /// </summary>
-        public static ConnectionSettings LoadDefaultConnectionFromRegistry()
-        {
-            try
-            {
-                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\DataSyncer\\Connections"))
-                {
-                    if (key != null)
-                    {
-                        string[] connectionNames = key.GetSubKeyNames();
-                        if (connectionNames.Length > 0)
-                        {
-                            // For now, load the first available connection
-                            // In a more advanced implementation, you'd track which one was marked as default
-                            string firstConnectionName = connectionNames[0];
-                            var connection = LoadConnectionFromRegistry(firstConnectionName);
-                            
-                            if (connection != null)
-                            {
-                                try
-                                {
-                                    ServiceLocator.LogService?.LogInfo(string.Format("Auto-loaded connection '{0}' on startup", firstConnectionName));
-                                }
-                                catch { }
-                                
-                                return connection;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                try
-                {
-                    ServiceLocator.LogService?.LogWarning(string.Format("Failed to auto-load default connection: {0}", ex.Message));
-                }
-                catch { }
-            }
-
-            return null;
         }
 
         private void SaveToConnectionsRegistry(string connectionName, ConnectionSettings settings)
@@ -1173,61 +1012,25 @@ namespace syncer.ui
         {
             try
             {
-                // TODO: Replace with connection selector dialog when FormConnectionManager is ready
-                var connectionNames = _connectionService.GetConnectionNames();
+                string selectedConnection = FormConnectionManager.ShowConnectionSelector(this);
                 
-                if (connectionNames.Count == 0)
+                if (!string.IsNullOrEmpty(selectedConnection))
                 {
-                    MessageBox.Show("No saved connections found. Create and save a connection first.", 
-                        "No Connections", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
-
-                // Simple list selection for now
-                string selectedConnection = null;
-                using (var inputDialog = new Form())
-                {
-                    inputDialog.Text = "Select Connection";
-                    inputDialog.Size = new Size(350, 200);
-                    inputDialog.StartPosition = FormStartPosition.CenterParent;
-                    
-                    var listBox = new ListBox();
-                    listBox.Location = new Point(10, 10);
-                    listBox.Size = new Size(310, 100);
-                    foreach (var name in connectionNames)
-                        listBox.Items.Add(name);
-                    
-                    var btnOK = new Button { Text = "Load", Location = new Point(200, 120), Size = new Size(60, 23) };
-                    var btnCancel = new Button { Text = "Cancel", Location = new Point(270, 120), Size = new Size(60, 23) };
-                    
-                    btnOK.Click += (s, evt) => { 
-                        if (listBox.SelectedItem != null) {
-                            selectedConnection = listBox.SelectedItem.ToString();
-                            inputDialog.DialogResult = DialogResult.OK;
-                        }
-                    };
-                    btnCancel.Click += (s, evt) => inputDialog.DialogResult = DialogResult.Cancel;
-                    
-                    inputDialog.Controls.AddRange(new Control[] { listBox, btnOK, btnCancel });
-                    
-                    if (inputDialog.ShowDialog() == DialogResult.OK && selectedConnection != null)
+                    var connectionSettings = _connectionService.GetConnection(selectedConnection);
+                    if (connectionSettings != null)
                     {
-                        var connectionSettings = _connectionService.GetConnection(selectedConnection);
-                        if (connectionSettings != null)
-                        {
-                            _currentSettings = connectionSettings;
-                            LoadSettings();
+                        _currentSettings = connectionSettings;
+                        LoadSettings();
+                        
+                        MessageBox.Show($"Connection '{selectedConnection}' loaded successfully!", 
+                            "Connection Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
                             
-                            MessageBox.Show($"Connection '{selectedConnection}' loaded successfully!", 
-                                "Connection Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                                
-                            ServiceLocator.LogService?.LogInfo($"Connection '{selectedConnection}' loaded by user");
-                        }
-                        else
-                        {
-                            MessageBox.Show($"Failed to load connection '{selectedConnection}'.", 
-                                "Load Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
+                        ServiceLocator.LogService?.LogInfo($"Connection '{selectedConnection}' loaded by user");
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Failed to load connection '{selectedConnection}'.", 
+                            "Load Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -1243,34 +1046,16 @@ namespace syncer.ui
         {
             try
             {
-                // TODO: Implement full connection manager when ready
-                var connectionNames = _connectionService.GetAllConnections();
-                
-                var message = $"Saved Connections ({connectionNames.Count}):\n\n";
-                if (connectionNames.Count == 0)
+                using (var connectionManager = new FormConnectionManager())
                 {
-                    message += "No connections saved yet.\n\nUse 'Save Connection' after testing a connection to save it for later use.";
+                    connectionManager.ShowDialog(this);
                 }
-                else
-                {
-                    foreach (var conn in connectionNames.Take(10))
-                    {
-                        message += $"• {conn.DisplayName} - {conn.ConnectionSummary}\n";
-                    }
-                    
-                    if (connectionNames.Count > 10)
-                        message += $"... and {connectionNames.Count - 10} more\n";
-                        
-                    message += "\nFull connection management will be available in a future update.";
-                }
-                
-                MessageBox.Show(message, "Connection Manager", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error accessing connection manager: {ex.Message}", 
+                MessageBox.Show($"Error opening connection manager: {ex.Message}", 
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService?.LogError($"Error accessing connection manager: {ex.Message}");
+                ServiceLocator.LogService?.LogError($"Error opening connection manager: {ex.Message}");
             }
         }
 
