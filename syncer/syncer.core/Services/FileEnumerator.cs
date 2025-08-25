@@ -17,6 +17,20 @@ namespace syncer.core
                     return results;
                 }
 
+                // Debug logging
+                if (filters != null && filters.FileExtensions != null && filters.FileExtensions.Count > 0)
+                {
+                    Console.WriteLine("FileEnumerator: Filtering enabled with " + filters.FileExtensions.Count + " extensions");
+                    foreach (var ext in filters.FileExtensions)
+                    {
+                        Console.WriteLine("FileEnumerator: Allowed extension: " + ext);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("FileEnumerator: No file extension filters active");
+                }
+
                 // If the filter settings have include or exclude patterns, use the pattern-based enumeration
                 if (filters != null && (!string.IsNullOrEmpty(filters.IncludePattern) || !string.IsNullOrEmpty(filters.ExcludePattern)))
                 {
@@ -32,14 +46,20 @@ namespace syncer.core
                     : SearchOption.TopDirectoryOnly;
 
                 string[] files = Directory.GetFiles(rootPath, "*", searchOption);
+                Console.WriteLine("FileEnumerator: Found " + files.Length + " total files before filtering");
 
                 foreach (string filePath in files)
                 {
                     try
                     {
-                        if (ShouldIncludeFile(filePath, filters))
+                        bool shouldInclude = ShouldIncludeFile(filePath, filters);
+                        if (shouldInclude)
                         {
                             results.Add(filePath);
+                        }
+                        else
+                        {
+                            Console.WriteLine("FileEnumerator: Excluded file: " + Path.GetFileName(filePath));
                         }
                     }
                     catch (Exception)
@@ -47,6 +67,8 @@ namespace syncer.core
                         // Log individual file errors but continue processing
                     }
                 }
+                
+                Console.WriteLine("FileEnumerator: Included " + results.Count + " files after filtering");
             }
             catch (Exception)
             {

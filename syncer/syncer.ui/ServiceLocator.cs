@@ -37,7 +37,19 @@ namespace syncer.ui
                 
                 // Create real service implementations using adapters
                 _syncJobService = new Services.CoreSyncJobServiceAdapter();
-                _connectionService = new Services.EnhancedConnectionService();
+                
+                // Try to create CoreConnectionServiceAdapter, fallback to stub if it fails
+                try
+                {
+                    _connectionService = new Services.CoreConnectionServiceAdapter();
+                    _logService.LogInfo("CoreConnectionServiceAdapter initialized successfully", "UI");
+                }
+                catch (Exception connEx)
+                {
+                    _logService.LogError("Failed to initialize CoreConnectionServiceAdapter: " + connEx.Message, "UI");
+                    _connectionService = new ConnectionService();
+                    _logService.LogInfo("Using stub ConnectionService instead", "UI");
+                }
                 
                 // Keep using UI implementations for these services for now
                 _filterService = new FilterService();

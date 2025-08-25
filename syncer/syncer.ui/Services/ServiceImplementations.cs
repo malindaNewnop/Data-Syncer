@@ -4,6 +4,7 @@ using System.Data;
 using System.IO;
 using System.Timers;
 using System.Threading;
+using System.Text.RegularExpressions;
 
 namespace syncer.ui.Services
 {
@@ -244,34 +245,176 @@ namespace syncer.ui.Services
                 Directory.CreateDirectory(job.DestinationPath);
             }
 
-            string[] files = Directory.GetFiles(job.SourcePath, "*", 
-                job.IncludeSubFolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
-
-            int transferredFiles = 0;
-            long transferredBytes = 0;
-
-            foreach (string sourceFile in files)
+            // Apply current filter settings to the job before execution
+            var filterService = ServiceLocator.FilterService;
+            if (filterService != null)
             {
-                string relativePath = Path.GetFullPath(sourceFile).Substring(Path.GetFullPath(job.SourcePath).Length + 1);
-                string destFile = Path.Combine(job.DestinationPath, relativePath);
-                
-                string destDir = Path.GetDirectoryName(destFile);
-                if (!Directory.Exists(destDir))
+                var currentFilters = filterService.GetFilterSettings();
+                if (currentFilters != null)
                 {
-                    Directory.CreateDirectory(destDir);
-                }
-
-                if (!File.Exists(destFile) || job.OverwriteExisting)
-                {
-                    File.Copy(sourceFile, destFile, job.OverwriteExisting);
-                    FileInfo fileInfo = new FileInfo(sourceFile);
-                    transferredBytes += fileInfo.Length;
-                    transferredFiles++;
+                    job.FilterSettings = currentFilters;
+                    Console.WriteLine("Applied filter settings to job execution - Enabled: " + currentFilters.FiltersEnabled + ", FileTypes: " + (currentFilters.AllowedFileTypes != null ? currentFilters.AllowedFileTypes.Length : 0));
                 }
             }
 
-            job.LastFileCount = transferredFiles;
-            job.LastTransferSize = transferredBytes;
+            // Get files with filtering applied
+            List<string> files = GetFilteredFiles(job.SourcePath, job.FilterSettings, job.IncludeSubFolders);
+            Console.WriteLine("Found " + files.Count + " files after applying filters");
+
+            foreach (string sourceFile in files)
+            {
+                try
+                {
+                    string relativePath = sourceFile.Substring(job.SourcePath.Length + 1);
+                    string destFile = Path.Combine(job.DestinationPath, relativePath);
+                    
+                    string destDir = Path.GetDirectoryName(destFile);
+                    if (!Directory.Exists(destDir))
+                    {
+                        Directory.CreateDirectory(destDir);
+                    }
+
+                    if (job.OverwriteExisting || !File.Exists(destFile))
+                    {
+                        File.Copy(sourceFile, destFile, true);
+                        ServiceLocator.LogService.LogInfo(string.Format("Copied: {0} -> {1}", sourceFile, destFile));
+                    }
+                    else
+                    {
+                        ServiceLocator.LogService.LogInfo(string.Format("Skipped (exists): {0}", destFile));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ServiceLocator.LogService.LogError(string.Format("Failed to copy file {0}: {1}", sourceFile, ex.Message));
+                }
+            }
+        }
+
+        private List<string> GetFilteredFiles(string sourcePath, FilterSettings filterSettings, bool includeSubFolders)
+        {
+            var allFiles = Directory.GetFiles(sourcePath, "*", 
+                includeSubFolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+            
+            var filteredFiles = new List<string>();
+            
+            // If filters are disabled, return all files
+            if (filterSettings == null || !filterSettings.FiltersEnabled)
+            {
+                Console.WriteLine("Filters disabled, returning all " + allFiles.Length + " files");
+                filteredFiles.AddRange(allFiles);
+                return filteredFiles;
+            }
+            
+            Console.WriteLine("Applying filters to " + allFiles.Length + " files");
+            
+            foreach (string file in allFiles)
+            {
+                if (ShouldIncludeFile(file, filterSettings))
+                {
+                    filteredFiles.Add(file);
+                }
+                else
+                {
+                    Console.WriteLine("Excluded file: " + Path.GetFileName(file));
+                }
+            }
+            
+            return filteredFiles;
+        }
+
+        private bool ShouldIncludeFile(string filePath, FilterSettings filterSettings)
+        {
+            if (filterSettings == null || !filterSettings.FiltersEnabled)
+                return true;
+            
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+                
+                // Check file attributes
+                if (!filterSettings.IncludeHiddenFiles && (fileInfo.Attributes & FileAttributes.Hidden) != 0)
+                    return false;
+                
+                if (!filterSettings.IncludeSystemFiles && (fileInfo.Attributes & FileAttributes.System) != 0)
+                    return false;
+                
+                if (!filterSettings.IncludeReadOnlyFiles && (fileInfo.Attributes & FileAttributes.ReadOnly) != 0)
+                    return false;
+                
+                // Check file size (convert MB to bytes)
+                long fileSizeBytes = fileInfo.Length;
+                long minSizeBytes = (long)(filterSettings.MinFileSize * 1024 * 1024);
+                long maxSizeBytes = (long)(filterSettings.MaxFileSize * 1024 * 1024);
+                
+                if (minSizeBytes > 0 && fileSizeBytes < minSizeBytes)
+                    return false;
+                
+                if (maxSizeBytes > 0 && fileSizeBytes > maxSizeBytes)
+                    return false;
+                
+                // Check file extensions
+                if (filterSettings.AllowedFileTypes != null && filterSettings.AllowedFileTypes.Length > 0)
+                {
+                    string fileExtension = fileInfo.Extension;
+                    bool matchesExtension = false;
+                    
+                    foreach (string allowedType in filterSettings.AllowedFileTypes)
+                    {
+                        // Extract extension from format like ".txt - Text files"
+                        string allowedExt = allowedType.Split(' ')[0].Trim();
+                        if (string.Equals(fileExtension, allowedExt, StringComparison.OrdinalIgnoreCase))
+                        {
+                            matchesExtension = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!matchesExtension)
+                    {
+                        Console.WriteLine("File " + Path.GetFileName(filePath) + " extension " + fileExtension + " not in allowed types");
+                        return false;
+                    }
+                }
+                
+                // Check exclude patterns
+                if (!string.IsNullOrEmpty(filterSettings.ExcludePatterns))
+                {
+                    string fileName = fileInfo.Name;
+                    string[] patterns = filterSettings.ExcludePatterns.Split(',', ';');
+                    
+                    foreach (string pattern in patterns)
+                    {
+                        string trimmedPattern = pattern.Trim();
+                        if (!string.IsNullOrEmpty(trimmedPattern))
+                        {
+                            // Simple wildcard matching
+                            if (trimmedPattern.Contains("*"))
+                            {
+                                // Convert to regex pattern
+                                string regexPattern = trimmedPattern.Replace("*", ".*");
+                                if (Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase))
+                                {
+                                    Console.WriteLine("File " + fileName + " matched exclude pattern: " + trimmedPattern);
+                                    return false;
+                                }
+                            }
+                            else if (fileName.IndexOf(trimmedPattern, StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                Console.WriteLine("File " + fileName + " matched exclude pattern: " + trimmedPattern);
+                                return false;
+                            }
+                        }
+                    }
+                }
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error checking file " + filePath + ": " + ex.Message);
+                return false; // Exclude files that can't be analyzed
+            }
         }
 
         private void ExecuteUploadTransfer(SyncJob job)
@@ -312,24 +455,43 @@ namespace syncer.ui.Services
                     throw new Exception(string.Format("Connection test failed: {0}", testError));
                 }
                 
-                // Get files to upload
-                string[] filesToUpload;
+                // Apply current filter settings to the job before execution
+                var filterService = ServiceLocator.FilterService;
+                if (filterService != null)
+                {
+                    var currentFilters = filterService.GetFilterSettings();
+                    if (currentFilters != null)
+                    {
+                        job.FilterSettings = currentFilters;
+                        Console.WriteLine("Applied filter settings to upload job - Enabled: " + currentFilters.FiltersEnabled + ", FileTypes: " + (currentFilters.AllowedFileTypes != null ? currentFilters.AllowedFileTypes.Length : 0));
+                    }
+                }
+
+                // Get files to upload with filtering applied
+                List<string> filesToUploadList;
                 if (Directory.Exists(job.SourcePath))
                 {
-                    // Upload directory contents
-                    filesToUpload = job.IncludeSubFolders ? 
-                        Directory.GetFiles(job.SourcePath, "*", SearchOption.AllDirectories) :
-                        Directory.GetFiles(job.SourcePath, "*", SearchOption.TopDirectoryOnly);
+                    // Upload directory contents with filtering
+                    filesToUploadList = GetFilteredFiles(job.SourcePath, job.FilterSettings, job.IncludeSubFolders);
                 }
                 else if (File.Exists(job.SourcePath))
                 {
-                    // Upload single file
-                    filesToUpload = new string[] { job.SourcePath };
+                    // Upload single file (check if it passes filter)
+                    if (ShouldIncludeFile(job.SourcePath, job.FilterSettings))
+                    {
+                        filesToUploadList = new List<string> { job.SourcePath };
+                    }
+                    else
+                    {
+                        throw new Exception("Source file does not match current filter settings");
+                    }
                 }
                 else
                 {
                     throw new Exception(string.Format("Source path does not exist: {0}", job.SourcePath));
                 }
+                
+                string[] filesToUpload = filesToUploadList.ToArray();
                 
                 ServiceLocator.LogService.LogInfo(string.Format("Found {0} files to upload", filesToUpload.Length));
                 
@@ -513,15 +675,15 @@ namespace syncer.ui.Services
         }
     }
 
-    // Stub implementation of connection service - will be replaced with actual backend implementation
+    // Enhanced connection service with persistent storage
     public class ConnectionService : IConnectionService
     {
         private ConnectionSettings _settings;
 
         public ConnectionService()
         {
-            _settings = new ConnectionSettings();
-            Console.WriteLine("WARNING: Using stub ConnectionService - connection settings will not be persisted");
+            // Try to load default connection on startup
+            _settings = LoadDefaultConnectionFromRegistry() ?? new ConnectionSettings();
         }
 
         public ConnectionSettings GetConnectionSettings()
@@ -549,16 +711,321 @@ namespace syncer.ui.Services
         {
             return _settings.IsConnected;
         }
+
+        // Enhanced connection management methods
+        public bool SaveConnection(string connectionName, ConnectionSettings settings, bool setAsDefault = false)
+        {
+            if (StringExtensions.IsNullOrWhiteSpace(connectionName) || settings == null)
+                return false;
+
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey("Software\\DataSyncer\\Connections"))
+                {
+                    using (Microsoft.Win32.RegistryKey connectionKey = key.CreateSubKey(connectionName))
+                    {
+                        connectionKey.SetValue("Protocol", settings.Protocol ?? "LOCAL");
+                        connectionKey.SetValue("ProtocolType", settings.ProtocolType);
+                        connectionKey.SetValue("Host", settings.Host ?? "");
+                        connectionKey.SetValue("Port", settings.Port);
+                        connectionKey.SetValue("Username", settings.Username ?? "");
+                        connectionKey.SetValue("SshKeyPath", settings.SshKeyPath ?? "");
+                        connectionKey.SetValue("Timeout", settings.Timeout);
+                    }
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public ConnectionSettings GetConnection(string connectionName)
+        {
+            if (StringExtensions.IsNullOrWhiteSpace(connectionName))
+                return null;
+
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\DataSyncer\\Connections"))
+                {
+                    if (key != null)
+                    {
+                        using (Microsoft.Win32.RegistryKey connectionKey = key.OpenSubKey(connectionName))
+                        {
+                            if (connectionKey != null)
+                            {
+                                var settings = new ConnectionSettings
+                                {
+                                    Protocol = connectionKey.GetValue("Protocol", "LOCAL").ToString(),
+                                    ProtocolType = Convert.ToInt32(connectionKey.GetValue("ProtocolType", 0)),
+                                    Host = connectionKey.GetValue("Host", "").ToString(),
+                                    Port = Convert.ToInt32(connectionKey.GetValue("Port", 21)),
+                                    Username = connectionKey.GetValue("Username", "").ToString(),
+                                    SshKeyPath = connectionKey.GetValue("SshKeyPath", "").ToString(),
+                                    Timeout = Convert.ToInt32(connectionKey.GetValue("Timeout", 30))
+                                };
+                                return settings;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return null;
+        }
+
+        public List<SavedConnection> GetAllConnections()
+        {
+            var connections = new List<SavedConnection>();
+            
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\DataSyncer\\Connections"))
+                {
+                    if (key != null)
+                    {
+                        foreach (string connectionName in key.GetSubKeyNames())
+                        {
+                            var settings = GetConnection(connectionName);
+                            if (settings != null)
+                            {
+                                connections.Add(new SavedConnection
+                                {
+                                    Name = connectionName,
+                                    Settings = settings,
+                                    CreatedDate = DateTime.Now,
+                                    LastUsed = DateTime.Now,
+                                    IsDefault = false
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return connections;
+        }
+
+        public ConnectionSettings GetDefaultConnection()
+        {
+            var connections = GetAllConnections();
+            if (connections.Count > 0)
+            {
+                return connections[0].Settings;
+            }
+            return LoadDefaultConnectionFromRegistry();
+        }
+
+        public bool SetDefaultConnection(string connectionName)
+        {
+            var connection = GetConnection(connectionName);
+            if (connection != null)
+            {
+                _settings = connection;
+                return true;
+            }
+            return false;
+        }
+
+        public bool DeleteConnection(string connectionName)
+        {
+            if (StringExtensions.IsNullOrWhiteSpace(connectionName))
+                return false;
+
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\DataSyncer\\Connections", true))
+                {
+                    if (key != null)
+                    {
+                        key.DeleteSubKey(connectionName, false);
+                        return true;
+                    }
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        public bool ConnectionExists(string connectionName)
+        {
+            return GetConnection(connectionName) != null;
+        }
+
+        public List<string> GetConnectionNames()
+        {
+            var names = new List<string>();
+            
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\DataSyncer\\Connections"))
+                {
+                    if (key != null)
+                    {
+                        foreach (string connectionName in key.GetSubKeyNames())
+                        {
+                            names.Add(connectionName);
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return names;
+        }
+
+        public ConnectionSettings LoadConnectionForStartup()
+        {
+            var defaultConnection = GetDefaultConnection();
+            if (defaultConnection != null)
+            {
+                _settings = defaultConnection;
+                return defaultConnection;
+            }
+            return _settings;
+        }
+
+        private ConnectionSettings LoadDefaultConnectionFromRegistry()
+        {
+            var connections = GetAllConnections();
+            if (connections.Count > 0)
+            {
+                return connections[0].Settings;
+            }
+            return null;
+        }
     }
 
     // Stub implementation of filter service - will be replaced with actual backend implementation
     public class FilterService : IFilterService
     {
         private FilterSettings _settings;
+        private string _configPath;
 
         public FilterService()
         {
-            _settings = new FilterSettings();
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string dataSyncerPath = Path.Combine(appDataPath, "DataSyncer");
+            _configPath = Path.Combine(dataSyncerPath, "filter_settings.json");
+            LoadSettings();
+        }
+
+        private void LoadSettings()
+        {
+            try
+            {
+                if (File.Exists(_configPath))
+                {
+                    string json = File.ReadAllText(_configPath);
+                    // Since we don't have Newtonsoft.Json available in .NET 3.5 stub, use simple parsing
+                    _settings = ParseFilterSettings(json);
+                }
+                else
+                {
+                    _settings = new FilterSettings();
+                }
+            }
+            catch
+            {
+                _settings = new FilterSettings();
+            }
+        }
+
+        private void SaveSettings()
+        {
+            try
+            {
+                string directory = Path.GetDirectoryName(_configPath);
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                
+                string json = SerializeFilterSettings(_settings);
+                File.WriteAllText(_configPath, json);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error saving filter settings: " + ex.Message);
+            }
+        }
+
+        private string SerializeFilterSettings(FilterSettings settings)
+        {
+            // Simple JSON serialization for .NET 3.5 compatibility
+            var json = "{\n";
+            json += "  \"FiltersEnabled\": " + settings.FiltersEnabled.ToString().ToLower() + ",\n";
+            json += "  \"MinFileSize\": " + settings.MinFileSize + ",\n";
+            json += "  \"MaxFileSize\": " + settings.MaxFileSize + ",\n";
+            json += "  \"IncludeHiddenFiles\": " + settings.IncludeHiddenFiles.ToString().ToLower() + ",\n";
+            json += "  \"IncludeSystemFiles\": " + settings.IncludeSystemFiles.ToString().ToLower() + ",\n";
+            json += "  \"IncludeReadOnlyFiles\": " + settings.IncludeReadOnlyFiles.ToString().ToLower() + ",\n";
+            json += "  \"ExcludePatterns\": \"" + (settings.ExcludePatterns ?? "") + "\",\n";
+            json += "  \"AllowedFileTypes\": [";
+            if (settings.AllowedFileTypes != null)
+            {
+                for (int i = 0; i < settings.AllowedFileTypes.Length; i++)
+                {
+                    json += "\"" + settings.AllowedFileTypes[i] + "\"";
+                    if (i < settings.AllowedFileTypes.Length - 1) json += ",";
+                }
+            }
+            json += "]\n";
+            json += "}";
+            return json;
+        }
+
+        private FilterSettings ParseFilterSettings(string json)
+        {
+            var settings = new FilterSettings();
+            
+            try
+            {
+                // Simple JSON parsing for .NET 3.5 compatibility
+                if (json.Contains("\"FiltersEnabled\": true")) settings.FiltersEnabled = true;
+                
+                // Parse numeric values
+                var minSizeMatch = System.Text.RegularExpressions.Regex.Match(json, "\"MinFileSize\":\\s*(\\d+\\.?\\d*)");
+                if (minSizeMatch.Success) settings.MinFileSize = decimal.Parse(minSizeMatch.Groups[1].Value);
+                
+                var maxSizeMatch = System.Text.RegularExpressions.Regex.Match(json, "\"MaxFileSize\":\\s*(\\d+\\.?\\d*)");
+                if (maxSizeMatch.Success) settings.MaxFileSize = decimal.Parse(maxSizeMatch.Groups[1].Value);
+                
+                // Parse boolean values
+                if (json.Contains("\"IncludeHiddenFiles\": true")) settings.IncludeHiddenFiles = true;
+                if (json.Contains("\"IncludeSystemFiles\": true")) settings.IncludeSystemFiles = true;
+                if (json.Contains("\"IncludeReadOnlyFiles\": false")) settings.IncludeReadOnlyFiles = false;
+                else settings.IncludeReadOnlyFiles = true; // default
+                
+                // Parse exclude patterns
+                var excludeMatch = System.Text.RegularExpressions.Regex.Match(json, "\"ExcludePatterns\":\\s*\"([^\"]*)\"");
+                if (excludeMatch.Success) settings.ExcludePatterns = excludeMatch.Groups[1].Value;
+                
+                // Parse allowed file types array
+                var typesMatch = System.Text.RegularExpressions.Regex.Match(json, "\"AllowedFileTypes\":\\s*\\[([^\\]]*)\\]");
+                if (typesMatch.Success)
+                {
+                    string typesStr = typesMatch.Groups[1].Value;
+                    var typeMatches = System.Text.RegularExpressions.Regex.Matches(typesStr, "\"([^\"]*)\"");
+                    var typesList = new List<string>();
+                    foreach (System.Text.RegularExpressions.Match match in typeMatches)
+                    {
+                        typesList.Add(match.Groups[1].Value);
+                    }
+                    settings.AllowedFileTypes = typesList.ToArray();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error parsing filter settings: " + ex.Message);
+            }
+            
+            return settings;
         }
 
         public FilterSettings GetFilterSettings()
@@ -569,6 +1036,8 @@ namespace syncer.ui.Services
         public bool SaveFilterSettings(FilterSettings settings)
         {
             _settings = settings;
+            SaveSettings();
+            Console.WriteLine("Filter settings saved - Enabled: " + settings.FiltersEnabled + ", FileTypes: " + (settings.AllowedFileTypes != null ? settings.AllowedFileTypes.Length : 0));
             return true;
         }
 

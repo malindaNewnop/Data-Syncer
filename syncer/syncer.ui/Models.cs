@@ -44,6 +44,9 @@ namespace syncer.ui
         public TimeSpan LastDuration { get; set; }
         public double LastAverageSpeed { get; set; } // Bytes per second
 
+        // Filter settings
+        public FilterSettings FilterSettings { get; set; }
+
         public SyncJob()
         {
             CreatedDate = DateTime.Now;
@@ -70,6 +73,9 @@ namespace syncer.ui
             LastFileCount = 0;
             LastDuration = TimeSpan.Zero;
             LastAverageSpeed = 0;
+            
+            // Initialize filter settings
+            FilterSettings = new FilterSettings();
         }
 
         public string GetNextRunTime()
