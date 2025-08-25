@@ -993,14 +993,58 @@ namespace syncer.ui
 
         private void btnBrowseSource_Click(object sender, EventArgs e)
         {
-            using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+            ConnectionSettings connectionSettings = _connectionService.GetConnectionSettings();
+            
+            // For source, we typically browse local files, but allow remote browsing too
+            // If connection is local or no connection, use local browse
+            if (connectionSettings == null || connectionSettings.Protocol == "LOCAL")
             {
-                dialog.Description = "Select source folder to sync (empty folders allowed)";
-                dialog.ShowNewFolderButton = true;
-                if (dialog.ShowDialog() == DialogResult.OK)
+                using (FolderBrowserDialog dialog = new FolderBrowserDialog())
                 {
-                    txtSourcePath.Text = dialog.SelectedPath;
+                    dialog.Description = "Select source folder to sync (empty folders allowed)";
+                    dialog.ShowNewFolderButton = true;
+                    if (txtSourcePath != null && !UIStringExtensions.IsNullOrWhiteSpace(txtSourcePath.Text))
+                        dialog.SelectedPath = txtSourcePath.Text;
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        txtSourcePath.Text = dialog.SelectedPath;
+                    }
                 }
+            }
+            else
+            {
+                // Ask user whether they want to browse local or remote for source
+                DialogResult browseChoice = MessageBox.Show(
+                    "You have a remote connection configured.\n\n" +
+                    "Do you want to browse:\n" +
+                    "• Yes = Local folders (typical for uploading TO remote server)\n" +
+                    "• No = Remote folders (for downloading FROM remote server)\n" +
+                    "• Cancel = Enter path manually",
+                    "Source Browse Options",
+                    MessageBoxButtons.YesNoCancel,
+                    MessageBoxIcon.Question);
+                
+                if (browseChoice == DialogResult.Yes)
+                {
+                    // Browse local folders
+                    using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+                    {
+                        dialog.Description = "Select local source folder to upload";
+                        dialog.ShowNewFolderButton = true;
+                        if (txtSourcePath != null && !UIStringExtensions.IsNullOrWhiteSpace(txtSourcePath.Text))
+                            dialog.SelectedPath = txtSourcePath.Text;
+                        if (dialog.ShowDialog() == DialogResult.OK)
+                        {
+                            txtSourcePath.Text = dialog.SelectedPath;
+                        }
+                    }
+                }
+                else if (browseChoice == DialogResult.No)
+                {
+                    // Browse remote folders (similar to destination browse)
+                    BrowseRemoteFolder(true); // true = for source path
+                }
+                // If Cancel, do nothing
             }
         }
 
@@ -1023,7 +1067,106 @@ namespace syncer.ui
             }
             else if (connectionSettings != null && (connectionSettings.Protocol == "FTP" || connectionSettings.Protocol == "SFTP"))
             {
-                if (_connectionService.IsConnected())
+                // Enhanced remote browsing - auto-connect if not connected
+                if (!_connectionService.IsConnected())
+                {
+                    // Ask user if they want to connect automatically
+                    DialogResult result = MessageBox.Show(
+                        $"You are not connected to the {connectionSettings.Protocol} server.\n\n" +
+                        $"Would you like to connect to {connectionSettings.Host} and browse the remote directories?\n\n" +
+                        "Click 'Yes' to connect and browse, or 'No' to enter the path manually.",
+                        "Auto-Connect for Remote Browse",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question);
+                        
+                    if (result == DialogResult.Yes)
+                    {
+                        // Try to establish connection by testing it first
+                        this.Cursor = Cursors.WaitCursor;
+                        try
+                        {
+                            // Convert UI ConnectionSettings to Core ConnectionSettings
+                            var coreSettings = new syncer.core.ConnectionSettings
+                            {
+                                Protocol = connectionSettings.Protocol == "SFTP" ? 
+                                    syncer.core.ProtocolType.Sftp : 
+                                    connectionSettings.Protocol == "FTP" ? 
+                                        syncer.core.ProtocolType.Ftp : 
+                                        syncer.core.ProtocolType.Local,
+                                Host = connectionSettings.Host,
+                                Port = connectionSettings.Port,
+                                Username = connectionSettings.Username,
+                                Password = connectionSettings.Password,
+                                SshKeyPath = connectionSettings.SshKeyPath,
+                                Timeout = connectionSettings.Timeout
+                            };
+                            
+                            // Create appropriate transfer client for testing
+                            syncer.core.ITransferClient testClient = null;
+                            if (connectionSettings.Protocol == "FTP")
+                            {
+                                testClient = new syncer.core.Transfers.EnhancedFtpTransferClient();
+                            }
+                            else if (connectionSettings.Protocol == "SFTP")
+                            {
+                                testClient = new syncer.core.Transfers.ProductionSftpTransferClient();
+                            }
+                            
+                            if (testClient != null)
+                            {
+                                string error;
+                                bool connectionResult = testClient.TestConnection(coreSettings, out error);
+                                if (!connectionResult)
+                                {
+                                    this.Cursor = Cursors.Default;
+                                    MessageBox.Show(
+                                        $"Failed to connect to the remote server.\n\nError: {error}\n\n" +
+                                        "Please check your connection settings and try again, or enter the remote path manually.",
+                                        "Connection Failed",
+                                        MessageBoxButtons.OK,
+                                        MessageBoxIcon.Warning);
+                                    ShowRemotePathInputDialog(false);
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                this.Cursor = Cursors.Default;
+                                MessageBox.Show(
+                                    "Unsupported protocol for remote browsing.",
+                                    "Connection Error",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Error);
+                                ShowRemotePathInputDialog(false);
+                                return;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            this.Cursor = Cursors.Default;
+                            MessageBox.Show(
+                                $"Error connecting to server: {ex.Message}\n\n" +
+                                "You can still enter the remote path manually.",
+                                "Connection Error",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+                            ShowRemotePathInputDialog(false);
+                            return;
+                        }
+                        finally
+                        {
+                            this.Cursor = Cursors.Default;
+                        }
+                    }
+                    else
+                    {
+                        ShowRemotePathInputDialog(false);
+                        return;
+                    }
+                }
+                
+                // Now proceed with remote browsing (either already connected or just connected)
+                try
                 {
                     // Convert UI ConnectionSettings to Core ConnectionSettings
                     var coreSettings = new syncer.core.ConnectionSettings
@@ -1041,53 +1184,245 @@ namespace syncer.ui
                         Timeout = connectionSettings.Timeout
                     };
                     
-                    // Use the new FileZilla-like file manager
-                    try
+                    // Use the FileZilla-like file manager
+                    this.Cursor = Cursors.WaitCursor;
+                    using (FormRemoteDirectoryBrowser fileManager = new FormRemoteDirectoryBrowser(coreSettings))
                     {
-                        using (FormRemoteDirectoryBrowser fileManager = new FormRemoteDirectoryBrowser(coreSettings))
+                        fileManager.IsUploadMode = false; // We want to select destination path
+                        fileManager.Text = $"Browse Remote Directories - {connectionSettings.Protocol}://{connectionSettings.Host}";
+                        
+                        this.Cursor = Cursors.Default;
+                        if (fileManager.ShowDialog() == DialogResult.OK)
                         {
-                            fileManager.IsUploadMode = false; // We want to select destination path
-                            if (fileManager.ShowDialog() == DialogResult.OK)
+                            if (!string.IsNullOrEmpty(fileManager.SelectedRemotePath))
                             {
-                                if (!string.IsNullOrEmpty(fileManager.SelectedRemotePath))
-                                {
-                                    if (txtDestinationPath != null) 
-                                        txtDestinationPath.Text = fileManager.SelectedRemotePath;
-                                }
+                                if (txtDestinationPath != null) 
+                                    txtDestinationPath.Text = fileManager.SelectedRemotePath;
+                                
+                                // Show success message
+                                MessageBox.Show(
+                                    $"Remote path selected successfully:\n{fileManager.SelectedRemotePath}",
+                                    "Path Selected",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Information);
                             }
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Error opening file manager: " + ex.Message, "Error",
-                            MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        ShowRemotePathInputDialog();
-                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    MessageBox.Show("Not connected to a remote server. Please connect first.", 
-                        "Connection Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    
-                    // Show remote path input dialog for now
-                    ShowRemotePathInputDialog();
+                    this.Cursor = Cursors.Default;
+                    MessageBox.Show(
+                        $"Error opening remote directory browser: {ex.Message}\n\n" +
+                        "You can still enter the remote path manually below.",
+                        "Browse Error",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    ShowRemotePathInputDialog(false);
                 }
             }
             else
             {
-                ShowRemotePathInputDialog();
+                // No connection settings found
+                MessageBox.Show(
+                    "No connection settings found.\n\n" +
+                    "Please configure your connection settings first, or select LOCAL protocol for local file browsing.",
+                    "Connection Required",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                ShowRemotePathInputDialog(false);
             }
         }
 
-        private void ShowRemotePathInputDialog()
+        /// <summary>
+        /// Helper method to browse remote folders for either source or destination
+        /// </summary>
+        /// <param name="isForSource">True if browsing for source path, false for destination path</param>
+        private void BrowseRemoteFolder(bool isForSource)
+        {
+            ConnectionSettings connectionSettings = _connectionService.GetConnectionSettings();
+            if (connectionSettings == null || (connectionSettings.Protocol != "FTP" && connectionSettings.Protocol != "SFTP"))
+            {
+                MessageBox.Show(
+                    "Remote browsing requires FTP or SFTP connection settings.\n\n" +
+                    "Please configure your connection settings first.",
+                    "Configuration Required",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            // Enhanced remote browsing - auto-connect if not connected
+            if (!_connectionService.IsConnected())
+            {
+                // Ask user if they want to connect automatically
+                string pathType = isForSource ? "source" : "destination";
+                DialogResult result = MessageBox.Show(
+                    $"You are not connected to the {connectionSettings.Protocol} server.\n\n" +
+                    $"Would you like to connect to {connectionSettings.Host} and browse the remote directories for {pathType} path?\n\n" +
+                    "Click 'Yes' to connect and browse, or 'No' to enter the path manually.",
+                    "Auto-Connect for Remote Browse",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+                    
+                if (result != DialogResult.Yes)
+                {
+                    ShowRemotePathInputDialog(isForSource);
+                    return;
+                }
+
+                // Try to establish connection by testing it first
+                this.Cursor = Cursors.WaitCursor;
+                try
+                {
+                    // Convert UI ConnectionSettings to Core ConnectionSettings
+                    var coreSettings = new syncer.core.ConnectionSettings
+                    {
+                        Protocol = connectionSettings.Protocol == "SFTP" ? 
+                            syncer.core.ProtocolType.Sftp : 
+                            connectionSettings.Protocol == "FTP" ? 
+                                syncer.core.ProtocolType.Ftp : 
+                                syncer.core.ProtocolType.Local,
+                        Host = connectionSettings.Host,
+                        Port = connectionSettings.Port,
+                        Username = connectionSettings.Username,
+                        Password = connectionSettings.Password,
+                        SshKeyPath = connectionSettings.SshKeyPath,
+                        Timeout = connectionSettings.Timeout
+                    };
+                    
+                    // Create appropriate transfer client for testing
+                    syncer.core.ITransferClient testClient = null;
+                    if (connectionSettings.Protocol == "FTP")
+                    {
+                        testClient = new syncer.core.Transfers.EnhancedFtpTransferClient();
+                    }
+                    else if (connectionSettings.Protocol == "SFTP")
+                    {
+                        testClient = new syncer.core.Transfers.ProductionSftpTransferClient();
+                    }
+                    
+                    if (testClient != null)
+                    {
+                        string error;
+                        bool connectionResult = testClient.TestConnection(coreSettings, out error);
+                        if (!connectionResult)
+                        {
+                            this.Cursor = Cursors.Default;
+                            MessageBox.Show(
+                                $"Failed to connect to the remote server.\n\nError: {error}\n\n" +
+                                "Please check your connection settings and try again, or enter the remote path manually.",
+                                "Connection Failed",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+                            ShowRemotePathInputDialog(isForSource);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        this.Cursor = Cursors.Default;
+                        MessageBox.Show(
+                            "Unsupported protocol for remote browsing.",
+                            "Connection Error",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
+                        ShowRemotePathInputDialog(isForSource);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    this.Cursor = Cursors.Default;
+                    MessageBox.Show(
+                        $"Error connecting to server: {ex.Message}\n\n" +
+                        "You can still enter the remote path manually.",
+                        "Connection Error",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                    ShowRemotePathInputDialog(isForSource);
+                    return;
+                }
+                finally
+                {
+                    this.Cursor = Cursors.Default;
+                }
+            }
+            
+            // Now proceed with remote browsing (either already connected or just connected)
+            try
+            {
+                // Convert UI ConnectionSettings to Core ConnectionSettings
+                var coreSettings = new syncer.core.ConnectionSettings
+                {
+                    Protocol = connectionSettings.Protocol == "SFTP" ? 
+                        syncer.core.ProtocolType.Sftp : 
+                        connectionSettings.Protocol == "FTP" ? 
+                            syncer.core.ProtocolType.Ftp : 
+                            syncer.core.ProtocolType.Local,
+                    Host = connectionSettings.Host,
+                    Port = connectionSettings.Port,
+                    Username = connectionSettings.Username,
+                    Password = connectionSettings.Password,
+                    SshKeyPath = connectionSettings.SshKeyPath,
+                    Timeout = connectionSettings.Timeout
+                };
+                
+                // Use the FileZilla-like file manager
+                this.Cursor = Cursors.WaitCursor;
+                using (FormRemoteDirectoryBrowser fileManager = new FormRemoteDirectoryBrowser(coreSettings))
+                {
+                    fileManager.IsUploadMode = !isForSource; // Upload mode for destination, download mode for source
+                    string pathType = isForSource ? "Source" : "Destination";
+                    fileManager.Text = $"Browse Remote {pathType} - {connectionSettings.Protocol}://{connectionSettings.Host}";
+                    
+                    this.Cursor = Cursors.Default;
+                    if (fileManager.ShowDialog() == DialogResult.OK)
+                    {
+                        if (!string.IsNullOrEmpty(fileManager.SelectedRemotePath))
+                        {
+                            if (isForSource && txtSourcePath != null)
+                            {
+                                txtSourcePath.Text = fileManager.SelectedRemotePath;
+                            }
+                            else if (!isForSource && txtDestinationPath != null)
+                            {
+                                txtDestinationPath.Text = fileManager.SelectedRemotePath;
+                            }
+                            
+                            // Show success message
+                            MessageBox.Show(
+                                $"Remote {pathType.ToLower()} path selected successfully:\n{fileManager.SelectedRemotePath}",
+                                "Path Selected",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                this.Cursor = Cursors.Default;
+                MessageBox.Show(
+                    $"Error opening remote directory browser: {ex.Message}\n\n" +
+                    "You can still enter the remote path manually below.",
+                    "Browse Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                ShowRemotePathInputDialog(isForSource);
+            }
+        }
+
+        private void ShowRemotePathInputDialog(bool isForSource = false)
         {
             using (Form inputForm = new Form())
             {
                 ConnectionSettings connectionSettings = _connectionService.GetConnectionSettings();
                 string protocol = connectionSettings != null ? connectionSettings.Protocol : "Unknown";
                 string host = connectionSettings != null ? connectionSettings.Host : "";
+                string pathType = isForSource ? "Source" : "Destination";
                 
-                inputForm.Text = $"Enter Remote Destination Path ({protocol})";
+                inputForm.Text = $"Enter Remote {pathType} Path ({protocol})";
                 inputForm.Size = new Size(450, 180);
                 inputForm.StartPosition = FormStartPosition.CenterParent;
                 inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -1098,29 +1433,33 @@ namespace syncer.ui
                 labelInfo.Left = 10; 
                 labelInfo.Top = 10; 
                 labelInfo.Width = 420;
-                labelInfo.Text = $"Enter the remote path on {protocol} server: {host}"; 
+                labelInfo.Text = $"Enter the remote {pathType.ToLower()} path on {protocol} server: {host}"; 
                 labelInfo.AutoSize = false;
                 
                 Label label = new Label(); 
                 label.Left = 10; 
                 label.Top = 40; 
-                label.Text = "Remote path (e.g., /remote/folder):"; 
+                label.Text = $"Remote {pathType.ToLower()} path (e.g., /remote/folder):"; 
                 label.AutoSize = true;
                 
                 TextBox textBox = new TextBox(); 
                 textBox.Left = 10; 
                 textBox.Top = 65; 
-                textBox.Width = 410; 
-                textBox.Text = txtDestinationPath != null ? txtDestinationPath.Text : string.Empty;
+                textBox.Width = 410;
+                
+                if (isForSource && txtSourcePath != null)
+                    textBox.Text = txtSourcePath.Text;
+                else if (!isForSource && txtDestinationPath != null)
+                    textBox.Text = txtDestinationPath.Text;
                 
                 Label tipLabel = new Label();
                 tipLabel.Left = 10;
                 tipLabel.Top = 95;
                 tipLabel.Width = 420;
                 tipLabel.Height = 30;
-                tipLabel.Text = "Tip: For FTP/SFTP, paths typically start with / and use forward slashes.";
-                tipLabel.ForeColor = Color.DarkBlue;
-                tipLabel.AutoSize = false;
+                tipLabel.Text = "Examples: /home/user/documents, /var/www/html, /uploads\nTip: Use forward slashes (/) for paths on Unix/Linux servers";
+                tipLabel.ForeColor = Color.Gray;
+                tipLabel.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Italic);
                 
                 Button okButton = new Button(); 
                 okButton.Text = "OK"; 
@@ -1145,9 +1484,20 @@ namespace syncer.ui
                 inputForm.AcceptButton = okButton;
                 inputForm.CancelButton = cancelButton;
                 
-                if (inputForm.ShowDialog() == DialogResult.OK && txtDestinationPath != null)
+                if (inputForm.ShowDialog() == DialogResult.OK)
                 {
-                    txtDestinationPath.Text = textBox.Text.Trim();
+                    string enteredPath = textBox.Text.Trim();
+                    if (!string.IsNullOrEmpty(enteredPath))
+                    {
+                        if (isForSource && txtSourcePath != null)
+                        {
+                            txtSourcePath.Text = enteredPath;
+                        }
+                        else if (!isForSource && txtDestinationPath != null)
+                        {
+                            txtDestinationPath.Text = enteredPath;
+                        }
+                    }
                 }
             }
         }
