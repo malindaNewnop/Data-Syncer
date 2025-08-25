@@ -104,9 +104,20 @@ namespace syncer.ui
             this.Size = new Size(900, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new Size(800, 600);
+            
+            // Add event handler to refresh timer jobs when form is activated
+            this.Activated += FormMain_Activated;
+            
             InitializeTimerJobsGrid();
             UpdateServiceStatus();
             UpdateConnectionStatus();
+            RefreshTimerJobsGrid();
+        }
+
+        private void FormMain_Activated(object sender, EventArgs e)
+        {
+            // Refresh timer jobs grid when form becomes active
+            // This ensures the grid is always up-to-date when user returns to main form
             RefreshTimerJobsGrid();
         }
 
@@ -264,6 +275,9 @@ namespace syncer.ui
                 
                 if (scheduleForm.ShowDialog() == DialogResult.OK)
                 {
+                    // Refresh timer jobs grid to show any new or updated jobs
+                    RefreshTimerJobsGrid();
+                    
                     // Show notification
                     if (_notificationService != null)
                     {
@@ -278,10 +292,8 @@ namespace syncer.ui
 
         private void filterSettingsToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            using (FormFilters filtersForm = new FormFilters())
-            {
-                filtersForm.ShowDialog();
-            }
+            MessageBox.Show("Filter settings are now configured individually for each job when creating timer jobs.\n\nTo set filters:\n1. Click 'Add Timer Job'\n2. Configure your desired filters in the job creation form\n3. Each job can have its own filter settings", 
+                "Filter Settings", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void viewLogsToolStripMenuItem_Click(object sender, EventArgs e)
@@ -310,6 +322,9 @@ namespace syncer.ui
             {
                 if (scheduleForm.ShowDialog() == DialogResult.OK)
                 {
+                    // Refresh timer jobs grid to show the newly added job
+                    RefreshTimerJobsGrid();
+                    
                     // Show notification
                     if (_notificationService != null)
                     {

@@ -425,14 +425,15 @@ namespace syncer.ui
             // 
             // btnPreview
             // 
-            this.btnPreview.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnPreview.Location = new System.Drawing.Point(16, 530);
+            this.btnPreview.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
+            this.btnPreview.Location = new System.Drawing.Point(470, 245);
             this.btnPreview.Margin = new System.Windows.Forms.Padding(4);
             this.btnPreview.Name = "btnPreview";
-            this.btnPreview.Size = new System.Drawing.Size(100, 30);
+            this.btnPreview.Size = new System.Drawing.Size(100, 25);
             this.btnPreview.TabIndex = 4;
-            this.btnPreview.Text = "Preview";
-            this.btnPreview.UseVisualStyleBackColor = true;
+            this.btnPreview.Text = "Preview Job";
+            this.btnPreview.BackColor = System.Drawing.Color.LightGreen;
+            this.btnPreview.UseVisualStyleBackColor = false;
             this.btnPreview.Click += new System.EventHandler(this.btnPreview_Click);
             // 
             // btnSave
@@ -518,7 +519,6 @@ namespace syncer.ui
             this.ClientSize = new System.Drawing.Size(779, 573);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnSave);
-            this.Controls.Add(this.btnPreview);
             this.Controls.Add(this.gbFileManager);
             this.Controls.Add(this.gbTimerSettings);
             this.Controls.Add(this.gbPaths);

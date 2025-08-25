@@ -245,21 +245,27 @@ namespace syncer.ui.Services
                 Directory.CreateDirectory(job.DestinationPath);
             }
 
-            // Apply current filter settings to the job before execution
-            var filterService = ServiceLocator.FilterService;
-            if (filterService != null)
+            // Use the job's own filter settings instead of global settings
+            if (job.FilterSettings == null)
             {
-                var currentFilters = filterService.GetFilterSettings();
-                if (currentFilters != null)
+                // Fallback to global filter settings if job doesn't have its own
+                var filterService = ServiceLocator.FilterService;
+                if (filterService != null)
                 {
-                    job.FilterSettings = currentFilters;
-                    Console.WriteLine("Applied filter settings to job execution - Enabled: " + currentFilters.FiltersEnabled + ", FileTypes: " + (currentFilters.AllowedFileTypes != null ? currentFilters.AllowedFileTypes.Length : 0));
+                    job.FilterSettings = filterService.GetFilterSettings();
                 }
             }
 
-            // Get files with filtering applied
+            // Get files with filtering applied using job-specific settings
             List<string> files = GetFilteredFiles(job.SourcePath, job.FilterSettings, job.IncludeSubFolders);
-            Console.WriteLine("Found " + files.Count + " files after applying filters");
+            Console.WriteLine("Found " + files.Count + " files after applying job-specific filters");
+
+            // If no files found, log it but don't treat as error (empty directory is valid)
+            if (files.Count == 0)
+            {
+                ServiceLocator.LogService.LogInfo(string.Format("No files found in source directory (or all files filtered out): {0}", job.SourcePath));
+                return; // Exit gracefully, nothing to sync
+            }
 
             foreach (string sourceFile in files)
             {
@@ -342,10 +348,10 @@ namespace syncer.ui.Services
                 if (!filterSettings.IncludeReadOnlyFiles && (fileInfo.Attributes & FileAttributes.ReadOnly) != 0)
                     return false;
                 
-                // Check file size (convert MB to bytes)
+                // Check file size (handle different units - assume MB if no unit specified)
                 long fileSizeBytes = fileInfo.Length;
-                long minSizeBytes = (long)(filterSettings.MinFileSize * 1024 * 1024);
-                long maxSizeBytes = (long)(filterSettings.MaxFileSize * 1024 * 1024);
+                long minSizeBytes = (long)(filterSettings.MinFileSize * 1024 * 1024); // Default to MB
+                long maxSizeBytes = (long)(filterSettings.MaxFileSize * 1024 * 1024); // Default to MB
                 
                 if (minSizeBytes > 0 && fileSizeBytes < minSizeBytes)
                     return false;
@@ -455,15 +461,14 @@ namespace syncer.ui.Services
                     throw new Exception(string.Format("Connection test failed: {0}", testError));
                 }
                 
-                // Apply current filter settings to the job before execution
-                var filterService = ServiceLocator.FilterService;
-                if (filterService != null)
+                // Use the job's own filter settings instead of global settings
+                if (job.FilterSettings == null)
                 {
-                    var currentFilters = filterService.GetFilterSettings();
-                    if (currentFilters != null)
+                    // Fallback to global filter settings if job doesn't have its own
+                    var filterService = ServiceLocator.FilterService;
+                    if (filterService != null)
                     {
-                        job.FilterSettings = currentFilters;
-                        Console.WriteLine("Applied filter settings to upload job - Enabled: " + currentFilters.FiltersEnabled + ", FileTypes: " + (currentFilters.AllowedFileTypes != null ? currentFilters.AllowedFileTypes.Length : 0));
+                        job.FilterSettings = filterService.GetFilterSettings();
                     }
                 }
 

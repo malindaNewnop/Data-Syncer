@@ -5,6 +5,8 @@ using System.IO;
 using System.ComponentModel;
 using System.Timers;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
+using System.Linq;
 using syncer.core;
 using syncer.core.Configuration;
 using syncer.ui.Forms;
@@ -28,6 +30,19 @@ namespace syncer.ui
         private string[] _selectedFilesForTimer; // Store files selected for timer upload
         private string _selectedFolderForTimer; // Base folder path for relative path calculation
         private string _timerUploadDestination = "/"; // Default destination path
+
+        // Filter controls
+        private GroupBox gbFilters;
+        private CheckBox chkEnableFilters;
+        private CheckedListBox clbFileTypes;
+        private NumericUpDown numMinFileSize;
+        private NumericUpDown numMaxFileSize;
+        private ComboBox cmbFileSizeUnit;
+        private CheckBox chkIncludeHiddenFiles;
+        private CheckBox chkIncludeSystemFiles;
+        private CheckBox chkIncludeReadOnlyFiles;
+        private TextBox txtExcludePatterns;
+        private FilterSettings _jobFilterSettings;
 
         public FormSchedule() : this(null) { }
 
@@ -122,8 +137,8 @@ namespace syncer.ui
 
         private void InitializeCustomComponents()
         {
-            this.Text = _isEditMode ? "Edit Upload Timer Settings" : "Add Upload Timer Settings";
-            this.Size = new Size(779, 440); // Reduced height since we're removing source/destination
+            this.Text = _isEditMode ? "Edit Upload Timer Job" : "Create New Upload Timer Job";
+            this.Size = new Size(980, 780); // Increased size for better spacing
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -132,23 +147,177 @@ namespace syncer.ui
             // Hide source and destination section - we don't need it anymore
             if (gbPaths != null) gbPaths.Visible = false;
             
-            // Move timer controls up since we're hiding source/destination section
-            if (gbTimerSettings != null)
-            {
-                gbTimerSettings.Location = new Point(gbTimerSettings.Location.X, 97);
-            }
-            
-            // Move file manager controls up too
-            if (gbFileManager != null)
-            {
-                gbFileManager.Location = new Point(gbFileManager.Location.X, 
-                    gbTimerSettings != null ? gbTimerSettings.Location.Y + gbTimerSettings.Height + 10 : 300);
-            }
+            // Reorganize layout with better positioning
+            ReorganizeFormLayout();
             
             SetDefaultValues();
             if (_isEditMode) LoadJobSettings();
             InitializeTransferClient();
             InitializeTimerControls();
+            InitializeFilterControls();
+        }
+
+        private void ReorganizeFormLayout()
+        {
+            // Add a header section
+            CreateHeaderSection();
+            
+            // Position timer settings at the top left with better spacing
+            if (gbTimerSettings != null)
+            {
+                gbTimerSettings.Location = new Point(20, 90);
+                gbTimerSettings.Size = new Size(450, 140);
+                gbTimerSettings.Text = "Timer Configuration";
+                
+                // Improve internal layout of timer controls
+                AdjustTimerControlsLayout();
+            }
+            
+            // Position file manager to the right of timer settings with proper spacing
+            if (gbFileManager != null)
+            {
+                gbFileManager.Location = new Point(490, 90);
+                gbFileManager.Size = new Size(450, 140);
+                gbFileManager.Text = "Folder Selection for Timer Upload";
+                
+                // Ensure proper spacing within the File Manager group
+                AdjustFileManagerLayout();
+            }
+        }
+
+        private void AdjustFileManagerLayout()
+        {
+            if (gbFileManager == null) return;
+            
+            // Find and adjust controls within the File Manager group box
+            foreach (Control control in gbFileManager.Controls)
+            {
+                if (control is Label)
+                {
+                    Label lbl = control as Label;
+                    if (lbl.Text.Contains("Manual file transfer operations") || lbl.Text.Contains("files selected"))
+                    {
+                        lbl.Location = new Point(15, 25);
+                        lbl.Size = new Size(400, 20);
+                        lbl.AutoSize = false;
+                    }
+                }
+                else if (control is Button)
+                {
+                    Button btn = control as Button;
+                    if (btn.Text.Contains("Browse") || btn.Text.Contains("Select"))
+                    {
+                        btn.Location = new Point(15, 50);
+                        btn.Size = new Size(120, 30);
+                        btn.Text = "Browse Folder";
+                    }
+                    else if (btn.Text.Contains("Upload File(s)"))
+                    {
+                        btn.Location = new Point(145, 50);
+                        btn.Size = new Size(100, 30);
+                    }
+                    else if (btn.Text.Contains("Download"))
+                    {
+                        btn.Location = new Point(255, 50);
+                        btn.Size = new Size(100, 30);
+                    }
+                }
+            }
+        }
+
+        private void AdjustTimerControlsLayout()
+        {
+            if (gbTimerSettings == null) return;
+            
+            // Find and adjust controls within the Timer Settings group box
+            foreach (Control control in gbTimerSettings.Controls)
+            {
+                if (control is CheckBox)
+                {
+                    CheckBox chk = control as CheckBox;
+                    if (chk.Text.Contains("Enable Timer"))
+                    {
+                        chk.Location = new Point(15, 25);
+                        chk.Size = new Size(120, 20);
+                    }
+                }
+                else if (control is Label)
+                {
+                    Label lbl = control as Label;
+                    if (lbl.Text.Contains("Upload Every"))
+                    {
+                        lbl.Location = new Point(15, 55);
+                        lbl.Size = new Size(80, 20);
+                    }
+                    else if (lbl.Text.Contains("Timer") && lbl.Text.Contains("stopped"))
+                    {
+                        lbl.Location = new Point(300, 25);
+                        lbl.Size = new Size(120, 20);
+                    }
+                    else if (lbl.Text.Contains("Never") || lbl.Text.Contains("Last"))
+                    {
+                        lbl.Location = new Point(300, 55);
+                        lbl.Size = new Size(120, 20);
+                    }
+                }
+                else if (control is NumericUpDown)
+                {
+                    NumericUpDown num = control as NumericUpDown;
+                    num.Location = new Point(100, 53);
+                    num.Size = new Size(60, 20);
+                }
+                else if (control is ComboBox)
+                {
+                    ComboBox cmb = control as ComboBox;
+                    cmb.Location = new Point(170, 53);
+                    cmb.Size = new Size(80, 20);
+                }
+                else if (control is Button)
+                {
+                    Button btn = control as Button;
+                    if (btn.Text.Contains("Start"))
+                    {
+                        btn.Location = new Point(15, 85);
+                        btn.Size = new Size(80, 30);
+                        btn.BackColor = Color.LightGreen;
+                    }
+                    else if (btn.Text.Contains("Stop"))
+                    {
+                        btn.Location = new Point(105, 85);
+                        btn.Size = new Size(80, 30);
+                        btn.BackColor = Color.LightCoral;
+                    }
+                }
+            }
+        }
+
+        private void CreateHeaderSection()
+        {
+            // Create header panel
+            Panel headerPanel = new Panel();
+            headerPanel.Location = new Point(0, 0);
+            headerPanel.Size = new Size(950, 70);
+            headerPanel.BackColor = Color.FromArgb(240, 248, 255); // Light blue background
+
+            // Main title
+            Label lblTitle = new Label();
+            lblTitle.Text = _isEditMode ? "Edit Upload Timer Job" : "Create New Upload Timer Job";
+            lblTitle.Location = new Point(20, 15);
+            lblTitle.Size = new Size(400, 25);
+            lblTitle.Font = new Font("Microsoft Sans Serif", 12F, FontStyle.Bold);
+            lblTitle.ForeColor = Color.DarkBlue;
+
+            // Subtitle
+            Label lblSubtitle = new Label();
+            lblSubtitle.Text = "Configure automatic file uploads with custom filters and schedules";
+            lblSubtitle.Location = new Point(20, 40);
+            lblSubtitle.Size = new Size(500, 20);
+            lblSubtitle.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular);
+            lblSubtitle.ForeColor = Color.DarkSlateGray;
+
+            headerPanel.Controls.Add(lblTitle);
+            headerPanel.Controls.Add(lblSubtitle);
+            this.Controls.Add(headerPanel);
         }
 
         private void InitializeTimerControls()
@@ -185,6 +354,593 @@ namespace syncer.ui
             // Initialize button states
             if (btnStartTimer != null) btnStartTimer.Enabled = false;
             if (btnStopTimer != null) btnStopTimer.Enabled = false;
+        }
+
+        private void InitializeFilterControls()
+        {
+            // Initialize filter settings from default or existing job
+            if (_jobFilterSettings == null)
+            {
+                _jobFilterSettings = new FilterSettings();
+                _jobFilterSettings.FiltersEnabled = true; // Enable by default for better user experience
+                _jobFilterSettings.IncludeHiddenFiles = false; // Usually don't want hidden files
+                _jobFilterSettings.IncludeSystemFiles = false; // Usually don't want system files
+                _jobFilterSettings.IncludeReadOnlyFiles = true; // Usually want read-only files
+                _jobFilterSettings.MinFileSize = 0; // No minimum
+                _jobFilterSettings.MaxFileSize = 100; // 100 MB default max
+            }
+
+            // Create main filter group box with better design
+            gbFilters = new GroupBox();
+            gbFilters.Text = "File Filters";
+            gbFilters.Size = new Size(920, 320); // Better width and height
+            gbFilters.Location = new Point(20, 250); // Moved up for better spacing
+            gbFilters.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Bold);
+
+            // Enable filters checkbox - prominent at the top
+            chkEnableFilters = new CheckBox();
+            chkEnableFilters.Text = "Enable file filtering for this job";
+            chkEnableFilters.Location = new Point(15, 25);
+            chkEnableFilters.Size = new Size(300, 25);
+            chkEnableFilters.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular);
+            chkEnableFilters.Checked = _jobFilterSettings.FiltersEnabled;
+            chkEnableFilters.CheckedChanged += chkEnableFilters_CheckedChanged;
+
+            // Create left panel for file types
+            CreateFileTypesPanel();
+            
+            // Create middle panel for file size controls
+            CreateFileSizePanel();
+            
+            // Create right panel for attributes and patterns
+            CreateAttributesPanel();
+
+            // Add main group box to form
+            this.Controls.Add(gbFilters);
+
+            // Create action buttons
+            CreateActionButtons();
+
+            // Update filter control states
+            UpdateFilterControlStates();
+        }
+
+        private void CreateFileTypesPanel()
+        {
+            // File types group
+            GroupBox gbFileTypes = new GroupBox();
+            gbFileTypes.Text = "Allowed File Types";
+            gbFileTypes.Location = new Point(15, 55);
+            gbFileTypes.Size = new Size(280, 180);
+            gbFileTypes.Font = new Font("Microsoft Sans Serif", 8.5F, FontStyle.Regular);
+
+            Label lblFileTypesHelp = new Label();
+            lblFileTypesHelp.Text = "Check the file types you want to include:";
+            lblFileTypesHelp.Location = new Point(10, 20);
+            lblFileTypesHelp.Size = new Size(260, 15);
+            lblFileTypesHelp.Font = new Font("Microsoft Sans Serif", 8F);
+
+            clbFileTypes = new CheckedListBox();
+            clbFileTypes.Location = new Point(10, 40);
+            clbFileTypes.Size = new Size(260, 120); // Slightly taller
+            clbFileTypes.Font = new Font("Microsoft Sans Serif", 8F);
+            clbFileTypes.CheckOnClick = true;
+            clbFileTypes.ScrollAlwaysVisible = true; // Always show scrollbar for better UX
+            string[] defaultFileTypes = ServiceLocator.FilterService.GetDefaultFileTypes();
+            clbFileTypes.Items.AddRange(defaultFileTypes);
+
+            Label lblFileTypesNote = new Label();
+            lblFileTypesNote.Text = "Leave all unchecked to allow all file types";
+            lblFileTypesNote.Location = new Point(10, 165); // Adjusted for taller CheckedListBox
+            lblFileTypesNote.Size = new Size(260, 15);
+            lblFileTypesNote.ForeColor = Color.Gray;
+            lblFileTypesNote.Font = new Font("Microsoft Sans Serif", 7.5f, FontStyle.Italic);
+
+            gbFileTypes.Controls.Add(lblFileTypesHelp);
+            gbFileTypes.Controls.Add(clbFileTypes);
+            gbFileTypes.Controls.Add(lblFileTypesNote);
+            gbFilters.Controls.Add(gbFileTypes);
+        }
+
+        private void CreateFileSizePanel()
+        {
+            // File size group
+            GroupBox gbFileSize = new GroupBox();
+            gbFileSize.Text = "File Size Limits";
+            gbFileSize.Location = new Point(310, 55);
+            gbFileSize.Size = new Size(280, 130);
+            gbFileSize.Font = new Font("Microsoft Sans Serif", 8.5F, FontStyle.Regular);
+
+            // Min size controls
+            Label lblMinSize = new Label();
+            lblMinSize.Text = "Minimum size:";
+            lblMinSize.Location = new Point(15, 25);
+            lblMinSize.Size = new Size(80, 20);
+            lblMinSize.Font = new Font("Microsoft Sans Serif", 8F);
+
+            numMinFileSize = new NumericUpDown();
+            numMinFileSize.Location = new Point(100, 23);
+            numMinFileSize.Size = new Size(80, 20);
+            numMinFileSize.Minimum = 0;
+            numMinFileSize.Maximum = 999999;
+            numMinFileSize.Value = _jobFilterSettings.MinFileSize;
+
+            // Max size controls
+            Label lblMaxSize = new Label();
+            lblMaxSize.Text = "Maximum size:";
+            lblMaxSize.Location = new Point(15, 55);
+            lblMaxSize.Size = new Size(80, 20);
+            lblMaxSize.Font = new Font("Microsoft Sans Serif", 8F);
+
+            numMaxFileSize = new NumericUpDown();
+            numMaxFileSize.Location = new Point(100, 53);
+            numMaxFileSize.Size = new Size(80, 20);
+            numMaxFileSize.Minimum = 0;
+            numMaxFileSize.Maximum = 999999;
+            numMaxFileSize.Value = _jobFilterSettings.MaxFileSize;
+
+            // Size unit combo
+            Label lblUnit = new Label();
+            lblUnit.Text = "Unit:";
+            lblUnit.Location = new Point(190, 25);
+            lblUnit.Size = new Size(30, 20);
+            lblUnit.Font = new Font("Microsoft Sans Serif", 8F);
+
+            cmbFileSizeUnit = new ComboBox();
+            cmbFileSizeUnit.Location = new Point(190, 53);
+            cmbFileSizeUnit.Size = new Size(60, 20);
+            cmbFileSizeUnit.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbFileSizeUnit.Items.AddRange(new string[] { "KB", "MB", "GB" });
+            cmbFileSizeUnit.SelectedIndex = 1; // Default to MB
+
+            Label lblSizeNote = new Label();
+            lblSizeNote.Text = "Set to 0 for no limit";
+            lblSizeNote.Location = new Point(15, 85);
+            lblSizeNote.Size = new Size(120, 15);
+            lblSizeNote.ForeColor = Color.Gray;
+            lblSizeNote.Font = new Font("Microsoft Sans Serif", 7.5f, FontStyle.Italic);
+
+            gbFileSize.Controls.Add(lblMinSize);
+            gbFileSize.Controls.Add(numMinFileSize);
+            gbFileSize.Controls.Add(lblMaxSize);
+            gbFileSize.Controls.Add(numMaxFileSize);
+            gbFileSize.Controls.Add(lblUnit);
+            gbFileSize.Controls.Add(cmbFileSizeUnit);
+            gbFileSize.Controls.Add(lblSizeNote);
+            gbFilters.Controls.Add(gbFileSize);
+        }
+
+        private void CreateAttributesPanel()
+        {
+            // File attributes and patterns group
+            GroupBox gbAttributes = new GroupBox();
+            gbAttributes.Text = "File Attributes & Patterns";
+            gbAttributes.Location = new Point(610, 55);
+            gbAttributes.Size = new Size(270, 180);
+            gbAttributes.Font = new Font("Microsoft Sans Serif", 8.5F, FontStyle.Regular);
+
+            // File attribute checkboxes
+            chkIncludeHiddenFiles = new CheckBox();
+            chkIncludeHiddenFiles.Text = "Include hidden files";
+            chkIncludeHiddenFiles.Location = new Point(15, 25);
+            chkIncludeHiddenFiles.Size = new Size(150, 20);
+            chkIncludeHiddenFiles.Font = new Font("Microsoft Sans Serif", 8F);
+            chkIncludeHiddenFiles.Checked = _jobFilterSettings.IncludeHiddenFiles;
+
+            chkIncludeSystemFiles = new CheckBox();
+            chkIncludeSystemFiles.Text = "Include system files";
+            chkIncludeSystemFiles.Location = new Point(15, 50);
+            chkIncludeSystemFiles.Size = new Size(150, 20);
+            chkIncludeSystemFiles.Font = new Font("Microsoft Sans Serif", 8F);
+            chkIncludeSystemFiles.Checked = _jobFilterSettings.IncludeSystemFiles;
+
+            chkIncludeReadOnlyFiles = new CheckBox();
+            chkIncludeReadOnlyFiles.Text = "Include read-only files";
+            chkIncludeReadOnlyFiles.Location = new Point(15, 75);
+            chkIncludeReadOnlyFiles.Size = new Size(150, 20);
+            chkIncludeReadOnlyFiles.Font = new Font("Microsoft Sans Serif", 8F);
+            chkIncludeReadOnlyFiles.Checked = _jobFilterSettings.IncludeReadOnlyFiles;
+
+            // Exclude patterns
+            Label lblExcludePatterns = new Label();
+            lblExcludePatterns.Text = "Exclude patterns:";
+            lblExcludePatterns.Location = new Point(15, 105);
+            lblExcludePatterns.Size = new Size(100, 15);
+            lblExcludePatterns.Font = new Font("Microsoft Sans Serif", 8F);
+
+            txtExcludePatterns = new TextBox();
+            txtExcludePatterns.Location = new Point(15, 125);
+            txtExcludePatterns.Size = new Size(240, 20);
+            txtExcludePatterns.Font = new Font("Microsoft Sans Serif", 8F);
+            txtExcludePatterns.Text = _jobFilterSettings.ExcludePatterns ?? "";
+
+            Label lblExcludeHelp = new Label();
+            lblExcludeHelp.Text = "Examples: *.tmp, temp*, backup*";
+            lblExcludeHelp.Location = new Point(15, 150);
+            lblExcludeHelp.Size = new Size(240, 15);
+            lblExcludeHelp.ForeColor = Color.Gray;
+            lblExcludeHelp.Font = new Font("Microsoft Sans Serif", 7.5f, FontStyle.Italic);
+
+            gbAttributes.Controls.Add(chkIncludeHiddenFiles);
+            gbAttributes.Controls.Add(chkIncludeSystemFiles);
+            gbAttributes.Controls.Add(chkIncludeReadOnlyFiles);
+            gbAttributes.Controls.Add(lblExcludePatterns);
+            gbAttributes.Controls.Add(txtExcludePatterns);
+            gbAttributes.Controls.Add(lblExcludeHelp);
+            gbFilters.Controls.Add(gbAttributes);
+        }
+
+        private void CreateActionButtons()
+        {
+            // Test filters button
+            Button btnTestFilters = new Button();
+            btnTestFilters.Text = "Test Filters";
+            btnTestFilters.Location = new Point(350, 245);
+            btnTestFilters.Size = new Size(100, 25);
+            btnTestFilters.Font = new Font("Microsoft Sans Serif", 8F);
+            btnTestFilters.BackColor = Color.LightSkyBlue;
+            btnTestFilters.Click += btnTestFilters_Click;
+            gbFilters.Controls.Add(btnTestFilters);
+
+            // Preview Job button (repositioned from designer)
+            if (btnPreview != null)
+            {
+                // Remove from main form if it was added there
+                if (this.Controls.Contains(btnPreview))
+                    this.Controls.Remove(btnPreview);
+                
+                // Add to filter group with proper positioning
+                btnPreview.Location = new Point(470, 245);
+                btnPreview.Size = new Size(100, 25);
+                btnPreview.Font = new Font("Microsoft Sans Serif", 8F);
+                btnPreview.BackColor = Color.LightGreen;
+                btnPreview.Text = "Preview Job";
+                gbFilters.Controls.Add(btnPreview);
+            }
+
+            // Status label for filter info
+            Label lblFilterStatus = new Label();
+            lblFilterStatus.Name = "lblFilterStatus";
+            lblFilterStatus.Text = "Filters disabled - all files will be included";
+            lblFilterStatus.Location = new Point(590, 250);
+            lblFilterStatus.Size = new Size(180, 15);
+            lblFilterStatus.ForeColor = Color.Gray;
+            lblFilterStatus.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Italic);
+            gbFilters.Controls.Add(lblFilterStatus);
+
+            // Add enable filters checkbox to main group
+            gbFilters.Controls.Add(chkEnableFilters);
+
+            // Add the filter group to the form
+            this.Controls.Add(gbFilters);
+
+            // Add a separator line before action buttons
+            Panel separator = new Panel();
+            separator.Height = 2;
+            separator.Width = 920;
+            separator.Location = new Point(20, 590);
+            separator.BackColor = Color.LightGray;
+            this.Controls.Add(separator);
+
+            // Create main action buttons at the bottom of the form
+            Button btnSave = new Button();
+            btnSave.Text = "Save Job";
+            btnSave.Location = new Point(720, 680); // Moved down for better spacing
+            btnSave.Size = new Size(100, 35);
+            btnSave.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Bold);
+            btnSave.BackColor = Color.LightGreen;
+            btnSave.Click += btnSave_Click;
+            this.Controls.Add(btnSave);
+
+            Button btnCancel = new Button();
+            btnCancel.Text = "Cancel";
+            btnCancel.Location = new Point(830, 680); // Moved down for better spacing
+            btnCancel.Size = new Size(100, 35);
+            btnCancel.Font = new Font("Microsoft Sans Serif", 9F);
+            btnCancel.BackColor = Color.LightCoral;
+            btnCancel.Click += btnCancel_Click;
+            this.Controls.Add(btnCancel);
+        }
+
+        private void chkEnableFilters_CheckedChanged(object sender, EventArgs e)
+        {
+            UpdateFilterControlStates();
+        }
+
+        private void UpdateFilterControlStates()
+        {
+            bool enabled = chkEnableFilters != null && chkEnableFilters.Checked;
+            
+            if (clbFileTypes != null) clbFileTypes.Enabled = enabled;
+            if (numMinFileSize != null) numMinFileSize.Enabled = enabled;
+            if (numMaxFileSize != null) numMaxFileSize.Enabled = enabled;
+            if (cmbFileSizeUnit != null) cmbFileSizeUnit.Enabled = enabled;
+            if (chkIncludeHiddenFiles != null) chkIncludeHiddenFiles.Enabled = enabled;
+            if (chkIncludeSystemFiles != null) chkIncludeSystemFiles.Enabled = enabled;
+            if (chkIncludeReadOnlyFiles != null) chkIncludeReadOnlyFiles.Enabled = enabled;
+            if (txtExcludePatterns != null) txtExcludePatterns.Enabled = enabled;
+            
+            // Update the filter status label
+            Control statusLabel = gbFilters?.Controls["lblFilterStatus"];
+            if (statusLabel != null)
+            {
+                statusLabel.Text = enabled ? 
+                    "Filters ENABLED - Only matching files will be uploaded" : 
+                    "Filters DISABLED - All files will be uploaded";
+                statusLabel.ForeColor = enabled ? Color.DarkGreen : Color.Gray;
+            }
+            
+            // Update the filter group box title to show status
+            if (gbFilters != null)
+            {
+                gbFilters.Text = enabled ? 
+                    "File Filters (ENABLED)" : 
+                    "File Filters (DISABLED)";
+            }
+        }
+
+        private FilterSettings GetCurrentFilterSettings()
+        {
+            FilterSettings settings = new FilterSettings();
+            
+            // Basic filter enable/disable
+            settings.FiltersEnabled = chkEnableFilters != null && chkEnableFilters.Checked;
+            
+            // File types
+            if (clbFileTypes != null && clbFileTypes.CheckedItems.Count > 0)
+            {
+                List<string> checkedTypes = new List<string>();
+                foreach (string item in clbFileTypes.CheckedItems)
+                {
+                    checkedTypes.Add(item);
+                }
+                settings.AllowedFileTypes = checkedTypes.ToArray();
+            }
+            
+            // File sizes (convert to MB for storage)
+            if (numMinFileSize != null && cmbFileSizeUnit != null && cmbFileSizeUnit.SelectedItem != null)
+            {
+                decimal minSize = numMinFileSize.Value;
+                string unit = cmbFileSizeUnit.SelectedItem.ToString();
+                
+                // Convert to MB for storage
+                if (unit == "KB")
+                    settings.MinFileSize = minSize / 1024;
+                else if (unit == "MB")
+                    settings.MinFileSize = minSize;
+                else if (unit == "GB")
+                    settings.MinFileSize = minSize * 1024;
+                else
+                    settings.MinFileSize = minSize; // Default to MB
+            }
+            
+            if (numMaxFileSize != null && cmbFileSizeUnit != null && cmbFileSizeUnit.SelectedItem != null)
+            {
+                decimal maxSize = numMaxFileSize.Value;
+                string unit = cmbFileSizeUnit.SelectedItem.ToString();
+                
+                // Convert to MB for storage
+                if (unit == "KB")
+                    settings.MaxFileSize = maxSize / 1024;
+                else if (unit == "MB")
+                    settings.MaxFileSize = maxSize;
+                else if (unit == "GB")
+                    settings.MaxFileSize = maxSize * 1024;
+                else
+                    settings.MaxFileSize = maxSize; // Default to MB
+            }
+            
+            // File attributes
+            if (chkIncludeHiddenFiles != null)
+                settings.IncludeHiddenFiles = chkIncludeHiddenFiles.Checked;
+            if (chkIncludeSystemFiles != null)
+                settings.IncludeSystemFiles = chkIncludeSystemFiles.Checked;
+            if (chkIncludeReadOnlyFiles != null)
+                settings.IncludeReadOnlyFiles = chkIncludeReadOnlyFiles.Checked;
+            
+            // Exclude patterns
+            if (txtExcludePatterns != null)
+                settings.ExcludePatterns = txtExcludePatterns.Text;
+            
+            return settings;
+        }
+
+        private void LoadFilterSettings()
+        {
+            if (_currentJob?.FilterSettings != null)
+            {
+                _jobFilterSettings = _currentJob.FilterSettings;
+                
+                // Update UI controls with loaded settings
+                if (chkEnableFilters != null)
+                    chkEnableFilters.Checked = _jobFilterSettings.FiltersEnabled;
+                
+                if (clbFileTypes != null && _jobFilterSettings.AllowedFileTypes != null)
+                {
+                    // Clear all selections first
+                    for (int i = 0; i < clbFileTypes.Items.Count; i++)
+                        clbFileTypes.SetItemChecked(i, false);
+                    
+                    // Check the items that match saved settings
+                    foreach (string allowedType in _jobFilterSettings.AllowedFileTypes)
+                    {
+                        int index = clbFileTypes.Items.IndexOf(allowedType);
+                        if (index >= 0)
+                            clbFileTypes.SetItemChecked(index, true);
+                    }
+                }
+                
+                if (numMinFileSize != null)
+                {
+                    // Values are stored in MB, display as MB by default
+                    numMinFileSize.Value = _jobFilterSettings.MinFileSize;
+                }
+                if (numMaxFileSize != null)
+                {
+                    // Values are stored in MB, display as MB by default
+                    numMaxFileSize.Value = _jobFilterSettings.MaxFileSize;
+                }
+                if (cmbFileSizeUnit != null)
+                {
+                    cmbFileSizeUnit.SelectedIndex = 1; // Default to MB since values are stored in MB
+                }
+                
+                if (chkIncludeHiddenFiles != null)
+                    chkIncludeHiddenFiles.Checked = _jobFilterSettings.IncludeHiddenFiles;
+                if (chkIncludeSystemFiles != null)
+                    chkIncludeSystemFiles.Checked = _jobFilterSettings.IncludeSystemFiles;
+                if (chkIncludeReadOnlyFiles != null)
+                    chkIncludeReadOnlyFiles.Checked = _jobFilterSettings.IncludeReadOnlyFiles;
+                
+                if (txtExcludePatterns != null)
+                    txtExcludePatterns.Text = _jobFilterSettings.ExcludePatterns ?? "";
+                
+                UpdateFilterControlStates();
+            }
+        }
+
+        private void btnTestFilters_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(_selectedFolderForTimer))
+            {
+                MessageBox.Show("Please select a folder first using the 'Browse Files' button before testing filters.", 
+                    "No Folder Selected", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                // Get current filter settings
+                FilterSettings currentFilters = GetCurrentFilterSettings();
+                
+                // Get all files in the selected folder
+                string[] allFiles = Directory.GetFiles(_selectedFolderForTimer, "*", SearchOption.AllDirectories);
+                
+                // Apply filters
+                List<string> includedFiles = new List<string>();
+                List<string> excludedFiles = new List<string>();
+                
+                foreach (string file in allFiles)
+                {
+                    if (ShouldIncludeFileForTimer(file, currentFilters))
+                    {
+                        includedFiles.Add(Path.GetFileName(file));
+                    }
+                    else
+                    {
+                        excludedFiles.Add(Path.GetFileName(file));
+                    }
+                }
+                
+                // Show results
+                string message = string.Format(
+                    "Filter Test Results for folder: {0}\n\n" +
+                    "Total files found: {1}\n" +
+                    "Files that WILL be uploaded: {2}\n" +
+                    "Files that will be EXCLUDED: {3}\n\n" +
+                    "Included files (first 10): {4}\n\n" +
+                    "Excluded files (first 10): {5}",
+                    Path.GetFileName(_selectedFolderForTimer),
+                    allFiles.Length,
+                    includedFiles.Count,
+                    excludedFiles.Count,
+                    string.Join(", ", includedFiles.Take(10).ToArray()),
+                    string.Join(", ", excludedFiles.Take(10).ToArray())
+                );
+                
+                MessageBox.Show(message, "Filter Test Results", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error testing filters: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private bool ShouldIncludeFileForTimer(string filePath, FilterSettings filterSettings)
+        {
+            if (filterSettings == null || !filterSettings.FiltersEnabled)
+                return true;
+            
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+                
+                // Check file attributes
+                if (!filterSettings.IncludeHiddenFiles && (fileInfo.Attributes & FileAttributes.Hidden) != 0)
+                    return false;
+                
+                if (!filterSettings.IncludeSystemFiles && (fileInfo.Attributes & FileAttributes.System) != 0)
+                    return false;
+                
+                if (!filterSettings.IncludeReadOnlyFiles && (fileInfo.Attributes & FileAttributes.ReadOnly) != 0)
+                    return false;
+                
+                // Check file size (assume MB for now)
+                long fileSizeBytes = fileInfo.Length;
+                long minSizeBytes = (long)(filterSettings.MinFileSize * 1024 * 1024);
+                long maxSizeBytes = (long)(filterSettings.MaxFileSize * 1024 * 1024);
+                
+                if (minSizeBytes > 0 && fileSizeBytes < minSizeBytes)
+                    return false;
+                
+                if (maxSizeBytes > 0 && fileSizeBytes > maxSizeBytes)
+                    return false;
+                
+                // Check file extensions
+                if (filterSettings.AllowedFileTypes != null && filterSettings.AllowedFileTypes.Length > 0)
+                {
+                    string fileExtension = fileInfo.Extension;
+                    bool matchesExtension = false;
+                    
+                    foreach (string allowedType in filterSettings.AllowedFileTypes)
+                    {
+                        // Extract extension from format like ".txt - Text files"
+                        string allowedExt = allowedType.Split(' ')[0].Trim();
+                        if (string.Equals(fileExtension, allowedExt, StringComparison.OrdinalIgnoreCase))
+                        {
+                            matchesExtension = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!matchesExtension)
+                        return false;
+                }
+                
+                // Check exclude patterns
+                if (!string.IsNullOrEmpty(filterSettings.ExcludePatterns))
+                {
+                    string fileName = fileInfo.Name;
+                    string[] patterns = filterSettings.ExcludePatterns.Split(',', ';');
+                    
+                    foreach (string pattern in patterns)
+                    {
+                        string trimmedPattern = pattern.Trim();
+                        if (!string.IsNullOrEmpty(trimmedPattern))
+                        {
+                            // Simple wildcard matching
+                            if (trimmedPattern.Contains("*"))
+                            {
+                                // Convert to regex pattern
+                                string regexPattern = trimmedPattern.Replace("*", ".*");
+                                if (Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase))
+                                    return false;
+                            }
+                            else if (fileName.IndexOf(trimmedPattern, StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                
+                return true;
+            }
+            catch (Exception)
+            {
+                // If we can't check the file, include it by default
+                return true;
+            }
         }
 
         protected override void OnFormClosed(FormClosedEventArgs e)
@@ -229,6 +985,9 @@ namespace syncer.ui
                 if (chkEnableTimer != null) chkEnableTimer.Checked = false; // Default for new timer feature
                 if (numTimerInterval != null) numTimerInterval.Value = 5; // Default 5 minute interval
                 if (cmbTimerUnit != null) cmbTimerUnit.SelectedIndex = 1; // Minutes
+                
+                // Load filter settings
+                LoadFilterSettings();
             }
         }
 
@@ -236,8 +995,8 @@ namespace syncer.ui
         {
             using (FolderBrowserDialog dialog = new FolderBrowserDialog())
             {
-                dialog.Description = "Select source folder to sync";
-                dialog.ShowNewFolderButton = false;
+                dialog.Description = "Select source folder to sync (empty folders allowed)";
+                dialog.ShowNewFolderButton = true;
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
                     txtSourcePath.Text = dialog.SelectedPath;
@@ -471,6 +1230,9 @@ namespace syncer.ui
             
             _currentJob.TransferMode = "Upload"; // Timer-based uploads
             
+            // Save filter settings to the job
+            _currentJob.FilterSettings = GetCurrentFilterSettings();
+            
             // Set connection settings for source and destination
             var currentConnection = _connectionService.GetConnectionSettings();
             if (currentConnection != null && currentConnection.IsRemoteConnection)
@@ -566,8 +1328,28 @@ namespace syncer.ui
                     string folderPath = dialog.SelectedPath;
                     
                     // Get all files in the selected folder (including subfolders)
-                    string[] files = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories);
-                    _selectedFilesForTimer = files;
+                    string[] allFiles = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories);
+                    
+                    // Apply filters to get realistic count
+                    List<string> filteredFiles = new List<string>();
+                    FilterSettings currentFilters = GetCurrentFilterSettings();
+                    
+                    if (currentFilters != null && currentFilters.FiltersEnabled)
+                    {
+                        foreach (string file in allFiles)
+                        {
+                            if (ShouldIncludeFileForTimer(file, currentFilters))
+                            {
+                                filteredFiles.Add(file);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        filteredFiles.AddRange(allFiles);
+                    }
+                    
+                    _selectedFilesForTimer = filteredFiles.ToArray();
                     
                     // Store the base folder path for relative path calculations during upload
                     _selectedFolderForTimer = folderPath;
@@ -575,18 +1357,27 @@ namespace syncer.ui
                     // Update the label to show selected folder and file count
                     if (lblSelectedFiles != null)
                     {
-                        if (files.Length == 1)
+                        string filterInfo = (currentFilters != null && currentFilters.FiltersEnabled) ? " (filtered)" : "";
+                        
+                        if (filteredFiles.Count == 0)
                         {
-                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (1 file, including new files added later)";
+                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (empty/no matching files - will monitor for new files)" + filterInfo;
+                        }
+                        else if (filteredFiles.Count == 1)
+                        {
+                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (1 file, including new files added later)" + filterInfo;
                         }
                         else
                         {
-                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (" + files.Length + " files, including new files added later)";
+                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (" + filteredFiles.Count + " files, including new files added later)" + filterInfo;
                         }
                     }
                     
-                    ServiceLocator.LogService.LogInfo(string.Format("Selected folder '{0}' with {1} files for timer upload (will also include newly added files)", 
-                        folderPath, files.Length));
+                    string filterMessage = (currentFilters != null && currentFilters.FiltersEnabled) ? 
+                        string.Format(" ({0} files after applying filters)", filteredFiles.Count) : "";
+                    
+                    ServiceLocator.LogService.LogInfo(string.Format("Selected folder '{0}' with {1} files{2} for timer upload (will also include newly added files)", 
+                        folderPath, allFiles.Length, filterMessage));
                     
                     // Ask for upload destination for timer uploads
                     AskForTimerUploadDestination();
@@ -746,9 +1537,9 @@ namespace syncer.ui
                 return false;
             }
             
-            if (_selectedFilesForTimer == null || _selectedFilesForTimer.Length == 0)
+            if (string.IsNullOrEmpty(_selectedFolderForTimer))
             {
-                MessageBox.Show("Please select files for timer upload using 'Browse Files' button.", "Validation Error", 
+                MessageBox.Show("Please select a folder for timer upload using 'Browse Files' button.", "Validation Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 if (btnBrowseFilesForTimer != null) btnBrowseFilesForTimer.Focus();
                 return false;
@@ -807,11 +1598,34 @@ namespace syncer.ui
                 }
                 
                 // Get all files in the directory, including any newly added files
-                string[] currentFiles = Directory.GetFiles(_selectedFolderForTimer, "*", SearchOption.AllDirectories);
+                string[] allFiles = Directory.GetFiles(_selectedFolderForTimer, "*", SearchOption.AllDirectories);
+                
+                // Apply filters if they are configured
+                List<string> filteredFiles = new List<string>();
+                FilterSettings currentFilters = GetCurrentFilterSettings();
+                
+                if (currentFilters != null && currentFilters.FiltersEnabled)
+                {
+                    foreach (string file in allFiles)
+                    {
+                        // Use the same filtering logic as the service
+                        if (ShouldIncludeFileForTimer(file, currentFilters))
+                        {
+                            filteredFiles.Add(file);
+                        }
+                    }
+                }
+                else
+                {
+                    // No filters, include all files
+                    filteredFiles.AddRange(allFiles);
+                }
+                
+                string[] currentFiles = filteredFiles.ToArray();
                 
                 if (currentFiles.Length == 0)
                 {
-                    ServiceLocator.LogService.LogError("No files found in selected folder for automatic upload");
+                    ServiceLocator.LogService.LogInfo("No files found (after filtering) in selected folder for automatic upload - will retry on next timer interval");
                     return;
                 }
                 
