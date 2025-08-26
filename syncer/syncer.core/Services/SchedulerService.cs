@@ -97,7 +97,11 @@ namespace syncer.core.Services
                         timer.Change(Timeout.Infinite, Timeout.Infinite);
                         timer.Dispose();
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        // Log timer disposal error but continue cleanup
+                        System.Diagnostics.Debug.WriteLine("Failed to dispose timer during cleanup: " + ex.Message);
+                    }
                 }
                 _jobTimers.Clear();
             }
@@ -135,7 +139,13 @@ namespace syncer.core.Services
                         _jobTimers[job.Id].Dispose();
                         _jobTimers.Remove(job.Id);
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        // Log timer cleanup error but continue
+                        System.Diagnostics.Debug.WriteLine("Failed to cleanup job timer for " + job.Id + ": " + ex.Message);
+                        // Still try to remove from dictionary
+                        _jobTimers.Remove(job.Id);
+                    }
                 }
 
                 // Calculate next run time

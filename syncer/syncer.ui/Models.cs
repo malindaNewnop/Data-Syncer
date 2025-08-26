@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+// Note: FilterSettings will be imported from syncer.core.Models once project reference is added
 
 namespace syncer.ui
 {
@@ -389,10 +390,23 @@ namespace syncer.ui
     }
 
     /// <summary>
-    /// Represents filter settings
+    /// Temporary FilterSettings for compilation - will be replaced with syncer.core.Models.FilterSettings
     /// </summary>
     public class FilterSettings
     {
+        // Core filtering properties
+        public System.Collections.Generic.List<string> IncludeExtensions { get; set; }
+        public System.Collections.Generic.List<string> ExcludeExtensions { get; set; }
+        public string IncludePattern { get; set; }
+        public string ExcludePattern { get; set; }
+        public long MinSizeKB { get; set; }
+        public long MaxSizeKB { get; set; }
+        public DateTime ModifiedAfter { get; set; }
+        public DateTime ModifiedBefore { get; set; }
+        public bool RecursiveSearch { get; set; }
+        public bool ValidateAfterTransfer { get; set; }
+        
+        // UI compatibility properties
         public bool FiltersEnabled { get; set; }
         public string[] AllowedFileTypes { get; set; }
         public decimal MinFileSize { get; set; }
@@ -401,13 +415,63 @@ namespace syncer.ui
         public bool IncludeSystemFiles { get; set; }
         public bool IncludeReadOnlyFiles { get; set; }
         public string ExcludePatterns { get; set; }
-
+        public bool IncludeSubfolders { get; set; }
+        
         public FilterSettings()
         {
+            IncludeExtensions = new System.Collections.Generic.List<string>();
+            ExcludeExtensions = new System.Collections.Generic.List<string>();
             FiltersEnabled = true;
             MinFileSize = 0;
             MaxFileSize = 100;
+            MinSizeKB = 0;
+            MaxSizeKB = 102400;
             IncludeReadOnlyFiles = true;
+            IncludeSubfolders = true;
+            RecursiveSearch = true;
+            ValidateAfterTransfer = true;
+            ModifiedAfter = DateTime.MinValue;
+            ModifiedBefore = DateTime.MinValue;
+        }
+        
+        /// <summary>
+        /// Convert UI file type selections to core extension lists
+        /// </summary>
+        public void UpdateExtensionsFromFileTypes()
+        {
+            IncludeExtensions.Clear();
+            
+            if (AllowedFileTypes != null)
+            {
+                foreach (string fileType in AllowedFileTypes)
+                {
+                    string extension = ExtractExtensionFromDisplayString(fileType);
+                    if (!string.IsNullOrEmpty(extension) && !IncludeExtensions.Contains(extension))
+                    {
+                        IncludeExtensions.Add(extension);
+                    }
+                }
+            }
+        }
+        
+        private string ExtractExtensionFromDisplayString(string displayString)
+        {
+            if (string.IsNullOrEmpty(displayString)) return string.Empty;
+            
+            int dashIndex = displayString.IndexOf(" - ");
+            string extension = dashIndex > 0 ? displayString.Substring(0, dashIndex).Trim() : displayString.Trim();
+            
+            if (!extension.StartsWith(".")) extension = "." + extension;
+            
+            return extension.ToLowerInvariant();
+        }
+        
+        public void UpdateSizeProperties()
+        {
+            MinSizeKB = (long)(MinFileSize * 1024);
+            MaxSizeKB = (long)(MaxFileSize * 1024);
+            ExcludePattern = ExcludePatterns;
+            RecursiveSearch = IncludeSubfolders;
         }
     }
 

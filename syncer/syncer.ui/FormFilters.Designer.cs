@@ -19,6 +19,7 @@ namespace syncer.ui
         private System.Windows.Forms.CheckBox chkIncludeHidden;
         private System.Windows.Forms.CheckBox chkIncludeSystem;
         private System.Windows.Forms.CheckBox chkIncludeReadOnly;
+        private System.Windows.Forms.CheckBox chkIncludeSubfolders;
         private System.Windows.Forms.Label lblExcludePatterns;
         private System.Windows.Forms.TextBox txtExcludePatterns;
         private System.Windows.Forms.Button btnSave;
@@ -52,6 +53,7 @@ namespace syncer.ui
             this.chkIncludeHidden = new System.Windows.Forms.CheckBox();
             this.chkIncludeSystem = new System.Windows.Forms.CheckBox();
             this.chkIncludeReadOnly = new System.Windows.Forms.CheckBox();
+            this.chkIncludeSubfolders = new System.Windows.Forms.CheckBox();
             this.lblExcludePatterns = new System.Windows.Forms.Label();
             this.txtExcludePatterns = new System.Windows.Forms.TextBox();
             this.btnSave = new System.Windows.Forms.Button();
@@ -185,6 +187,7 @@ namespace syncer.ui
             this.gbAdvancedFilters.Controls.Add(this.chkIncludeHidden);
             this.gbAdvancedFilters.Controls.Add(this.chkIncludeSystem);
             this.gbAdvancedFilters.Controls.Add(this.chkIncludeReadOnly);
+            this.gbAdvancedFilters.Controls.Add(this.chkIncludeSubfolders);
             this.gbAdvancedFilters.Controls.Add(this.lblExcludePatterns);
             this.gbAdvancedFilters.Controls.Add(this.txtExcludePatterns);
             this.gbAdvancedFilters.Location = new System.Drawing.Point(12, 327);
@@ -217,6 +220,14 @@ namespace syncer.ui
             this.chkIncludeReadOnly.TabIndex = 2;
             this.chkIncludeReadOnly.Text = "Include Read-only";
             this.chkIncludeReadOnly.UseVisualStyleBackColor = true;
+            // chkIncludeSubfolders
+            this.chkIncludeSubfolders.AutoSize = true;
+            this.chkIncludeSubfolders.Location = new System.Drawing.Point(400, 22);
+            this.chkIncludeSubfolders.Name = "chkIncludeSubfolders";
+            this.chkIncludeSubfolders.Size = new System.Drawing.Size(115, 17);
+            this.chkIncludeSubfolders.TabIndex = 3;
+            this.chkIncludeSubfolders.Text = "Include Subfolders";
+            this.chkIncludeSubfolders.UseVisualStyleBackColor = true;
             // lblExcludePatterns
             this.lblExcludePatterns.AutoSize = true;
             this.lblExcludePatterns.Location = new System.Drawing.Point(10, 55);

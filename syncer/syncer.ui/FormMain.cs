@@ -219,34 +219,6 @@ namespace syncer.ui
             }
         }
 
-        private void enhancedSftpSettingsToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                using (var enhancedForm = new Forms.FormComprehensiveConnection())
-                {
-                    if (enhancedForm.ShowDialog() == DialogResult.OK)
-                    {
-                        UpdateConnectionStatus();
-                        
-                        // Show notification for SFTP connection update
-                        if (_notificationService != null)
-                        {
-                            _notificationService.ShowNotification(
-                                "SFTP Connection Updated", 
-                                "Enhanced SFTP settings have been configured successfully.",
-                                ToolTipIcon.Info);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error opening enhanced SFTP settings: " + ex.Message, 
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
         private void sshKeyGenerationToolStripMenuItem_Click(object sender, EventArgs e)
         {
             try
@@ -264,36 +236,6 @@ namespace syncer.ui
                 MessageBox.Show("Error opening SSH key generation: " + ex.Message, 
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-        }
-
-        private void scheduleSettingsToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            using (FormSchedule scheduleForm = new FormSchedule())
-            {
-                // Set form title to reflect it's now for timer jobs
-                scheduleForm.Text = "Timer Job Settings";
-                
-                if (scheduleForm.ShowDialog() == DialogResult.OK)
-                {
-                    // Refresh timer jobs grid to show any new or updated jobs
-                    RefreshTimerJobsGrid();
-                    
-                    // Show notification
-                    if (_notificationService != null)
-                    {
-                        _notificationService.ShowNotification(
-                            "Schedule Updated",
-                            "Job schedules have been updated successfully.",
-                            ToolTipIcon.Info);
-                    }
-                }
-            }
-        }
-
-        private void filterSettingsToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            MessageBox.Show("Filter settings are now configured individually for each job when creating timer jobs.\n\nTo set filters:\n1. Click 'Add Timer Job'\n2. Configure your desired filters in the job creation form\n3. Each job can have its own filter settings", 
-                "Filter Settings", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void viewLogsToolStripMenuItem_Click(object sender, EventArgs e)

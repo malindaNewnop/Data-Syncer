@@ -54,6 +54,7 @@ namespace syncer.ui
                 if (chkIncludeHidden != null) chkIncludeHidden.Checked = _currentSettings.IncludeHiddenFiles;
                 if (chkIncludeSystem != null) chkIncludeSystem.Checked = _currentSettings.IncludeSystemFiles;
                 if (chkIncludeReadOnly != null) chkIncludeReadOnly.Checked = _currentSettings.IncludeReadOnlyFiles;
+                if (chkIncludeSubfolders != null) chkIncludeSubfolders.Checked = _currentSettings.IncludeSubfolders;
                 if (txtExcludePatterns != null) txtExcludePatterns.Text = _currentSettings.ExcludePatterns ?? string.Empty;
                 if (_currentSettings.AllowedFileTypes != null && clbFileTypes != null)
                 {
@@ -88,6 +89,7 @@ namespace syncer.ui
             if (numMinSize != null) numMinSize.Value = 0;
             if (numMaxSize != null) numMaxSize.Value = 100;
             if (chkIncludeReadOnly != null) chkIncludeReadOnly.Checked = true;
+            if (chkIncludeSubfolders != null) chkIncludeSubfolders.Checked = true;
             SetDefaultFileTypeSelection();
         }
 
@@ -103,24 +105,57 @@ namespace syncer.ui
         private void SaveSettings()
         {
             if (_currentSettings == null) _currentSettings = new FilterSettings();
+            
             _currentSettings.FiltersEnabled = chkEnableFilters != null && chkEnableFilters.Checked;
             _currentSettings.MinFileSize = numMinSize != null ? numMinSize.Value : 0;
             _currentSettings.MaxFileSize = numMaxSize != null ? numMaxSize.Value : 100;
             _currentSettings.IncludeHiddenFiles = chkIncludeHidden != null && chkIncludeHidden.Checked;
             _currentSettings.IncludeSystemFiles = chkIncludeSystem != null && chkIncludeSystem.Checked;
             _currentSettings.IncludeReadOnlyFiles = chkIncludeReadOnly == null || chkIncludeReadOnly.Checked;
+            _currentSettings.IncludeSubfolders = chkIncludeSubfolders == null || chkIncludeSubfolders.Checked;
             _currentSettings.ExcludePatterns = txtExcludePatterns != null ? txtExcludePatterns.Text.Trim() : string.Empty;
+            
+            // Enhanced file type handling with proper extension extraction
             if (clbFileTypes != null)
             {
                 System.Collections.Generic.List<string> selectedTypes = new System.Collections.Generic.List<string>();
+                ServiceLocator.LogService.LogInfo("FormFilters.SaveSettings - Processing selected file types:");
+                ServiceLocator.LogService.LogInfo("Total items in checklist: " + clbFileTypes.Items.Count);
+                ServiceLocator.LogService.LogInfo("Checked items count: " + clbFileTypes.CheckedItems.Count);
+                
                 foreach (object item in clbFileTypes.CheckedItems)
                 {
-                    selectedTypes.Add(item.ToString());
+                    string itemStr = item.ToString();
+                    selectedTypes.Add(itemStr);
+                    ServiceLocator.LogService.LogInfo("  Selected file type: " + itemStr);
                 }
+                
                 _currentSettings.AllowedFileTypes = selectedTypes.ToArray();
+                
+                // Update core extension properties for proper filtering
+                _currentSettings.UpdateExtensionsFromFileTypes();
+                _currentSettings.UpdateSizeProperties();
+                
+                ServiceLocator.LogService.LogInfo("Final AllowedFileTypes array length: " + (_currentSettings.AllowedFileTypes != null ? _currentSettings.AllowedFileTypes.Length : 0));
+                ServiceLocator.LogService.LogInfo("Converted extensions count: " + (_currentSettings.IncludeExtensions != null ? _currentSettings.IncludeExtensions.Count : 0));
+                
+                // Log converted extensions for debugging
+                if (_currentSettings.IncludeExtensions != null)
+                {
+                    foreach (string ext in _currentSettings.IncludeExtensions)
+                    {
+                        ServiceLocator.LogService.LogInfo("  Converted extension: " + ext);
+                    }
+                }
             }
+            else
+            {
+                ServiceLocator.LogService.LogInfo("FormFilters.SaveSettings - clbFileTypes is null!");
+            }
+            
+            ServiceLocator.LogService.LogInfo("FormFilters.SaveSettings - FiltersEnabled: " + _currentSettings.FiltersEnabled);
             _filterService.SaveFilterSettings(_currentSettings);
-            ServiceLocator.LogService.LogInfo("Filter settings saved");
+            ServiceLocator.LogService.LogInfo("Filter settings saved with proper extension conversion");
         }
 
         private void btnSelectAll_Click(object sender, EventArgs e)
@@ -271,31 +306,85 @@ namespace syncer.ui
                 preview += "Filters are disabled - all files will be processed.";
                 return preview;
             }
+            
             preview += "Filters are enabled\n\n";
-            preview += "Included file types:\n";
+            
+            // File type preview with actual extension conversion
+            preview += "File Type Filters:\n";
             if (clbFileTypes != null && clbFileTypes.CheckedItems.Count > 0)
             {
+                preview += "  Selected types:\n";
+                System.Collections.Generic.List<string> extensions = new System.Collections.Generic.List<string>();
+                
                 foreach (object o in clbFileTypes.CheckedItems)
                 {
-                    preview += "  • " + o.ToString() + "\n";
+                    string displayString = o.ToString();
+                    preview += "    • " + displayString + "\n";
+                    
+                    // Extract actual extension that will be used for filtering
+                    string extension = ExtractExtensionFromDisplayString(displayString);
+                    if (!string.IsNullOrEmpty(extension) && !extensions.Contains(extension))
+                    {
+                        extensions.Add(extension);
+                    }
+                }
+                
+                preview += "  Actual extensions used for filtering:\n";
+                foreach (string ext in extensions)
+                {
+                    preview += "    • " + ext + "\n";
                 }
             }
             else
             {
-                preview += "  • None (all files will be excluded)\n";
+                preview += "  • None selected (all files will be excluded)\n";
             }
-            preview += "\nSize filters:\n";
-            preview += "  • Minimum size: " + (numMinSize != null ? numMinSize.Value.ToString() : "0") + " MB\n";
-            preview += "  • Maximum size: " + (numMaxSize != null ? numMaxSize.Value.ToString() : "100") + " MB\n";
-            preview += "\nAdvanced options:\n";
+            
+            // Size filters
+            preview += "\nSize Filters:\n";
+            decimal minSize = numMinSize != null ? numMinSize.Value : 0;
+            decimal maxSize = numMaxSize != null ? numMaxSize.Value : 100;
+            preview += "  • Minimum size: " + minSize + " MB (" + (minSize * 1024) + " KB)\n";
+            preview += "  • Maximum size: " + maxSize + " MB (" + (maxSize * 1024) + " KB)\n";
+            
+            // Advanced options
+            preview += "\nAdvanced Options:\n";
             preview += "  • Include hidden files: " + ((chkIncludeHidden != null && chkIncludeHidden.Checked) ? "Yes" : "No") + "\n";
             preview += "  • Include system files: " + ((chkIncludeSystem != null && chkIncludeSystem.Checked) ? "Yes" : "No") + "\n";
             preview += "  • Include read-only files: " + ((chkIncludeReadOnly == null || chkIncludeReadOnly.Checked) ? "Yes" : "No") + "\n";
+            preview += "  • Include subfolders: " + ((chkIncludeSubfolders == null || chkIncludeSubfolders.Checked) ? "Yes" : "No") + "\n";
+            
+            // Pattern filters
             if (txtExcludePatterns != null && !UIStringExtensions.IsNullOrWhiteSpace(txtExcludePatterns.Text))
             {
                 preview += "  • Exclude patterns: " + txtExcludePatterns.Text + "\n";
             }
+            
+            preview += "\nFilter Logic Summary:\n";
+            preview += "Files will be included if they:\n";
+            preview += "• Match one of the selected file extensions\n";
+            preview += "• Are within the specified size range\n";
+            preview += "• Meet the advanced criteria (hidden/system/readonly)\n";
+            preview += "• Don't match any exclude patterns\n";
+            
             return preview;
+        }
+        
+        /// <summary>
+        /// Extract extension from display string - matches FilterSettings logic
+        /// </summary>
+        private string ExtractExtensionFromDisplayString(string displayString)
+        {
+            if (string.IsNullOrEmpty(displayString)) return string.Empty;
+            
+            // Handle format like ".txt - Text files" or just ".txt"
+            int dashIndex = displayString.IndexOf(" - ");
+            string extension = dashIndex > 0 ? displayString.Substring(0, dashIndex).Trim() : displayString.Trim();
+            
+            // Ensure it starts with a dot and contains only valid characters
+            if (!extension.StartsWith(".")) extension = "." + extension;
+            
+            return extension.ToLowerInvariant();
         }
     }
 }

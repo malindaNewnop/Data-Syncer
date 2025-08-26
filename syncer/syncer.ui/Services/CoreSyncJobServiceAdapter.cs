@@ -201,6 +201,24 @@ namespace syncer.ui.Services
             }
         }
 
+        public List<string> ApplyCurrentFiltersToFileList(string[] filePaths)
+        {
+            // Delegate to the main sync job service implementation
+            var mainService = ServiceLocator.SyncJobService;
+            if (mainService != null && mainService != this)
+            {
+                return mainService.ApplyCurrentFiltersToFileList(filePaths);
+            }
+            
+            // Fallback implementation - just return all files if the main service is not available
+            var result = new List<string>();
+            if (filePaths != null)
+            {
+                result.AddRange(filePaths);
+            }
+            return result;
+        }
+
         // Helper methods to convert between UI and Core job models
         private SyncJob ConvertCoreJobToUIJob(syncer.core.SyncJob coreJob)
         {

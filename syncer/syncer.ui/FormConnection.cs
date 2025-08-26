@@ -1042,23 +1042,6 @@ namespace syncer.ui
             }
         }
 
-        private void btnManageConnections_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                using (var connectionManager = new FormConnectionManager())
-                {
-                    connectionManager.ShowDialog(this);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error opening connection manager: {ex.Message}", 
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService?.LogError($"Error opening connection manager: {ex.Message}");
-            }
-        }
-
         #endregion
     }
 }

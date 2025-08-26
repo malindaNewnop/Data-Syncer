@@ -33,6 +33,7 @@ namespace syncer.ui.Services
             public DateTime? LastUploadTime { get; set; }
             public ITransferClient TransferClient { get; set; }
             public syncer.core.ConnectionSettings ConnectionSettings { get; set; }
+            public FilterSettings FilterSettings { get; set; }
         }
         
         public TimerJobManager()
@@ -44,6 +45,12 @@ namespace syncer.ui.Services
         
         public bool RegisterTimerJob(long jobId, string folderPath, string remotePath, double intervalMs)
         {
+            // Call the overloaded method with null filter settings
+            return RegisterTimerJob(jobId, folderPath, remotePath, intervalMs, null);
+        }
+        
+        public bool RegisterTimerJob(long jobId, string folderPath, string remotePath, double intervalMs, FilterSettings filterSettings)
+        {
             try
             {
                 // Check if the job already exists
@@ -54,6 +61,7 @@ namespace syncer.ui.Services
                     job.FolderPath = folderPath;
                     job.RemotePath = remotePath;
                     job.IntervalMs = intervalMs;
+                    job.FilterSettings = filterSettings;
                     
                     // Update timer interval if running
                     if (job.Timer != null && job.IsRunning)
@@ -103,7 +111,8 @@ namespace syncer.ui.Services
                     IsRunning = false,
                     LastUploadTime = null,
                     TransferClient = transferClient,
-                    ConnectionSettings = coreSettings
+                    ConnectionSettings = coreSettings,
+                    FilterSettings = filterSettings
                 };
                 
                 _timerJobs.Add(jobId, newJob);
@@ -294,11 +303,44 @@ namespace syncer.ui.Services
                 _logService.LogInfo(string.Format("Timer elapsed for job {0} - starting folder upload", jobId));
                 
                 // Get all files in the directory, including any newly added files
-                string[] currentFiles = Directory.GetFiles(job.FolderPath, "*", SearchOption.AllDirectories);
+                string[] allFiles = Directory.GetFiles(job.FolderPath, "*", SearchOption.AllDirectories);
+                
+                if (allFiles.Length == 0)
+                {
+                    _logService.LogWarning(string.Format("No files found in folder {0} for timer job {1}", job.FolderPath, jobId));
+                    return;
+                }
+                
+                // Apply filters if they are configured
+                List<string> filteredFiles = new List<string>();
+                
+                if (job.FilterSettings != null && job.FilterSettings.FiltersEnabled)
+                {
+                    _logService.LogInfo(string.Format("Applying filters to {0} files for job {1}", allFiles.Length, jobId));
+                    
+                    foreach (string file in allFiles)
+                    {
+                        if (ShouldIncludeFile(file, job.FilterSettings))
+                        {
+                            filteredFiles.Add(file);
+                        }
+                    }
+                    
+                    _logService.LogInfo(string.Format("{0} files passed filters out of {1} total files", 
+                        filteredFiles.Count, allFiles.Length));
+                }
+                else
+                {
+                    _logService.LogInfo(string.Format("No filters applied for job {0}, including all {1} files", 
+                        jobId, allFiles.Length));
+                    filteredFiles.AddRange(allFiles);
+                }
+                
+                string[] currentFiles = filteredFiles.ToArray();
                 
                 if (currentFiles.Length == 0)
                 {
-                    _logService.LogWarning(string.Format("No files found in folder {0} for timer job {1}", job.FolderPath, jobId));
+                    _logService.LogWarning(string.Format("No files passed the filter for timer job {0}", jobId));
                     return;
                 }
                 
@@ -420,6 +462,104 @@ namespace syncer.ui.Services
             catch (Exception ex)
             {
                 _logService.LogError(string.Format("Error in folder upload for job {0}: {1}", job.JobId, ex.Message));
+            }
+        }
+        
+        /// <summary>
+        /// Checks if a file should be included based on filter settings
+        /// </summary>
+        private bool ShouldIncludeFile(string filePath, FilterSettings filterSettings)
+        {
+            if (filterSettings == null || !filterSettings.FiltersEnabled)
+                return true;
+            
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+                
+                // Check file attributes
+                if (!filterSettings.IncludeHiddenFiles && (fileInfo.Attributes & FileAttributes.Hidden) != 0)
+                    return false;
+                
+                if (!filterSettings.IncludeSystemFiles && (fileInfo.Attributes & FileAttributes.System) != 0)
+                    return false;
+                
+                if (!filterSettings.IncludeReadOnlyFiles && (fileInfo.Attributes & FileAttributes.ReadOnly) != 0)
+                    return false;
+                
+                // Check file size (assume MB for now)
+                long fileSizeBytes = fileInfo.Length;
+                long minSizeBytes = (long)(filterSettings.MinFileSize * 1024 * 1024);
+                long maxSizeBytes = (long)(filterSettings.MaxFileSize * 1024 * 1024);
+                
+                if (minSizeBytes > 0 && fileSizeBytes < minSizeBytes)
+                    return false;
+                
+                if (maxSizeBytes > 0 && fileSizeBytes > maxSizeBytes)
+                    return false;
+                
+                // Check file extensions
+                if (filterSettings.AllowedFileTypes != null && filterSettings.AllowedFileTypes.Length > 0)
+                {
+                    string fileExtension = fileInfo.Extension;
+                    bool matchesExtension = false;
+                    
+                    foreach (string allowedType in filterSettings.AllowedFileTypes)
+                    {
+                        // Extract extension from format like ".txt - Text files"
+                        string allowedExt = allowedType.Split(' ')[0].Trim();
+                        if (string.Equals(fileExtension, allowedExt, StringComparison.OrdinalIgnoreCase))
+                        {
+                            matchesExtension = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!matchesExtension)
+                    {
+                        _logService.LogInfo(string.Format("File {0} excluded due to extension filter", Path.GetFileName(filePath)));
+                        return false;
+                    }
+                }
+                
+                // Check exclude patterns
+                if (!string.IsNullOrEmpty(filterSettings.ExcludePatterns))
+                {
+                    string fileName = fileInfo.Name;
+                    string[] patterns = filterSettings.ExcludePatterns.Split(',', ';');
+                    
+                    foreach (string pattern in patterns)
+                    {
+                        string trimmedPattern = pattern.Trim();
+                        if (!string.IsNullOrEmpty(trimmedPattern))
+                        {
+                            // Simple wildcard matching
+                            if (trimmedPattern.Contains("*"))
+                            {
+                                // Convert to regex pattern
+                                string regexPattern = trimmedPattern.Replace("*", ".*");
+                                if (System.Text.RegularExpressions.Regex.IsMatch(fileName, regexPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                                {
+                                    _logService.LogInfo(string.Format("File {0} excluded due to pattern match: {1}", fileName, trimmedPattern));
+                                    return false;
+                                }
+                            }
+                            else if (fileName.IndexOf(trimmedPattern, StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                _logService.LogInfo(string.Format("File {0} excluded due to pattern match: {1}", fileName, trimmedPattern));
+                                return false;
+                            }
+                        }
+                    }
+                }
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(string.Format("Error checking file {0}: {1}", filePath, ex.Message));
+                // If we can't check the file, exclude it
+                return false;
             }
         }
     }

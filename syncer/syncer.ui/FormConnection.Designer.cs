@@ -20,7 +20,6 @@ namespace syncer.ui
         private System.Windows.Forms.Button btnTestConnection;
         private System.Windows.Forms.Button btnSaveConnection;
         private System.Windows.Forms.Button btnLoadConnection;
-        private System.Windows.Forms.Button btnManageConnections;
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
         
@@ -69,7 +68,6 @@ namespace syncer.ui
             this.btnTestConnection = new System.Windows.Forms.Button();
             this.btnSaveConnection = new System.Windows.Forms.Button();
             this.btnLoadConnection = new System.Windows.Forms.Button();
-            this.btnManageConnections = new System.Windows.Forms.Button();
             this.lblConnectionName = new System.Windows.Forms.Label();
             this.txtConnectionName = new System.Windows.Forms.TextBox();
             this.btnSave = new System.Windows.Forms.Button();
@@ -124,7 +122,6 @@ namespace syncer.ui
             this.tabConnectionSettings.Controls.Add(this.btnTestConnection);
             this.tabConnectionSettings.Controls.Add(this.btnSaveConnection);
             this.tabConnectionSettings.Controls.Add(this.btnLoadConnection);
-            this.tabConnectionSettings.Controls.Add(this.btnManageConnections);
             this.tabConnectionSettings.Location = new System.Drawing.Point(4, 22);
             this.tabConnectionSettings.Name = "tabConnectionSettings";
             this.tabConnectionSettings.Padding = new System.Windows.Forms.Padding(3);
@@ -375,18 +372,6 @@ namespace syncer.ui
             this.btnLoadConnection.Text = "Load Connection";
             this.btnLoadConnection.UseVisualStyleBackColor = false;
             this.btnLoadConnection.Click += new System.EventHandler(this.btnLoadConnection_Click);
-            
-            // 
-            // btnManageConnections
-            // 
-            this.btnManageConnections.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
-            this.btnManageConnections.Location = new System.Drawing.Point(275, 270);
-            this.btnManageConnections.Name = "btnManageConnections";
-            this.btnManageConnections.Size = new System.Drawing.Size(120, 30);
-            this.btnManageConnections.TabIndex = 19;
-            this.btnManageConnections.Text = "Manage Connections";
-            this.btnManageConnections.UseVisualStyleBackColor = true;
-            this.btnManageConnections.Click += new System.EventHandler(this.btnManageConnections_Click);
             
             // 
             // lblKeyPath

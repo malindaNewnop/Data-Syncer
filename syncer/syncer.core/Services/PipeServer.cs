@@ -61,7 +61,10 @@ namespace syncer.core
                     _pipeServer?.Close();
                     _pipeServer?.Dispose();
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Failed to close pipe server: " + ex.Message);
+                }
 
                 if (_serverThread != null && _serverThread.IsAlive)
                 {
@@ -71,7 +74,10 @@ namespace syncer.core
                         {
                             _serverThread.Abort();
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine("Failed to abort server thread: " + ex.Message);
+                        }
                     }
                 }
 
@@ -150,7 +156,10 @@ namespace syncer.core
                         _pipeServer?.Close();
                         _pipeServer?.Dispose();
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Failed to dispose pipe server in finally block: " + ex.Message);
+                    }
                 }
             }
         }

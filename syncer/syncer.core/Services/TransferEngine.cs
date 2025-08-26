@@ -297,7 +297,11 @@ namespace syncer.core.Services
                     {
                         if (File.Exists(tempFile))
                         {
-                            try { File.Delete(tempFile); } catch { }
+                            try { File.Delete(tempFile); } 
+                            catch (Exception ex) 
+                            { 
+                                System.Diagnostics.Debug.WriteLine("Failed to delete temp file: " + ex.Message);
+                            }
                         }
                     }
                 }

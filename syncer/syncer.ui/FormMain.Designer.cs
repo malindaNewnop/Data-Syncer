@@ -9,12 +9,9 @@ namespace syncer.ui
         private System.Windows.Forms.ToolStripMenuItem helpToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem connectionSettingsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem connectionManagerToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem scheduleSettingsToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem filterSettingsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem viewLogsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem enhancedSftpSettingsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem sshKeyGenerationToolStripMenuItem;
         private System.Windows.Forms.Button btnAddJob;
         private System.Windows.Forms.Button btnStartStop;
@@ -45,8 +42,6 @@ namespace syncer.ui
             this.settingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.connectionSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.connectionManagerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.scheduleSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.filterSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.viewLogsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.helpToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.aboutToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -67,13 +62,6 @@ namespace syncer.ui
             this.gbControls.SuspendLayout();
             this.gbTimerJobs.SuspendLayout();
             this.SuspendLayout();
-
-            // Initialize enhancedSftpSettingsToolStripMenuItem
-            this.enhancedSftpSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.enhancedSftpSettingsToolStripMenuItem.Name = "enhancedSftpSettingsToolStripMenuItem";
-            this.enhancedSftpSettingsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
-            this.enhancedSftpSettingsToolStripMenuItem.Text = "Enhanced SFTP Settings";
-            this.enhancedSftpSettingsToolStripMenuItem.Click += new System.EventHandler(this.enhancedSftpSettingsToolStripMenuItem_Click);
 
             // Initialize sshKeyGenerationToolStripMenuItem
             this.sshKeyGenerationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -107,10 +95,7 @@ namespace syncer.ui
             this.settingsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.connectionSettingsToolStripMenuItem,
             this.connectionManagerToolStripMenuItem,
-            this.enhancedSftpSettingsToolStripMenuItem,
             this.sshKeyGenerationToolStripMenuItem,
-            this.scheduleSettingsToolStripMenuItem,
-            this.filterSettingsToolStripMenuItem,
             this.viewLogsToolStripMenuItem});
             this.settingsToolStripMenuItem.Name = "settingsToolStripMenuItem";
             this.settingsToolStripMenuItem.Size = new System.Drawing.Size(61, 20);
@@ -128,16 +113,6 @@ namespace syncer.ui
             this.connectionManagerToolStripMenuItem.Text = "Connection Manager";
             this.connectionManagerToolStripMenuItem.Click += new System.EventHandler(this.connectionManagerToolStripMenuItem_Click);
             // 
-            // scheduleSettingsToolStripMenuItem
-            this.scheduleSettingsToolStripMenuItem.Name = "scheduleSettingsToolStripMenuItem";
-            this.scheduleSettingsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
-            this.scheduleSettingsToolStripMenuItem.Text = "Timer Jobs";
-            this.scheduleSettingsToolStripMenuItem.Click += new System.EventHandler(this.scheduleSettingsToolStripMenuItem_Click);
-            // filterSettingsToolStripMenuItem
-            this.filterSettingsToolStripMenuItem.Name = "filterSettingsToolStripMenuItem";
-            this.filterSettingsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
-            this.filterSettingsToolStripMenuItem.Text = "Filter Settings";
-            this.filterSettingsToolStripMenuItem.Click += new System.EventHandler(this.filterSettingsToolStripMenuItem_Click);
             // viewLogsToolStripMenuItem
             this.viewLogsToolStripMenuItem.Name = "viewLogsToolStripMenuItem";
             this.viewLogsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
