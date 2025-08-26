@@ -31,9 +31,9 @@ namespace syncer.ui
         private string _selectedFolderForTimer; // Base folder path for relative path calculation
         private string _timerUploadDestination = "/"; // Default destination path
 
-        // Filter controls
-        private GroupBox gbFilters;
-        private CheckBox chkEnableFilters;
+        // Filter controls - simplified filtering (most advanced filtering features removed)
+        // private GroupBox gbFilters; // Unused - filtering simplified
+        // private CheckBox chkEnableFilters; // Unused - filtering simplified
         private CheckedListBox clbFileTypes;
         private NumericUpDown numMinFileSize;
         private NumericUpDown numMaxFileSize;
@@ -137,15 +137,12 @@ namespace syncer.ui
 
         private void InitializeCustomComponents()
         {
-            this.Text = _isEditMode ? "Edit Upload Timer Job" : "Create New Upload Timer Job";
-            this.Size = new Size(980, 780); // Increased size for better spacing
+            this.Text = _isEditMode ? "Edit Upload Timer Job" : "Add Upload Timer Settings";
+            this.Size = new Size(800, 320); // Wide enough to show both Timer Settings and File Manager sections
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            
-            // Hide source and destination section - we don't need it anymore
-            if (gbPaths != null) gbPaths.Visible = false;
             
             // Reorganize layout with better positioning
             ReorganizeFormLayout();
@@ -165,9 +162,9 @@ namespace syncer.ui
             // Position timer settings at the top left with better spacing
             if (gbTimerSettings != null)
             {
-                gbTimerSettings.Location = new Point(20, 90);
-                gbTimerSettings.Size = new Size(450, 140);
-                gbTimerSettings.Text = "Timer Configuration";
+                gbTimerSettings.Location = new Point(12, 85);
+                gbTimerSettings.Size = new Size(370, 120);
+                gbTimerSettings.Text = "Upload Timer Settings";
                 
                 // Improve internal layout of timer controls
                 AdjustTimerControlsLayout();
@@ -176,9 +173,9 @@ namespace syncer.ui
             // Position file manager to the right of timer settings with proper spacing
             if (gbFileManager != null)
             {
-                gbFileManager.Location = new Point(490, 90);
-                gbFileManager.Size = new Size(450, 140);
-                gbFileManager.Text = "Folder Selection for Timer Upload";
+                gbFileManager.Location = new Point(398, 85);
+                gbFileManager.Size = new Size(370, 120);
+                gbFileManager.Text = "File Manager";
                 
                 // Ensure proper spacing within the File Manager group
                 AdjustFileManagerLayout();
@@ -338,18 +335,8 @@ namespace syncer.ui
                 numTimerInterval.Value = 5; // Default 5 minutes
             }
             
-            // Initialize the Save Timer Job button
-            if (btnSaveTimerJob != null)
-            {
-                btnSaveTimerJob.BackColor = System.Drawing.Color.LightBlue;
-                btnSaveTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-                btnSaveTimerJob.Text = "Save Timer Job Configuration";
-                btnSaveTimerJob.Enabled = true;
-            }
-
             // Initialize timer status
             if (lblTimerStatus != null) lblTimerStatus.Text = "Timer stopped";
-            if (lblLastUpload != null) lblLastUpload.Text = "Never";
             
             // Initialize button states
             if (btnStartTimer != null) btnStartTimer.Enabled = false;
@@ -373,273 +360,47 @@ namespace syncer.ui
                 _jobFilterSettings.MaxFileSize = 1000; // 1GB default max
             }
 
-            // Create a simple message instead of complex filter controls
-            Label lblFilterNote = new Label();
-            lblFilterNote.Text = "File Selection: All files in the selected folder will be uploaded automatically.\nNo advanced filtering is available in this version.";
-            lblFilterNote.Location = new Point(20, 250);
-            lblFilterNote.Size = new Size(600, 40);
-            lblFilterNote.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular);
-            lblFilterNote.ForeColor = Color.DarkBlue;
-            this.Controls.Add(lblFilterNote);
+            // Filter controls are now handled in the designer file
+            // No need to create additional labels here
         }
 
         private void CreateFileTypesPanel()
         {
-            // File types group
-            GroupBox gbFileTypes = new GroupBox();
-            gbFileTypes.Text = "Allowed File Types";
-            gbFileTypes.Location = new Point(15, 55);
-            gbFileTypes.Size = new Size(280, 180);
-            gbFileTypes.Font = new Font("Microsoft Sans Serif", 8.5F, FontStyle.Regular);
-
-            Label lblFileTypesHelp = new Label();
-            lblFileTypesHelp.Text = "Check the file types you want to include:";
-            lblFileTypesHelp.Location = new Point(10, 20);
-            lblFileTypesHelp.Size = new Size(260, 15);
-            lblFileTypesHelp.Font = new Font("Microsoft Sans Serif", 8F);
-
-            clbFileTypes = new CheckedListBox();
-            clbFileTypes.Location = new Point(10, 40);
-            clbFileTypes.Size = new Size(260, 120); // Slightly taller
-            clbFileTypes.Font = new Font("Microsoft Sans Serif", 8F);
-            clbFileTypes.CheckOnClick = true;
-            clbFileTypes.ScrollAlwaysVisible = true; // Always show scrollbar for better UX
-            string[] defaultFileTypes = ServiceLocator.FilterService.GetDefaultFileTypes();
-            clbFileTypes.Items.AddRange(defaultFileTypes);
-
-            Label lblFileTypesNote = new Label();
-            lblFileTypesNote.Text = "Leave all unchecked to allow all file types";
-            lblFileTypesNote.Location = new Point(10, 165); // Adjusted for taller CheckedListBox
-            lblFileTypesNote.Size = new Size(260, 15);
-            lblFileTypesNote.ForeColor = Color.Gray;
-            lblFileTypesNote.Font = new Font("Microsoft Sans Serif", 7.5f, FontStyle.Italic);
-
-            gbFileTypes.Controls.Add(lblFileTypesHelp);
-            gbFileTypes.Controls.Add(clbFileTypes);
-            gbFileTypes.Controls.Add(lblFileTypesNote);
-            gbFilters.Controls.Add(gbFileTypes);
+            // Advanced filtering simplified - this method no longer creates complex UI
+            // File type filtering is handled automatically
+            return;
         }
 
         private void CreateFileSizePanel()
         {
-            // File size group
-            GroupBox gbFileSize = new GroupBox();
-            gbFileSize.Text = "File Size Limits";
-            gbFileSize.Location = new Point(310, 55);
-            gbFileSize.Size = new Size(280, 130);
-            gbFileSize.Font = new Font("Microsoft Sans Serif", 8.5F, FontStyle.Regular);
-
-            // Min size controls
-            Label lblMinSize = new Label();
-            lblMinSize.Text = "Minimum size:";
-            lblMinSize.Location = new Point(15, 25);
-            lblMinSize.Size = new Size(80, 20);
-            lblMinSize.Font = new Font("Microsoft Sans Serif", 8F);
-
-            numMinFileSize = new NumericUpDown();
-            numMinFileSize.Location = new Point(100, 23);
-            numMinFileSize.Size = new Size(80, 20);
-            numMinFileSize.Minimum = 0;
-            numMinFileSize.Maximum = 999999;
-            numMinFileSize.Value = _jobFilterSettings.MinFileSize;
-
-            // Max size controls
-            Label lblMaxSize = new Label();
-            lblMaxSize.Text = "Maximum size:";
-            lblMaxSize.Location = new Point(15, 55);
-            lblMaxSize.Size = new Size(80, 20);
-            lblMaxSize.Font = new Font("Microsoft Sans Serif", 8F);
-
-            numMaxFileSize = new NumericUpDown();
-            numMaxFileSize.Location = new Point(100, 53);
-            numMaxFileSize.Size = new Size(80, 20);
-            numMaxFileSize.Minimum = 0;
-            numMaxFileSize.Maximum = 999999;
-            numMaxFileSize.Value = _jobFilterSettings.MaxFileSize;
-
-            // Size unit combo
-            Label lblUnit = new Label();
-            lblUnit.Text = "Unit:";
-            lblUnit.Location = new Point(190, 25);
-            lblUnit.Size = new Size(30, 20);
-            lblUnit.Font = new Font("Microsoft Sans Serif", 8F);
-
-            cmbFileSizeUnit = new ComboBox();
-            cmbFileSizeUnit.Location = new Point(190, 53);
-            cmbFileSizeUnit.Size = new Size(60, 20);
-            cmbFileSizeUnit.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbFileSizeUnit.Items.AddRange(new string[] { "KB", "MB", "GB" });
-            cmbFileSizeUnit.SelectedIndex = 1; // Default to MB
-
-            Label lblSizeNote = new Label();
-            lblSizeNote.Text = "Set to 0 for no limit";
-            lblSizeNote.Location = new Point(15, 85);
-            lblSizeNote.Size = new Size(120, 15);
-            lblSizeNote.ForeColor = Color.Gray;
-            lblSizeNote.Font = new Font("Microsoft Sans Serif", 7.5f, FontStyle.Italic);
-
-            gbFileSize.Controls.Add(lblMinSize);
-            gbFileSize.Controls.Add(numMinFileSize);
-            gbFileSize.Controls.Add(lblMaxSize);
-            gbFileSize.Controls.Add(numMaxFileSize);
-            gbFileSize.Controls.Add(lblUnit);
-            gbFileSize.Controls.Add(cmbFileSizeUnit);
-            gbFileSize.Controls.Add(lblSizeNote);
-            gbFilters.Controls.Add(gbFileSize);
+            // Advanced filtering simplified - this method no longer creates complex UI
+            return;
         }
 
         private void CreateAttributesPanel()
         {
-            // File attributes and patterns group
-            GroupBox gbAttributes = new GroupBox();
-            gbAttributes.Text = "File Attributes & Patterns";
-            gbAttributes.Location = new Point(610, 55);
-            gbAttributes.Size = new Size(270, 180);
-            gbAttributes.Font = new Font("Microsoft Sans Serif", 8.5F, FontStyle.Regular);
-
-            // File attribute checkboxes
-            chkIncludeHiddenFiles = new CheckBox();
-            chkIncludeHiddenFiles.Text = "Include hidden files";
-            chkIncludeHiddenFiles.Location = new Point(15, 25);
-            chkIncludeHiddenFiles.Size = new Size(150, 20);
-            chkIncludeHiddenFiles.Font = new Font("Microsoft Sans Serif", 8F);
-            chkIncludeHiddenFiles.Checked = _jobFilterSettings.IncludeHiddenFiles;
-
-            chkIncludeSystemFiles = new CheckBox();
-            chkIncludeSystemFiles.Text = "Include system files";
-            chkIncludeSystemFiles.Location = new Point(15, 50);
-            chkIncludeSystemFiles.Size = new Size(150, 20);
-            chkIncludeSystemFiles.Font = new Font("Microsoft Sans Serif", 8F);
-            chkIncludeSystemFiles.Checked = _jobFilterSettings.IncludeSystemFiles;
-
-            chkIncludeReadOnlyFiles = new CheckBox();
-            chkIncludeReadOnlyFiles.Text = "Include read-only files";
-            chkIncludeReadOnlyFiles.Location = new Point(15, 75);
-            chkIncludeReadOnlyFiles.Size = new Size(150, 20);
-            chkIncludeReadOnlyFiles.Font = new Font("Microsoft Sans Serif", 8F);
-            chkIncludeReadOnlyFiles.Checked = _jobFilterSettings.IncludeReadOnlyFiles;
-
-            // Exclude patterns
-            Label lblExcludePatterns = new Label();
-            lblExcludePatterns.Text = "Exclude patterns:";
-            lblExcludePatterns.Location = new Point(15, 105);
-            lblExcludePatterns.Size = new Size(100, 15);
-            lblExcludePatterns.Font = new Font("Microsoft Sans Serif", 8F);
-
-            txtExcludePatterns = new TextBox();
-            txtExcludePatterns.Location = new Point(15, 125);
-            txtExcludePatterns.Size = new Size(240, 20);
-            txtExcludePatterns.Font = new Font("Microsoft Sans Serif", 8F);
-            txtExcludePatterns.Text = _jobFilterSettings.ExcludePatterns ?? "";
-
-            Label lblExcludeHelp = new Label();
-            lblExcludeHelp.Text = "Examples: *.tmp, temp*, backup*";
-            lblExcludeHelp.Location = new Point(15, 150);
-            lblExcludeHelp.Size = new Size(240, 15);
-            lblExcludeHelp.ForeColor = Color.Gray;
-            lblExcludeHelp.Font = new Font("Microsoft Sans Serif", 7.5f, FontStyle.Italic);
-
-            gbAttributes.Controls.Add(chkIncludeHiddenFiles);
-            gbAttributes.Controls.Add(chkIncludeSystemFiles);
-            gbAttributes.Controls.Add(chkIncludeReadOnlyFiles);
-            gbAttributes.Controls.Add(lblExcludePatterns);
-            gbAttributes.Controls.Add(txtExcludePatterns);
-            gbAttributes.Controls.Add(lblExcludeHelp);
-            gbFilters.Controls.Add(gbAttributes);
+            // Advanced filtering simplified - this method no longer creates complex UI
+            return;
         }
 
         private void CreateActionButtons()
         {
-            // Test filters button
-            Button btnTestFilters = new Button();
-            btnTestFilters.Text = "Test Filters";
-            btnTestFilters.Location = new Point(350, 245);
-            btnTestFilters.Size = new Size(100, 25);
-            btnTestFilters.Font = new Font("Microsoft Sans Serif", 8F);
-            btnTestFilters.BackColor = Color.LightSkyBlue;
-            btnTestFilters.Click += btnTestFilters_Click;
-            gbFilters.Controls.Add(btnTestFilters);
-
-
-            // Status label for filter info
-            Label lblFilterStatus = new Label();
-            lblFilterStatus.Name = "lblFilterStatus";
-            lblFilterStatus.Text = "Filters disabled - all files will be included";
-            lblFilterStatus.Location = new Point(590, 250);
-            lblFilterStatus.Size = new Size(180, 15);
-            lblFilterStatus.ForeColor = Color.Gray;
-            lblFilterStatus.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Italic);
-            gbFilters.Controls.Add(lblFilterStatus);
-
-            // Add enable filters checkbox to main group
-            gbFilters.Controls.Add(chkEnableFilters);
-
-            // Add the filter group to the form
-            this.Controls.Add(gbFilters);
-
-            // Add a separator line before action buttons
-            Panel separator = new Panel();
-            separator.Height = 2;
-            separator.Width = 920;
-            separator.Location = new Point(20, 590);
-            separator.BackColor = Color.LightGray;
-            this.Controls.Add(separator);
-
-            // Create main action buttons at the bottom of the form
-            Button btnSave = new Button();
-            btnSave.Text = "Save Job";
-            btnSave.Location = new Point(720, 680); // Moved down for better spacing
-            btnSave.Size = new Size(100, 35);
-            btnSave.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Bold);
-            btnSave.BackColor = Color.LightGreen;
-            btnSave.Click += btnSave_Click;
-            this.Controls.Add(btnSave);
-
-            Button btnCancel = new Button();
-            btnCancel.Text = "Cancel";
-            btnCancel.Location = new Point(830, 680); // Moved down for better spacing
-            btnCancel.Size = new Size(100, 35);
-            btnCancel.Font = new Font("Microsoft Sans Serif", 9F);
-            btnCancel.BackColor = Color.LightCoral;
-            btnCancel.Click += btnCancel_Click;
-            this.Controls.Add(btnCancel);
+            // Advanced filtering simplified - complex filter UI removed
+            // Main action buttons are handled by the main form designer
+            return;
         }
 
         private void chkEnableFilters_CheckedChanged(object sender, EventArgs e)
         {
-            UpdateFilterControlStates();
+            // Advanced filtering simplified - this method no longer needed
+            return;
         }
 
         private void UpdateFilterControlStates()
         {
-            bool enabled = chkEnableFilters != null && chkEnableFilters.Checked;
-            
-            if (clbFileTypes != null) clbFileTypes.Enabled = enabled;
-            if (numMinFileSize != null) numMinFileSize.Enabled = enabled;
-            if (numMaxFileSize != null) numMaxFileSize.Enabled = enabled;
-            if (cmbFileSizeUnit != null) cmbFileSizeUnit.Enabled = enabled;
-            if (chkIncludeHiddenFiles != null) chkIncludeHiddenFiles.Enabled = enabled;
-            if (chkIncludeSystemFiles != null) chkIncludeSystemFiles.Enabled = enabled;
-            if (chkIncludeReadOnlyFiles != null) chkIncludeReadOnlyFiles.Enabled = enabled;
-            if (txtExcludePatterns != null) txtExcludePatterns.Enabled = enabled;
-            
-            // Update the filter status label
-            Control statusLabel = gbFilters?.Controls["lblFilterStatus"];
-            if (statusLabel != null)
-            {
-                statusLabel.Text = enabled ? 
-                    "Filters ENABLED - Only matching files will be uploaded" : 
-                    "Filters DISABLED - All files will be uploaded";
-                statusLabel.ForeColor = enabled ? Color.DarkGreen : Color.Gray;
-            }
-            
-            // Update the filter group box title to show status
-            if (gbFilters != null)
-            {
-                gbFilters.Text = enabled ? 
-                    "File Filters (ENABLED)" : 
-                    "File Filters (DISABLED)";
-            }
+            // Filtering simplified - advanced filter controls removed
+            // All files will be uploaded automatically
+            return;
         }
 
         private FilterSettings GetCurrentFilterSettings()
@@ -667,9 +428,8 @@ namespace syncer.ui
             {
                 _jobFilterSettings = _currentJob.FilterSettings;
                 
-                // Update UI controls with loaded settings
-                if (chkEnableFilters != null)
-                    chkEnableFilters.Checked = _jobFilterSettings.FiltersEnabled;
+                // Simplified filtering - most UI controls removed
+                // Only basic filter settings are maintained for compatibility
                 
                 if (clbFileTypes != null && _jobFilterSettings.AllowedFileTypes != null)
                 {
@@ -743,13 +503,12 @@ namespace syncer.ui
 
         private void SetDefaultValues()
         {
-            if (chkEnabled != null) chkEnabled.Checked = true;
+            if (chkEnableJob != null) chkEnableJob.Checked = true;
             if (chkEnableTimer != null) chkEnableTimer.Checked = false;
             if (numTimerInterval != null) numTimerInterval.Value = 5;
             if (cmbTimerUnit != null) cmbTimerUnit.SelectedIndex = 1; // Minutes
             if (lblTimerStatus != null) lblTimerStatus.Text = "Timer stopped";
-            if (lblLastUpload != null) lblLastUpload.Text = "Never";
-            if (lblSelectedFiles != null) lblSelectedFiles.Text = "No files selected";
+            if (lblNoFilesSelected != null) lblNoFilesSelected.Text = "No files selected";
             
             // Initialize timer upload settings
             _selectedFilesForTimer = null;
@@ -761,9 +520,7 @@ namespace syncer.ui
             if (_currentJob != null)
             {
                 if (txtJobName != null) txtJobName.Text = _currentJob.Name;
-                if (chkEnabled != null) chkEnabled.Checked = _currentJob.IsEnabled;
-                if (txtSourcePath != null) txtSourcePath.Text = _currentJob.SourcePath;
-                if (txtDestinationPath != null) txtDestinationPath.Text = _currentJob.DestinationPath;
+                if (chkEnableJob != null) chkEnableJob.Checked = _currentJob.IsEnabled;
                 
                 // Load timer settings (if available from job data)
                 if (chkEnableTimer != null) chkEnableTimer.Checked = false; // Default for new timer feature
@@ -775,516 +532,11 @@ namespace syncer.ui
             }
         }
 
-        private void btnBrowseSource_Click(object sender, EventArgs e)
-        {
-            ConnectionSettings connectionSettings = _connectionService.GetConnectionSettings();
-            
-            // For source, we typically browse local files, but allow remote browsing too
-            // If connection is local or no connection, use local browse
-            if (connectionSettings == null || connectionSettings.Protocol == "LOCAL")
-            {
-                using (FolderBrowserDialog dialog = new FolderBrowserDialog())
-                {
-                    dialog.Description = "Select source folder to sync (empty folders allowed)";
-                    dialog.ShowNewFolderButton = true;
-                    if (txtSourcePath != null && !UIStringExtensions.IsNullOrWhiteSpace(txtSourcePath.Text))
-                        dialog.SelectedPath = txtSourcePath.Text;
-                    if (dialog.ShowDialog() == DialogResult.OK)
-                    {
-                        txtSourcePath.Text = dialog.SelectedPath;
-                    }
-                }
-            }
-            else
-            {
-                // Ask user whether they want to browse local or remote for source
-                DialogResult browseChoice = MessageBox.Show(
-                    "You have a remote connection configured.\n\n" +
-                    "Do you want to browse:\n" +
-                    "• Yes = Local folders (typical for uploading TO remote server)\n" +
-                    "• No = Remote folders (for downloading FROM remote server)\n" +
-                    "• Cancel = Enter path manually",
-                    "Source Browse Options",
-                    MessageBoxButtons.YesNoCancel,
-                    MessageBoxIcon.Question);
-                
-                if (browseChoice == DialogResult.Yes)
-                {
-                    // Browse local folders
-                    using (FolderBrowserDialog dialog = new FolderBrowserDialog())
-                    {
-                        dialog.Description = "Select local source folder to upload";
-                        dialog.ShowNewFolderButton = true;
-                        if (txtSourcePath != null && !UIStringExtensions.IsNullOrWhiteSpace(txtSourcePath.Text))
-                            dialog.SelectedPath = txtSourcePath.Text;
-                        if (dialog.ShowDialog() == DialogResult.OK)
-                        {
-                            txtSourcePath.Text = dialog.SelectedPath;
-                        }
-                    }
-                }
-                else if (browseChoice == DialogResult.No)
-                {
-                    // Browse remote folders (similar to destination browse)
-                    BrowseRemoteFolder(true); // true = for source path
-                }
-                // If Cancel, do nothing
-            }
-        }
+        // Removed - btnBrowseSource_Click method - no longer needed in simplified timer form
+        // Removed - btnBrowseDestination_Click method - no longer needed in simplified timer form
 
-        private void btnBrowseDestination_Click(object sender, EventArgs e)
-        {
-            ConnectionSettings connectionSettings = _connectionService.GetConnectionSettings();
-            if (connectionSettings != null && connectionSettings.Protocol == "LOCAL")
-            {
-                using (FolderBrowserDialog dialog = new FolderBrowserDialog())
-                {
-                    dialog.Description = "Select destination folder for local sync";
-                    dialog.ShowNewFolderButton = true;
-                    if (txtDestinationPath != null && !UIStringExtensions.IsNullOrWhiteSpace(txtDestinationPath.Text))
-                        dialog.SelectedPath = txtDestinationPath.Text;
-                    if (dialog.ShowDialog() == DialogResult.OK)
-                    {
-                        if (txtDestinationPath != null) txtDestinationPath.Text = dialog.SelectedPath;
-                    }
-                }
-            }
-            else if (connectionSettings != null && (connectionSettings.Protocol == "FTP" || connectionSettings.Protocol == "SFTP"))
-            {
-                // Enhanced remote browsing - auto-connect if not connected
-                if (!_connectionService.IsConnected())
-                {
-                    // Ask user if they want to connect automatically
-                    DialogResult result = MessageBox.Show(
-                        $"You are not connected to the {connectionSettings.Protocol} server.\n\n" +
-                        $"Would you like to connect to {connectionSettings.Host} and browse the remote directories?\n\n" +
-                        "Click 'Yes' to connect and browse, or 'No' to enter the path manually.",
-                        "Auto-Connect for Remote Browse",
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Question);
-                        
-                    if (result == DialogResult.Yes)
-                    {
-                        // Try to establish connection by testing it first
-                        this.Cursor = Cursors.WaitCursor;
-                        try
-                        {
-                            // Convert UI ConnectionSettings to Core ConnectionSettings
-                            var coreSettings = new syncer.core.ConnectionSettings
-                            {
-                                Protocol = connectionSettings.Protocol == "SFTP" ? 
-                                    syncer.core.ProtocolType.Sftp : 
-                                    connectionSettings.Protocol == "FTP" ? 
-                                        syncer.core.ProtocolType.Ftp : 
-                                        syncer.core.ProtocolType.Local,
-                                Host = connectionSettings.Host,
-                                Port = connectionSettings.Port,
-                                Username = connectionSettings.Username,
-                                Password = connectionSettings.Password,
-                                SshKeyPath = connectionSettings.SshKeyPath,
-                                Timeout = connectionSettings.Timeout
-                            };
-                            
-                            // Create appropriate transfer client for testing
-                            syncer.core.ITransferClient testClient = null;
-                            if (connectionSettings.Protocol == "FTP")
-                            {
-                                testClient = new syncer.core.Transfers.EnhancedFtpTransferClient();
-                            }
-                            else if (connectionSettings.Protocol == "SFTP")
-                            {
-                                testClient = new syncer.core.Transfers.ProductionSftpTransferClient();
-                            }
-                            
-                            if (testClient != null)
-                            {
-                                string error;
-                                bool connectionResult = testClient.TestConnection(coreSettings, out error);
-                                if (!connectionResult)
-                                {
-                                    this.Cursor = Cursors.Default;
-                                    MessageBox.Show(
-                                        $"Failed to connect to the remote server.\n\nError: {error}\n\n" +
-                                        "Please check your connection settings and try again, or enter the remote path manually.",
-                                        "Connection Failed",
-                                        MessageBoxButtons.OK,
-                                        MessageBoxIcon.Warning);
-                                    ShowRemotePathInputDialog(false);
-                                    return;
-                                }
-                            }
-                            else
-                            {
-                                this.Cursor = Cursors.Default;
-                                MessageBox.Show(
-                                    "Unsupported protocol for remote browsing.",
-                                    "Connection Error",
-                                    MessageBoxButtons.OK,
-                                    MessageBoxIcon.Error);
-                                ShowRemotePathInputDialog(false);
-                                return;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            this.Cursor = Cursors.Default;
-                            MessageBox.Show(
-                                $"Error connecting to server: {ex.Message}\n\n" +
-                                "You can still enter the remote path manually.",
-                                "Connection Error",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Error);
-                            ShowRemotePathInputDialog(false);
-                            return;
-                        }
-                        finally
-                        {
-                            this.Cursor = Cursors.Default;
-                        }
-                    }
-                    else
-                    {
-                        ShowRemotePathInputDialog(false);
-                        return;
-                    }
-                }
-                
-                // Now proceed with remote browsing (either already connected or just connected)
-                try
-                {
-                    // Convert UI ConnectionSettings to Core ConnectionSettings
-                    var coreSettings = new syncer.core.ConnectionSettings
-                    {
-                        Protocol = connectionSettings.Protocol == "SFTP" ? 
-                            syncer.core.ProtocolType.Sftp : 
-                            connectionSettings.Protocol == "FTP" ? 
-                                syncer.core.ProtocolType.Ftp : 
-                                syncer.core.ProtocolType.Local,
-                        Host = connectionSettings.Host,
-                        Port = connectionSettings.Port,
-                        Username = connectionSettings.Username,
-                        Password = connectionSettings.Password,
-                        SshKeyPath = connectionSettings.SshKeyPath,
-                        Timeout = connectionSettings.Timeout
-                    };
-                    
-                    // Use the FileZilla-like file manager
-                    this.Cursor = Cursors.WaitCursor;
-                    using (FormRemoteDirectoryBrowser fileManager = new FormRemoteDirectoryBrowser(coreSettings))
-                    {
-                        fileManager.IsUploadMode = false; // We want to select destination path
-                        fileManager.Text = $"Browse Remote Directories - {connectionSettings.Protocol}://{connectionSettings.Host}";
-                        
-                        this.Cursor = Cursors.Default;
-                        if (fileManager.ShowDialog() == DialogResult.OK)
-                        {
-                            if (!string.IsNullOrEmpty(fileManager.SelectedRemotePath))
-                            {
-                                if (txtDestinationPath != null) 
-                                    txtDestinationPath.Text = fileManager.SelectedRemotePath;
-                                
-                                // Show success message
-                                MessageBox.Show(
-                                    $"Remote path selected successfully:\n{fileManager.SelectedRemotePath}",
-                                    "Path Selected",
-                                    MessageBoxButtons.OK,
-                                    MessageBoxIcon.Information);
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    this.Cursor = Cursors.Default;
-                    MessageBox.Show(
-                        $"Error opening remote directory browser: {ex.Message}\n\n" +
-                        "You can still enter the remote path manually below.",
-                        "Browse Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
-                    ShowRemotePathInputDialog(false);
-                }
-            }
-            else
-            {
-                // No connection settings found
-                MessageBox.Show(
-                    "No connection settings found.\n\n" +
-                    "Please configure your connection settings first, or select LOCAL protocol for local file browsing.",
-                    "Connection Required",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-                ShowRemotePathInputDialog(false);
-            }
-        }
-
-        /// <summary>
-        /// Helper method to browse remote folders for either source or destination
-        /// </summary>
-        /// <param name="isForSource">True if browsing for source path, false for destination path</param>
-        private void BrowseRemoteFolder(bool isForSource)
-        {
-            ConnectionSettings connectionSettings = _connectionService.GetConnectionSettings();
-            if (connectionSettings == null || (connectionSettings.Protocol != "FTP" && connectionSettings.Protocol != "SFTP"))
-            {
-                MessageBox.Show(
-                    "Remote browsing requires FTP or SFTP connection settings.\n\n" +
-                    "Please configure your connection settings first.",
-                    "Configuration Required",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-                return;
-            }
-
-            // Enhanced remote browsing - auto-connect if not connected
-            if (!_connectionService.IsConnected())
-            {
-                // Ask user if they want to connect automatically
-                string pathType = isForSource ? "source" : "destination";
-                DialogResult result = MessageBox.Show(
-                    $"You are not connected to the {connectionSettings.Protocol} server.\n\n" +
-                    $"Would you like to connect to {connectionSettings.Host} and browse the remote directories for {pathType} path?\n\n" +
-                    "Click 'Yes' to connect and browse, or 'No' to enter the path manually.",
-                    "Auto-Connect for Remote Browse",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question);
-                    
-                if (result != DialogResult.Yes)
-                {
-                    ShowRemotePathInputDialog(isForSource);
-                    return;
-                }
-
-                // Try to establish connection by testing it first
-                this.Cursor = Cursors.WaitCursor;
-                try
-                {
-                    // Convert UI ConnectionSettings to Core ConnectionSettings
-                    var coreSettings = new syncer.core.ConnectionSettings
-                    {
-                        Protocol = connectionSettings.Protocol == "SFTP" ? 
-                            syncer.core.ProtocolType.Sftp : 
-                            connectionSettings.Protocol == "FTP" ? 
-                                syncer.core.ProtocolType.Ftp : 
-                                syncer.core.ProtocolType.Local,
-                        Host = connectionSettings.Host,
-                        Port = connectionSettings.Port,
-                        Username = connectionSettings.Username,
-                        Password = connectionSettings.Password,
-                        SshKeyPath = connectionSettings.SshKeyPath,
-                        Timeout = connectionSettings.Timeout
-                    };
-                    
-                    // Create appropriate transfer client for testing
-                    syncer.core.ITransferClient testClient = null;
-                    if (connectionSettings.Protocol == "FTP")
-                    {
-                        testClient = new syncer.core.Transfers.EnhancedFtpTransferClient();
-                    }
-                    else if (connectionSettings.Protocol == "SFTP")
-                    {
-                        testClient = new syncer.core.Transfers.ProductionSftpTransferClient();
-                    }
-                    
-                    if (testClient != null)
-                    {
-                        string error;
-                        bool connectionResult = testClient.TestConnection(coreSettings, out error);
-                        if (!connectionResult)
-                        {
-                            this.Cursor = Cursors.Default;
-                            MessageBox.Show(
-                                $"Failed to connect to the remote server.\n\nError: {error}\n\n" +
-                                "Please check your connection settings and try again, or enter the remote path manually.",
-                                "Connection Failed",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Warning);
-                            ShowRemotePathInputDialog(isForSource);
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        this.Cursor = Cursors.Default;
-                        MessageBox.Show(
-                            "Unsupported protocol for remote browsing.",
-                            "Connection Error",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error);
-                        ShowRemotePathInputDialog(isForSource);
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    this.Cursor = Cursors.Default;
-                    MessageBox.Show(
-                        $"Error connecting to server: {ex.Message}\n\n" +
-                        "You can still enter the remote path manually.",
-                        "Connection Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error);
-                    ShowRemotePathInputDialog(isForSource);
-                    return;
-                }
-                finally
-                {
-                    this.Cursor = Cursors.Default;
-                }
-            }
-            
-            // Now proceed with remote browsing (either already connected or just connected)
-            try
-            {
-                // Convert UI ConnectionSettings to Core ConnectionSettings
-                var coreSettings = new syncer.core.ConnectionSettings
-                {
-                    Protocol = connectionSettings.Protocol == "SFTP" ? 
-                        syncer.core.ProtocolType.Sftp : 
-                        connectionSettings.Protocol == "FTP" ? 
-                            syncer.core.ProtocolType.Ftp : 
-                            syncer.core.ProtocolType.Local,
-                    Host = connectionSettings.Host,
-                    Port = connectionSettings.Port,
-                    Username = connectionSettings.Username,
-                    Password = connectionSettings.Password,
-                    SshKeyPath = connectionSettings.SshKeyPath,
-                    Timeout = connectionSettings.Timeout
-                };
-                
-                // Use the FileZilla-like file manager
-                this.Cursor = Cursors.WaitCursor;
-                using (FormRemoteDirectoryBrowser fileManager = new FormRemoteDirectoryBrowser(coreSettings))
-                {
-                    fileManager.IsUploadMode = !isForSource; // Upload mode for destination, download mode for source
-                    string pathType = isForSource ? "Source" : "Destination";
-                    fileManager.Text = $"Browse Remote {pathType} - {connectionSettings.Protocol}://{connectionSettings.Host}";
-                    
-                    this.Cursor = Cursors.Default;
-                    if (fileManager.ShowDialog() == DialogResult.OK)
-                    {
-                        if (!string.IsNullOrEmpty(fileManager.SelectedRemotePath))
-                        {
-                            if (isForSource && txtSourcePath != null)
-                            {
-                                txtSourcePath.Text = fileManager.SelectedRemotePath;
-                            }
-                            else if (!isForSource && txtDestinationPath != null)
-                            {
-                                txtDestinationPath.Text = fileManager.SelectedRemotePath;
-                            }
-                            
-                            // Show success message
-                            MessageBox.Show(
-                                $"Remote {pathType.ToLower()} path selected successfully:\n{fileManager.SelectedRemotePath}",
-                                "Path Selected",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Information);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                this.Cursor = Cursors.Default;
-                MessageBox.Show(
-                    $"Error opening remote directory browser: {ex.Message}\n\n" +
-                    "You can still enter the remote path manually below.",
-                    "Browse Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                ShowRemotePathInputDialog(isForSource);
-            }
-        }
-
-        private void ShowRemotePathInputDialog(bool isForSource = false)
-        {
-            using (Form inputForm = new Form())
-            {
-                ConnectionSettings connectionSettings = _connectionService.GetConnectionSettings();
-                string protocol = connectionSettings != null ? connectionSettings.Protocol : "Unknown";
-                string host = connectionSettings != null ? connectionSettings.Host : "";
-                string pathType = isForSource ? "Source" : "Destination";
-                
-                inputForm.Text = $"Enter Remote {pathType} Path ({protocol})";
-                inputForm.Size = new Size(450, 180);
-                inputForm.StartPosition = FormStartPosition.CenterParent;
-                inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
-                inputForm.MaximizeBox = false;
-                inputForm.MinimizeBox = false;
-                
-                Label labelInfo = new Label(); 
-                labelInfo.Left = 10; 
-                labelInfo.Top = 10; 
-                labelInfo.Width = 420;
-                labelInfo.Text = $"Enter the remote {pathType.ToLower()} path on {protocol} server: {host}"; 
-                labelInfo.AutoSize = false;
-                
-                Label label = new Label(); 
-                label.Left = 10; 
-                label.Top = 40; 
-                label.Text = $"Remote {pathType.ToLower()} path (e.g., /remote/folder):"; 
-                label.AutoSize = true;
-                
-                TextBox textBox = new TextBox(); 
-                textBox.Left = 10; 
-                textBox.Top = 65; 
-                textBox.Width = 410;
-                
-                if (isForSource && txtSourcePath != null)
-                    textBox.Text = txtSourcePath.Text;
-                else if (!isForSource && txtDestinationPath != null)
-                    textBox.Text = txtDestinationPath.Text;
-                
-                Label tipLabel = new Label();
-                tipLabel.Left = 10;
-                tipLabel.Top = 95;
-                tipLabel.Width = 420;
-                tipLabel.Height = 30;
-                tipLabel.Text = "Examples: /home/user/documents, /var/www/html, /uploads\nTip: Use forward slashes (/) for paths on Unix/Linux servers";
-                tipLabel.ForeColor = Color.Gray;
-                tipLabel.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Italic);
-                
-                Button okButton = new Button(); 
-                okButton.Text = "OK"; 
-                okButton.Left = 255; 
-                okButton.Width = 75; 
-                okButton.Top = 130; 
-                okButton.DialogResult = DialogResult.OK;
-                
-                Button cancelButton = new Button(); 
-                cancelButton.Text = "Cancel"; 
-                cancelButton.Left = 345; 
-                cancelButton.Width = 75; 
-                cancelButton.Top = 130; 
-                cancelButton.DialogResult = DialogResult.Cancel;
-                
-                inputForm.Controls.Add(labelInfo);
-                inputForm.Controls.Add(label);
-                inputForm.Controls.Add(textBox);
-                inputForm.Controls.Add(tipLabel);
-                inputForm.Controls.Add(okButton);
-                inputForm.Controls.Add(cancelButton);
-                inputForm.AcceptButton = okButton;
-                inputForm.CancelButton = cancelButton;
-                
-                if (inputForm.ShowDialog() == DialogResult.OK)
-                {
-                    string enteredPath = textBox.Text.Trim();
-                    if (!string.IsNullOrEmpty(enteredPath))
-                    {
-                        if (isForSource && txtSourcePath != null)
-                        {
-                            txtSourcePath.Text = enteredPath;
-                        }
-                        else if (!isForSource && txtDestinationPath != null)
-                        {
-                            txtDestinationPath.Text = enteredPath;
-                        }
-                    }
-                }
-            }
-        }
+        // Removed - BrowseRemoteFolder method - no longer needed in simplified timer form
+        // Removed - ShowRemotePathInputDialog method - no longer needed in simplified timer form
 
         private void btnSave_Click(object sender, EventArgs e)
         {
@@ -1335,9 +587,11 @@ namespace syncer.ui
         {
             if (_currentJob == null) _currentJob = new SyncJob();
             _currentJob.Name = txtJobName.Text.Trim();
-            _currentJob.IsEnabled = chkEnabled.Checked;
-            _currentJob.SourcePath = txtSourcePath.Text.Trim();
-            _currentJob.DestinationPath = txtDestinationPath.Text.Trim();
+            _currentJob.IsEnabled = chkEnableJob.Checked;
+            
+            // For timer jobs, use selected folder path
+            _currentJob.SourcePath = _selectedFolderForTimer ?? "";
+            _currentJob.DestinationPath = _timerUploadDestination ?? "/";
             _currentJob.StartTime = DateTime.Now; // Set to current time for timer-based uploads
             
             // For timer functionality, store interval in minutes for consistency
@@ -1489,21 +743,21 @@ namespace syncer.ui
                     _selectedFolderForTimer = folderPath;
                     
                     // Update the label to show selected folder and file count
-                    if (lblSelectedFiles != null)
+                    if (lblNoFilesSelected != null)
                     {
                         string filterInfo = (currentFilters != null && currentFilters.FiltersEnabled) ? " (filtered)" : "";
                         
                         if (filteredFiles.Count == 0)
                         {
-                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (empty/no matching files - will monitor for new files)" + filterInfo;
+                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (empty/no matching files - will monitor for new files)" + filterInfo;
                         }
                         else if (filteredFiles.Count == 1)
                         {
-                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (1 file, including new files added later)" + filterInfo;
+                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (1 file, including new files added later)" + filterInfo;
                         }
                         else
                         {
-                            lblSelectedFiles.Text = Path.GetFileName(folderPath) + " (" + filteredFiles.Count + " files, including new files added later)" + filterInfo;
+                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (" + filteredFiles.Count + " files, including new files added later)" + filterInfo;
                         }
                     }
                     
@@ -1771,10 +1025,7 @@ namespace syncer.ui
                 
                 // Update last upload time
                 _lastUploadTime = DateTime.Now;
-                if (lblLastUpload != null)
-                {
-                    lblLastUpload.Text = _lastUploadTime.ToString("yyyy-MM-dd HH:mm:ss");
-                }
+                // Note: Last upload time display removed for simplified interface
             }
             catch (Exception ex)
             {
@@ -1793,7 +1044,7 @@ namespace syncer.ui
 
         private string GenerateTimerPreview()
         {
-            string enabled = chkEnabled.Checked ? "Enabled" : "Disabled";
+            string enabled = chkEnableJob.Checked ? "Enabled" : "Disabled";
             string timerEnabled = (chkEnableTimer != null && chkEnableTimer.Checked) ? "Enabled" : "Disabled";
             
             string interval = "Not set";
@@ -1807,8 +1058,8 @@ namespace syncer.ui
             
             return "Job Name: " + txtJobName.Text + "\n" +
                    "Status: " + enabled + "\n" +
-                   "Source: " + txtSourcePath.Text + "\n" +
-                   "Destination: " + txtDestinationPath.Text + "\n" +
+                   "Source: " + (_selectedFolderForTimer ?? "No folder selected") + "\n" +
+                   "Destination: " + (_timerUploadDestination ?? "/") + "\n" +
                    "Timer: " + timerEnabled + "\n" +
                    "Upload Interval: " + interval + "\n" +
                    "Timer Status: " + timerStatus + "\n" +
@@ -2464,6 +1715,22 @@ namespace syncer.ui
             };
             
             worker.RunWorkerAsync();
+        }
+
+        #endregion
+
+        #region Direct Transfer Methods
+
+        private void btnDirectUpload_Click(object sender, EventArgs e)
+        {
+            // Same functionality as btnUploadFile_Click
+            btnUploadFile_Click(sender, e);
+        }
+
+        private void btnDirectDownload_Click(object sender, EventArgs e)
+        {
+            // Same functionality as btnDownloadFile_Click
+            btnDownloadFile_Click(sender, e);
         }
 
         #endregion
