@@ -31,6 +31,7 @@ namespace syncer.ui.Forms
             this.groupBoxNotifications = new System.Windows.Forms.GroupBox();
             this.checkBoxNotificationsEnabled = new System.Windows.Forms.CheckBox();
             this.checkBoxStartupNotification = new System.Windows.Forms.CheckBox();
+            this.checkBoxAutoStart = new System.Windows.Forms.CheckBox();
             this.labelNotificationDelay = new System.Windows.Forms.Label();
             this.numericUpDownDelay = new System.Windows.Forms.NumericUpDown();
             this.labelSeconds = new System.Windows.Forms.Label();
@@ -121,11 +122,12 @@ namespace syncer.ui.Forms
             // 
             // groupBoxTrayBehavior
             // 
+            this.groupBoxTrayBehavior.Controls.Add(this.checkBoxAutoStart);
             this.groupBoxTrayBehavior.Controls.Add(this.checkBoxStartMinimized);
             this.groupBoxTrayBehavior.Controls.Add(this.checkBoxMinimizeToTray);
             this.groupBoxTrayBehavior.Location = new System.Drawing.Point(12, 150);
             this.groupBoxTrayBehavior.Name = "groupBoxTrayBehavior";
-            this.groupBoxTrayBehavior.Size = new System.Drawing.Size(360, 80);
+            this.groupBoxTrayBehavior.Size = new System.Drawing.Size(360, 105);
             this.groupBoxTrayBehavior.TabIndex = 1;
             this.groupBoxTrayBehavior.TabStop = false;
             this.groupBoxTrayBehavior.Text = "Tray Behavior";
@@ -150,10 +152,20 @@ namespace syncer.ui.Forms
             this.checkBoxStartMinimized.Text = "Start minimized to tray";
             this.checkBoxStartMinimized.UseVisualStyleBackColor = true;
             // 
+            // checkBoxAutoStart
+            // 
+            this.checkBoxAutoStart.AutoSize = true;
+            this.checkBoxAutoStart.Location = new System.Drawing.Point(20, 71);
+            this.checkBoxAutoStart.Name = "checkBoxAutoStart";
+            this.checkBoxAutoStart.Size = new System.Drawing.Size(158, 17);
+            this.checkBoxAutoStart.TabIndex = 2;
+            this.checkBoxAutoStart.Text = "Auto-start with Windows";
+            this.checkBoxAutoStart.UseVisualStyleBackColor = true;
+            // 
             // buttonOK
             // 
             this.buttonOK.DialogResult = System.Windows.Forms.DialogResult.OK;
-            this.buttonOK.Location = new System.Drawing.Point(216, 250);
+            this.buttonOK.Location = new System.Drawing.Point(216, 275);
             this.buttonOK.Name = "buttonOK";
             this.buttonOK.Size = new System.Drawing.Size(75, 23);
             this.buttonOK.TabIndex = 2;
@@ -164,7 +176,7 @@ namespace syncer.ui.Forms
             // buttonCancel
             // 
             this.buttonCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.buttonCancel.Location = new System.Drawing.Point(297, 250);
+            this.buttonCancel.Location = new System.Drawing.Point(297, 275);
             this.buttonCancel.Name = "buttonCancel";
             this.buttonCancel.Size = new System.Drawing.Size(75, 23);
             this.buttonCancel.TabIndex = 3;
@@ -177,7 +189,7 @@ namespace syncer.ui.Forms
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.CancelButton = this.buttonCancel;
-            this.ClientSize = new System.Drawing.Size(384, 285);
+            this.ClientSize = new System.Drawing.Size(384, 310);
             this.Controls.Add(this.buttonCancel);
             this.Controls.Add(this.buttonOK);
             this.Controls.Add(this.groupBoxTrayBehavior);
@@ -208,6 +220,7 @@ namespace syncer.ui.Forms
         private System.Windows.Forms.GroupBox groupBoxTrayBehavior;
         private System.Windows.Forms.CheckBox checkBoxMinimizeToTray;
         private System.Windows.Forms.CheckBox checkBoxStartMinimized;
+        private System.Windows.Forms.CheckBox checkBoxAutoStart;
         private System.Windows.Forms.Button buttonOK;
         private System.Windows.Forms.Button buttonCancel;
     }

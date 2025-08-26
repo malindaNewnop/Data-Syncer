@@ -36,7 +36,7 @@ namespace syncer.core.Services
                     if (key != null)
                     {
                         key.SetValue(_applicationName, _executablePath);
-                        _logService.LogInfo($"Auto-start enabled for {_applicationName}", "AutoStartService");
+                        _logService.LogInfo("Auto-start enabled for " + _applicationName, "AutoStartService");
                         return true;
                     }
                 }
@@ -45,7 +45,7 @@ namespace syncer.core.Services
             }
             catch (Exception ex)
             {
-                _logService.LogError($"Failed to enable auto-start: {ex.Message}", ex);
+                _logService.LogError("Failed to enable auto-start: " + ex.Message, "AutoStartService");
                 return false;
             }
         }
@@ -62,7 +62,7 @@ namespace syncer.core.Services
                     if (key != null)
                     {
                         key.DeleteValue(_applicationName, false);
-                        _logService.LogInfo($"Auto-start disabled for {_applicationName}", "AutoStartService");
+                        _logService.LogInfo("Auto-start disabled for " + _applicationName, "AutoStartService");
                         return true;
                     }
                 }
@@ -71,7 +71,7 @@ namespace syncer.core.Services
             }
             catch (Exception ex)
             {
-                _logService.LogError($"Failed to disable auto-start: {ex.Message}", ex);
+                _logService.LogError("Failed to disable auto-start: " + ex.Message, "AutoStartService");
                 return false;
             }
         }
@@ -95,7 +95,7 @@ namespace syncer.core.Services
             }
             catch (Exception ex)
             {
-                _logService.LogError($"Failed to check auto-start status: {ex.Message}", ex);
+                _logService.LogError("Failed to check auto-start status: " + ex.Message, "AutoStartService");
                 return false;
             }
         }
@@ -108,7 +108,7 @@ namespace syncer.core.Services
             try
             {
                 string startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
-                string shortcutPath = Path.Combine(startupFolder, $"{_applicationName}.lnk");
+                string shortcutPath = Path.Combine(startupFolder, _applicationName + ".lnk");
                 
                 if (!File.Exists(shortcutPath))
                 {
@@ -117,15 +117,15 @@ namespace syncer.core.Services
                     using (StreamWriter writer = new StreamWriter(vbsScript))
                     {
                         writer.WriteLine("Set WshShell = WScript.CreateObject(\"WScript.Shell\")");
-                        writer.WriteLine($"Set shortcut = WshShell.CreateShortcut(\"{shortcutPath}\")");
-                        writer.WriteLine($"shortcut.TargetPath = \"{_executablePath}\"");
-                        writer.WriteLine($"shortcut.WorkingDirectory = \"{Path.GetDirectoryName(_executablePath)}\"");
-                        writer.WriteLine($"shortcut.Description = \"{_applicationName} Auto Start\"");
+                        writer.WriteLine("Set shortcut = WshShell.CreateShortcut(\"" + shortcutPath + "\")");
+                        writer.WriteLine("shortcut.TargetPath = \"" + _executablePath + "\"");
+                        writer.WriteLine("shortcut.WorkingDirectory = \"" + Path.GetDirectoryName(_executablePath) + "\"");
+                        writer.WriteLine("shortcut.Description = \"" + _applicationName + " Auto Start\"");
                         writer.WriteLine("shortcut.Save");
                     }
 
                     // Run the script
-                    ProcessStartInfo psi = new ProcessStartInfo("wscript.exe", $"\"{vbsScript}\"")
+                    ProcessStartInfo psi = new ProcessStartInfo("wscript.exe", "\"" + vbsScript + "\"")
                     {
                         CreateNoWindow = true,
                         UseShellExecute = false
@@ -139,12 +139,12 @@ namespace syncer.core.Services
                     File.Delete(vbsScript);
                 }
                 
-                _logService.LogInfo($"Auto-start via startup folder enabled for {_applicationName}", "AutoStartService");
+                _logService.LogInfo("Auto-start via startup folder enabled for " + _applicationName, "AutoStartService");
                 return true;
             }
             catch (Exception ex)
             {
-                _logService.LogError($"Failed to enable auto-start via startup folder: {ex.Message}", ex);
+                _logService.LogError("Failed to enable auto-start via startup folder: " + ex.Message, "AutoStartService");
                 return false;
             }
         }

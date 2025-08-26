@@ -1,11 +1,13 @@
 using System;
 using System.Windows.Forms;
+using syncer.core.Services;
 
 namespace syncer.ui.Forms
 {
     public partial class FormTraySettings : Form
     {
         private IConfigurationService _configService;
+        private AutoStartService _autoStartService;
         
         public FormTraySettings()
         {
@@ -14,6 +16,11 @@ namespace syncer.ui.Forms
             try
             {
                 _configService = ServiceLocator.ConfigurationService;
+                
+                // Initialize auto-start service
+                var coreLogService = new syncer.core.FileLogService();
+                _autoStartService = new AutoStartService("Data Syncer", coreLogService);
+                
                 LoadSettings();
             }
             catch (Exception ex)
@@ -38,6 +45,12 @@ namespace syncer.ui.Forms
                 checkBoxMinimizeToTray.Checked = _configService.GetSetting("MinimizeToTray", true);
                 checkBoxStartMinimized.Checked = _configService.GetSetting("StartMinimized", false);
                 
+                // Load auto-start setting
+                if (_autoStartService != null)
+                {
+                    checkBoxAutoStart.Checked = _autoStartService.IsAutoStartEnabled();
+                }
+                
                 // Update control states
                 UpdateControlStates();
             }
@@ -61,6 +74,32 @@ namespace syncer.ui.Forms
                 // Save tray behavior settings
                 _configService.SaveSetting("MinimizeToTray", checkBoxMinimizeToTray.Checked);
                 _configService.SaveSetting("StartMinimized", checkBoxStartMinimized.Checked);
+                
+                // Handle auto-start setting
+                if (_autoStartService != null)
+                {
+                    bool autoStartEnabled = _autoStartService.IsAutoStartEnabled();
+                    bool autoStartRequested = checkBoxAutoStart.Checked;
+                    
+                    if (autoStartEnabled != autoStartRequested)
+                    {
+                        bool success = false;
+                        if (autoStartRequested)
+                        {
+                            success = _autoStartService.EnableAutoStart();
+                        }
+                        else
+                        {
+                            success = _autoStartService.DisableAutoStart();
+                        }
+                        
+                        if (!success)
+                        {
+                            MessageBox.Show("Failed to update auto-start setting. Please check permissions.", 
+                                "Auto-start Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    }
+                }
                 
                 // Save all settings to registry/config
                 _configService.SaveAllSettings();

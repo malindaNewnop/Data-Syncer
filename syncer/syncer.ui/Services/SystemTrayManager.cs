@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
+using syncer.core.Services;
 
 namespace syncer.ui.Services
 {
@@ -15,6 +16,7 @@ namespace syncer.ui.Services
         private Form _mainForm;
         private ILogService _logService;
         private IServiceManager _serviceManager;
+        private syncer.core.Services.AutoStartService _autoStartService;
         private bool _disposed = false;
         private System.Timers.Timer _statusUpdateTimer;
         
@@ -40,6 +42,10 @@ namespace syncer.ui.Services
                 // Initialize services
                 _logService = ServiceLocator.LogService;
                 _serviceManager = ServiceLocator.ServiceManager;
+                
+                // Initialize auto-start service using core log service
+                var coreLogService = new syncer.core.FileLogService();
+                _autoStartService = new syncer.core.Services.AutoStartService("Data Syncer", coreLogService);
                 
                 // Load configuration settings
                 var configService = ServiceLocator.ConfigurationService;
@@ -318,11 +324,19 @@ namespace syncer.ui.Services
             MenuItem notificationsItem = new MenuItem("Notifications", OnMenuNotificationsClick);
             notificationsItem.Checked = _notificationsEnabled;
             
+            // Auto-start menu item
+            MenuItem autoStartItem = new MenuItem("Auto-start with Windows", OnMenuAutoStartClick);
+            if (_autoStartService != null)
+            {
+                autoStartItem.Checked = _autoStartService.IsAutoStartEnabled();
+            }
+            
             settingsItem.MenuItems.Add(connectionItem);
             settingsItem.MenuItems.Add(filtersItem);
             settingsItem.MenuItems.Add(new MenuItem("-")); // Separator
             settingsItem.MenuItems.Add(traySettingsItem);
             settingsItem.MenuItems.Add(notificationsItem);
+            settingsItem.MenuItems.Add(autoStartItem);
             _contextMenu.MenuItems.Add(settingsItem);
             
             _contextMenu.MenuItems.Add(new MenuItem("-")); // Separator
@@ -601,6 +615,63 @@ namespace syncer.ui.Services
             {
                 Console.WriteLine("Error exiting application: " + ex.Message);
                 Environment.Exit(1); // Force exit on error
+            }
+        }
+
+        private void OnMenuAutoStartClick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_autoStartService == null)
+                {
+                    ShowNotification("Auto-start Error", "Auto-start service is not available", ToolTipIcon.Error);
+                    return;
+                }
+
+                MenuItem menuItem = sender as MenuItem;
+                if (menuItem == null) return;
+
+                bool currentState = _autoStartService.IsAutoStartEnabled();
+                bool success = false;
+
+                if (currentState)
+                {
+                    // Disable auto-start
+                    success = _autoStartService.DisableAutoStart();
+                    if (success)
+                    {
+                        menuItem.Checked = false;
+                        ShowNotification("Auto-start Disabled", "Data Syncer will no longer start with Windows", ToolTipIcon.Info);
+                        if (_logService != null)
+                            _logService.LogInfo("Auto-start disabled from system tray", "UI");
+                    }
+                    else
+                    {
+                        ShowNotification("Auto-start Error", "Failed to disable auto-start", ToolTipIcon.Error);
+                    }
+                }
+                else
+                {
+                    // Enable auto-start
+                    success = _autoStartService.EnableAutoStart();
+                    if (success)
+                    {
+                        menuItem.Checked = true;
+                        ShowNotification("Auto-start Enabled", "Data Syncer will now start with Windows", ToolTipIcon.Info);
+                        if (_logService != null)
+                            _logService.LogInfo("Auto-start enabled from system tray", "UI");
+                    }
+                    else
+                    {
+                        ShowNotification("Auto-start Error", "Failed to enable auto-start", ToolTipIcon.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowNotification("Auto-start Error", "Error toggling auto-start: " + ex.Message, ToolTipIcon.Error);
+                if (_logService != null)
+                    _logService.LogError("Failed to toggle auto-start from tray: " + ex.Message, "UI");
             }
         }
 

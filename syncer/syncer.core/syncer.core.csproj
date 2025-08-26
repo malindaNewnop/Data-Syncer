@@ -52,6 +52,7 @@
     <Compile Include="Core\ServiceFactory.cs" />
     <Compile Include="Core\StringExtensions.cs" />
     <Compile Include="Services\PreviewService.cs" />
+    <Compile Include="Services\AutoStartService.cs" />
     <Compile Include="Services\JobRunner.cs" />
     <Compile Include="Services\MultiJobRunner.cs" />
     <Compile Include="Services\XmlJobQueueService.cs" />
