@@ -813,65 +813,23 @@ namespace syncer.ui
                 // Get current filter settings
                 FilterSettings currentFilters = GetCurrentFilterSettings();
                 
-                // Determine if we should include subfolders
-                bool includeSubfolders = true; // default
-                if (currentFilters != null && currentFilters.FiltersEnabled)
-                {
-                    includeSubfolders = currentFilters.IncludeSubfolders;
-                }
-                
-                // Get all files in the selected folder based on subfolder setting
-                string[] allFiles = Directory.GetFiles(_selectedFolderForTimer, "*", 
-                    includeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+                // Get all files in the selected folder
+                string[] allFiles = Directory.GetFiles(_selectedFolderForTimer, "*", SearchOption.AllDirectories);
                 
                 // Apply filters
-                var syncService = ServiceLocator.SyncJobService;
                 List<string> includedFiles = new List<string>();
                 List<string> excludedFiles = new List<string>();
                 
-                if (syncService != null)
+                foreach (string file in allFiles)
                 {
-                    var filteredFilesList = syncService.ApplyCurrentFiltersToFileList(allFiles);
-                    
-                    // Create a hashset for faster lookup (.NET 3.5 compatible)
-                    var filteredFilesSet = new Dictionary<string, bool>();
-                    foreach (string file in filteredFilesList)
-                    {
-                        filteredFilesSet[file] = true;
-                    }
-                    
-                    foreach (string file in allFiles)
-                    {
-                        if (filteredFilesSet.ContainsKey(file))
-                        {
-                            includedFiles.Add(Path.GetFileName(file));
-                        }
-                        else
-                        {
-                            excludedFiles.Add(Path.GetFileName(file));
-                        }
-                    }
-                }
-                else
-                {
-                    // Fallback - if no service, include all files
-                    foreach (string file in allFiles)
+                    if (ShouldIncludeFileForTimer(file, currentFilters))
                     {
                         includedFiles.Add(Path.GetFileName(file));
                     }
-                }
-                
-                // Prepare display lists (first 10 items, .NET 3.5 compatible)
-                List<string> includedDisplay = new List<string>();
-                for (int i = 0; i < Math.Min(10, includedFiles.Count); i++)
-                {
-                    includedDisplay.Add(includedFiles[i]);
-                }
-                
-                List<string> excludedDisplay = new List<string>();
-                for (int i = 0; i < Math.Min(10, excludedFiles.Count); i++)
-                {
-                    excludedDisplay.Add(excludedFiles[i]);
+                    else
+                    {
+                        excludedFiles.Add(Path.GetFileName(file));
+                    }
                 }
                 
                 // Show results
@@ -886,8 +844,8 @@ namespace syncer.ui
                     allFiles.Length,
                     includedFiles.Count,
                     excludedFiles.Count,
-                    string.Join(", ", includedDisplay.ToArray()),
-                    string.Join(", ", excludedDisplay.ToArray())
+                    string.Join(", ", includedFiles.Take(10).ToArray()),
+                    string.Join(", ", excludedFiles.Take(10).ToArray())
                 );
                 
                 MessageBox.Show(message, "Filter Test Results", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -895,6 +853,93 @@ namespace syncer.ui
             catch (Exception ex)
             {
                 MessageBox.Show("Error testing filters: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private bool ShouldIncludeFileForTimer(string filePath, FilterSettings filterSettings)
+        {
+            if (filterSettings == null || !filterSettings.FiltersEnabled)
+                return true;
+            
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+                
+                // Check file attributes
+                if (!filterSettings.IncludeHiddenFiles && (fileInfo.Attributes & FileAttributes.Hidden) != 0)
+                    return false;
+                
+                if (!filterSettings.IncludeSystemFiles && (fileInfo.Attributes & FileAttributes.System) != 0)
+                    return false;
+                
+                if (!filterSettings.IncludeReadOnlyFiles && (fileInfo.Attributes & FileAttributes.ReadOnly) != 0)
+                    return false;
+                
+                // Check file size (assume MB for now)
+                long fileSizeBytes = fileInfo.Length;
+                long minSizeBytes = (long)(filterSettings.MinFileSize * 1024 * 1024);
+                long maxSizeBytes = (long)(filterSettings.MaxFileSize * 1024 * 1024);
+                
+                if (minSizeBytes > 0 && fileSizeBytes < minSizeBytes)
+                    return false;
+                
+                if (maxSizeBytes > 0 && fileSizeBytes > maxSizeBytes)
+                    return false;
+                
+                // Check file extensions
+                if (filterSettings.AllowedFileTypes != null && filterSettings.AllowedFileTypes.Length > 0)
+                {
+                    string fileExtension = fileInfo.Extension;
+                    bool matchesExtension = false;
+                    
+                    foreach (string allowedType in filterSettings.AllowedFileTypes)
+                    {
+                        // Extract extension from format like ".txt - Text files"
+                        string allowedExt = allowedType.Split(' ')[0].Trim();
+                        if (string.Equals(fileExtension, allowedExt, StringComparison.OrdinalIgnoreCase))
+                        {
+                            matchesExtension = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!matchesExtension)
+                        return false;
+                }
+                
+                // Check exclude patterns
+                if (!string.IsNullOrEmpty(filterSettings.ExcludePatterns))
+                {
+                    string fileName = fileInfo.Name;
+                    string[] patterns = filterSettings.ExcludePatterns.Split(',', ';');
+                    
+                    foreach (string pattern in patterns)
+                    {
+                        string trimmedPattern = pattern.Trim();
+                        if (!string.IsNullOrEmpty(trimmedPattern))
+                        {
+                            // Simple wildcard matching
+                            if (trimmedPattern.Contains("*"))
+                            {
+                                // Convert to regex pattern
+                                string regexPattern = trimmedPattern.Replace("*", ".*");
+                                if (Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase))
+                                    return false;
+                            }
+                            else if (fileName.IndexOf(trimmedPattern, StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                
+                return true;
+            }
+            catch (Exception)
+            {
+                // If we can't check the file, include it by default
+                return true;
             }
         }
 
@@ -1576,11 +1621,8 @@ namespace syncer.ui
                     if (timerJobManager != null)
                     {
                         double intervalMs = CalculateTimerInterval();
-                        // Get the filter settings from the current job
-                        FilterSettings jobFilters = _currentJob?.FilterSettings;
-                        
                         bool registered = timerJobManager.RegisterTimerJob(_currentJob.Id, 
-                            _selectedFolderForTimer, _timerUploadDestination, intervalMs, jobFilters);
+                            _selectedFolderForTimer, _timerUploadDestination, intervalMs);
                         
                         if (registered && _isTimerRunning)
                         {
@@ -1644,15 +1686,12 @@ namespace syncer.ui
                     
                     if (currentFilters != null && currentFilters.FiltersEnabled)
                     {
-                        var syncService = ServiceLocator.SyncJobService;
-                        if (syncService != null)
+                        foreach (string file in allFiles)
                         {
-                            filteredFiles = syncService.ApplyCurrentFiltersToFileList(allFiles);
-                        }
-                        else
-                        {
-                            // Fallback - use all files if service not available
-                            filteredFiles.AddRange(allFiles);
+                            if (ShouldIncludeFileForTimer(file, currentFilters))
+                            {
+                                filteredFiles.Add(file);
+                            }
                         }
                     }
                     else
@@ -1908,16 +1947,8 @@ namespace syncer.ui
                     return;
                 }
                 
-                // Get all files in the directory, respecting subfolder setting
-                FilterSettings filterSettings = GetCurrentFilterSettings();
-                bool includeSubfolders = true; // default
-                if (filterSettings != null && filterSettings.FiltersEnabled)
-                {
-                    includeSubfolders = filterSettings.IncludeSubfolders;
-                }
-                
-                string[] allFiles = Directory.GetFiles(_selectedFolderForTimer, "*", 
-                    includeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+                // Get all files in the directory, including any newly added files
+                string[] allFiles = Directory.GetFiles(_selectedFolderForTimer, "*", SearchOption.AllDirectories);
                 
                 // Apply filters if they are configured
                 List<string> filteredFiles = new List<string>();
@@ -1925,16 +1956,13 @@ namespace syncer.ui
                 
                 if (currentFilters != null && currentFilters.FiltersEnabled)
                 {
-                    var syncService = ServiceLocator.SyncJobService;
-                    if (syncService != null)
+                    foreach (string file in allFiles)
                     {
-                        var filteredFilesList = syncService.ApplyCurrentFiltersToFileList(allFiles);
-                        filteredFiles.AddRange(filteredFilesList);
-                    }
-                    else
-                    {
-                        // Fallback - use all files if service not available
-                        filteredFiles.AddRange(allFiles);
+                        // Use the same filtering logic as the service
+                        if (ShouldIncludeFileForTimer(file, currentFilters))
+                        {
+                            filteredFiles.Add(file);
+                        }
                     }
                 }
                 else
@@ -2223,39 +2251,6 @@ namespace syncer.ui
         {
             if (localFilePaths == null || localFilePaths.Length == 0) return;
 
-            // Apply filters to the selected files
-            var syncService = ServiceLocator.SyncJobService;
-            List<string> filteredFiles;
-            
-            if (syncService != null)
-            {
-                filteredFiles = syncService.ApplyCurrentFiltersToFileList(localFilePaths);
-            }
-            else
-            {
-                // Fallback - no filtering if service is not available
-                filteredFiles = new List<string>(localFilePaths);
-            }
-
-            if (filteredFiles.Count == 0)
-            {
-                MessageBox.Show("No files match the current filter settings. Please check your filter configuration.", 
-                    "No Files to Upload", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-            
-            if (filteredFiles.Count < localFilePaths.Length)
-            {
-                int excludedCount = localFilePaths.Length - filteredFiles.Count;
-                DialogResult result = MessageBox.Show(
-                    string.Format("{0} file(s) were excluded by filters. {1} file(s) will be uploaded.\n\nDo you want to proceed?", 
-                        excludedCount, filteredFiles.Count),
-                    "Files Filtered", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                
-                if (result == DialogResult.No)
-                    return;
-            }
-
             // Ask for remote destination folder
             using (Form inputForm = new Form())
             {
@@ -2302,7 +2297,7 @@ namespace syncer.ui
                     string remotePath = textBox.Text.Trim();
                     if (!string.IsNullOrEmpty(remotePath))
                     {
-                        PerformUpload(filteredFiles.ToArray(), remotePath);
+                        PerformUpload(localFilePaths, remotePath);
                     }
                 }
             }
@@ -2310,38 +2305,6 @@ namespace syncer.ui
 
         private void PerformFolderUpload(string baseLocalFolder, string[] localFilePaths, string baseRemotePath)
         {
-            // Apply filters to the files before upload
-            var syncService = ServiceLocator.SyncJobService;
-            List<string> filteredFiles;
-            
-            if (syncService != null)
-            {
-                filteredFiles = syncService.ApplyCurrentFiltersToFileList(localFilePaths);
-            }
-            else
-            {
-                // Fallback - no filtering if service is not available
-                filteredFiles = new List<string>(localFilePaths);
-            }
-
-            if (filteredFiles.Count == 0)
-            {
-                ServiceLocator.LogService.LogInfo("No files match the current filter settings. Upload skipped.");
-                MessageBox.Show("No files match the current filter settings.", 
-                    "No Files to Upload", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-            
-            if (filteredFiles.Count < localFilePaths.Length)
-            {
-                int excludedCount = localFilePaths.Length - filteredFiles.Count;
-                ServiceLocator.LogService.LogInfo(string.Format("{0} file(s) were excluded by filters. {1} file(s) will be uploaded.", 
-                    excludedCount, filteredFiles.Count));
-            }
-
-            // Use the filtered files array for upload
-            string[] filesToUpload = filteredFiles.ToArray();
-
             BackgroundWorker worker = new BackgroundWorker();
             worker.WorkerReportsProgress = true;
             worker.DoWork += (sender, e) =>
@@ -2349,16 +2312,16 @@ namespace syncer.ui
                 try
                 {
                     ServiceLocator.LogService.LogInfo(string.Format("Starting upload of folder '{0}' with {1} files to {2}", 
-                        baseLocalFolder, filesToUpload.Length, baseRemotePath));
+                        baseLocalFolder, localFilePaths.Length, baseRemotePath));
                     ServiceLocator.LogService.LogInfo(string.Format("Connection: {0}@{1}:{2}", 
                         _coreConnectionSettings.Username, _coreConnectionSettings.Host, _coreConnectionSettings.Port));
                         
                     // Create dictionary to track created remote folders
                     Dictionary<string, bool> createdRemoteFolders = new Dictionary<string, bool>();
                     
-                    for (int i = 0; i < filesToUpload.Length; i++)
+                    for (int i = 0; i < localFilePaths.Length; i++)
                     {
-                        string localFile = filesToUpload[i];
+                        string localFile = localFilePaths[i];
                         
                         // Calculate relative path from base folder
                         string relativePath = localFile.Substring(baseLocalFolder.Length).TrimStart('\\', '/');
@@ -2398,7 +2361,7 @@ namespace syncer.ui
                             }
                         }
                         
-                        worker.ReportProgress((i * 100) / filesToUpload.Length, 
+                        worker.ReportProgress((i * 100) / localFilePaths.Length, 
                             string.Format("Uploading {0}...", relativePath));
                         
                         ServiceLocator.LogService.LogInfo(string.Format("Uploading: {0} -> {1}", localFile, remoteFile));

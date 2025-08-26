@@ -299,15 +299,8 @@ namespace syncer.ui.Services
 
         private List<string> GetFilteredFiles(string sourcePath, FilterSettings filterSettings, bool includeSubFolders)
         {
-            // Override includeSubFolders with filter setting if filters are enabled
-            bool useSubFolders = includeSubFolders;
-            if (filterSettings != null && filterSettings.FiltersEnabled)
-            {
-                useSubFolders = filterSettings.IncludeSubfolders;
-            }
-            
             var allFiles = Directory.GetFiles(sourcePath, "*", 
-                useSubFolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+                includeSubFolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
             
             var filteredFiles = new List<string>();
             
@@ -320,16 +313,12 @@ namespace syncer.ui.Services
             }
             
             Console.WriteLine("Applying filters to " + allFiles.Length + " files");
-            Console.WriteLine("Filters enabled: " + filterSettings.FiltersEnabled);
-            Console.WriteLine("Include subfolders: " + filterSettings.IncludeSubfolders);
-            Console.WriteLine("Allowed file types count: " + (filterSettings.AllowedFileTypes != null ? filterSettings.AllowedFileTypes.Length : 0));
             
             foreach (string file in allFiles)
             {
                 if (ShouldIncludeFile(file, filterSettings))
                 {
                     filteredFiles.Add(file);
-                    Console.WriteLine("Included file: " + Path.GetFileName(file));
                 }
                 else
                 {
@@ -337,190 +326,7 @@ namespace syncer.ui.Services
                 }
             }
             
-            Console.WriteLine("Final filtered count: " + filteredFiles.Count + " out of " + allFiles.Length);
             return filteredFiles;
-        }
-
-        /// <summary>
-        /// Apply current filter settings to a list of files
-        /// </summary>
-        public List<string> ApplyCurrentFiltersToFileList(string[] filePaths)
-        {
-            var filteredFiles = new List<string>();
-            var filterService = ServiceLocator.FilterService;
-            
-            if (filterService == null)
-            {
-                // No filter service, return all files
-                filteredFiles.AddRange(filePaths);
-                return filteredFiles;
-            }
-            
-            var currentFilters = filterService.GetFilterSettings();
-            
-            if (currentFilters == null || !currentFilters.FiltersEnabled)
-            {
-                // Filters disabled, return all files
-                Console.WriteLine("Filters disabled, returning all " + filePaths.Length + " files");
-                ServiceLocator.LogService.LogInfo("Filters disabled, uploading all " + filePaths.Length + " files");
-                filteredFiles.AddRange(filePaths);
-                return filteredFiles;
-            }
-            
-            Console.WriteLine("Applying filters to " + filePaths.Length + " files");
-            Console.WriteLine("Filters enabled: " + currentFilters.FiltersEnabled);
-            Console.WriteLine("Allowed file types count: " + (currentFilters.AllowedFileTypes != null ? currentFilters.AllowedFileTypes.Length : 0));
-            
-            ServiceLocator.LogService.LogInfo("Applying filters to " + filePaths.Length + " files");
-            ServiceLocator.LogService.LogInfo("Filters enabled: " + currentFilters.FiltersEnabled);
-            ServiceLocator.LogService.LogInfo("Allowed file types count: " + (currentFilters.AllowedFileTypes != null ? currentFilters.AllowedFileTypes.Length : 0));
-            
-            foreach (string file in filePaths)
-            {
-                if (ShouldIncludeFile(file, currentFilters))
-                {
-                    filteredFiles.Add(file);
-                    Console.WriteLine("Included file: " + Path.GetFileName(file));
-                }
-                else
-                {
-                    Console.WriteLine("Excluded file: " + Path.GetFileName(file));
-                }
-            }
-            
-            Console.WriteLine("Final filtered count: " + filteredFiles.Count + " out of " + filePaths.Length);
-            ServiceLocator.LogService.LogInfo("Final filtered count: " + filteredFiles.Count + " out of " + filePaths.Length);
-            
-            // Log filtering details to the logs window if available
-            try
-            {
-                foreach (System.Windows.Forms.Form form in System.Windows.Forms.Application.OpenForms)
-                {
-                    if (form.Name == "FormMain")
-                    {
-                        var method = form.GetType().GetMethod("LogFilteringResults");
-                        if (method != null)
-                        {
-                            string filterDetails = "";
-                            if (currentFilters != null)
-                            {
-                                if (currentFilters.AllowedFileTypes != null && currentFilters.AllowedFileTypes.Length > 0)
-                                {
-                                    var typesToShow = new string[Math.Min(3, currentFilters.AllowedFileTypes.Length)];
-                                    Array.Copy(currentFilters.AllowedFileTypes, typesToShow, typesToShow.Length);
-                                    filterDetails = "File types: " + string.Join(", ", typesToShow);
-                                    if (currentFilters.AllowedFileTypes.Length > 3)
-                                        filterDetails += "...";
-                                }
-                                else
-                                {
-                                    filterDetails = "No file types selected";
-                                }
-                            }
-                            
-                            method.Invoke(form, new object[] { filePaths.Length, filteredFiles.Count, filterDetails });
-                        }
-                        break;
-                    }
-                }
-            }
-            catch
-            {
-                // Ignore errors in logging to UI
-            }
-            
-            return filteredFiles;
-        }
-
-        /// <summary>
-        /// Verify filter functionality with detailed logging
-        /// </summary>
-        public void VerifyFilterFunctionality()
-        {
-            var filterService = ServiceLocator.FilterService;
-            if (filterService == null)
-            {
-                ServiceLocator.LogService.LogError("FilterService not available for verification");
-                return;
-            }
-
-            var settings = filterService.GetFilterSettings();
-            ServiceLocator.LogService.LogInfo("=== FILTER VERIFICATION ===");
-            ServiceLocator.LogService.LogInfo("Filters Enabled: " + (settings != null ? settings.FiltersEnabled.ToString() : "NULL"));
-            
-            if (settings != null)
-            {
-                ServiceLocator.LogService.LogInfo("Include Subfolders: " + settings.IncludeSubfolders);
-                ServiceLocator.LogService.LogInfo("Min File Size: " + settings.MinFileSize + " MB");
-                ServiceLocator.LogService.LogInfo("Max File Size: " + settings.MaxFileSize + " MB");
-                ServiceLocator.LogService.LogInfo("Include Hidden: " + settings.IncludeHiddenFiles);
-                ServiceLocator.LogService.LogInfo("Include System: " + settings.IncludeSystemFiles);
-                ServiceLocator.LogService.LogInfo("Include ReadOnly: " + settings.IncludeReadOnlyFiles);
-                ServiceLocator.LogService.LogInfo("Exclude Patterns: " + (settings.ExcludePatterns ?? "NONE"));
-                
-                if (settings.AllowedFileTypes != null)
-                {
-                    ServiceLocator.LogService.LogInfo("Allowed File Types Count: " + settings.AllowedFileTypes.Length);
-                    for (int i = 0; i < settings.AllowedFileTypes.Length; i++)
-                    {
-                        ServiceLocator.LogService.LogInfo("  Type " + (i + 1) + ": " + settings.AllowedFileTypes[i]);
-                    }
-                }
-                else
-                {
-                    ServiceLocator.LogService.LogInfo("Allowed File Types: NULL");
-                }
-            }
-            ServiceLocator.LogService.LogInfo("=== END FILTER VERIFICATION ===");
-        }
-
-        /// <summary>
-        /// Test filtering with sample data to verify functionality
-        /// </summary>
-        public void TestFilterFunctionality()
-        {
-            ServiceLocator.LogService.LogInfo("=== TESTING FILTER FUNCTIONALITY ===");
-            
-            // Create test file list
-            string[] testFiles = {
-                "C:\\test\\document.pdf",
-                "C:\\test\\image.jpg", 
-                "C:\\test\\text.txt",
-                "C:\\test\\data.xlsx",
-                "C:\\test\\subfolder\\document2.pdf",
-                "C:\\test\\subfolder\\image2.png"
-            };
-            
-            var filterService = ServiceLocator.FilterService;
-            if (filterService == null)
-            {
-                ServiceLocator.LogService.LogError("FilterService not available for testing");
-                return;
-            }
-            
-            var settings = filterService.GetFilterSettings();
-            if (settings == null)
-            {
-                ServiceLocator.LogService.LogError("Filter settings not available for testing");
-                return;
-            }
-            
-            ServiceLocator.LogService.LogInfo("Testing with " + testFiles.Length + " sample files");
-            ServiceLocator.LogService.LogInfo("Filter enabled: " + settings.FiltersEnabled);
-            
-            if (settings.AllowedFileTypes != null)
-            {
-                ServiceLocator.LogService.LogInfo("Allowed types: " + string.Join(", ", settings.AllowedFileTypes));
-            }
-            
-            // Test each file
-            for (int i = 0; i < testFiles.Length; i++)
-            {
-                bool shouldInclude = ShouldIncludeFile(testFiles[i], settings);
-                ServiceLocator.LogService.LogInfo("File: " + testFiles[i] + " -> " + (shouldInclude ? "INCLUDED" : "EXCLUDED"));
-            }
-            
-            ServiceLocator.LogService.LogInfo("=== END FILTER TESTING ===");
         }
 
         private bool ShouldIncludeFile(string filePath, FilterSettings filterSettings)
@@ -530,7 +336,9 @@ namespace syncer.ui.Services
             
             try
             {
-                var fileInfo = new FileInfo(filePath);                // Check file attributes
+                var fileInfo = new FileInfo(filePath);
+                
+                // Check file attributes
                 if (!filterSettings.IncludeHiddenFiles && (fileInfo.Attributes & FileAttributes.Hidden) != 0)
                     return false;
                 
@@ -554,22 +362,16 @@ namespace syncer.ui.Services
                 // Check file extensions
                 if (filterSettings.AllowedFileTypes != null && filterSettings.AllowedFileTypes.Length > 0)
                 {
-                    string fileExtension = fileInfo.Extension.ToLowerInvariant();
+                    string fileExtension = fileInfo.Extension;
                     bool matchesExtension = false;
-                    
-                    Console.WriteLine("Checking file extension: " + fileExtension);
                     
                     foreach (string allowedType in filterSettings.AllowedFileTypes)
                     {
                         // Extract extension from format like ".txt - Text files"
-                        string allowedExt = allowedType.Split(' ')[0].Trim().ToLowerInvariant();
-                        
-                        Console.WriteLine("  Comparing with allowed type: " + allowedExt);
-                        
+                        string allowedExt = allowedType.Split(' ')[0].Trim();
                         if (string.Equals(fileExtension, allowedExt, StringComparison.OrdinalIgnoreCase))
                         {
                             matchesExtension = true;
-                            Console.WriteLine("  Match found!");
                             break;
                         }
                     }
@@ -580,38 +382,32 @@ namespace syncer.ui.Services
                         return false;
                     }
                 }
-                else if (filterSettings.FiltersEnabled)
-                {
-                    // If filters are enabled but no file types are selected, exclude all files
-                    Console.WriteLine("Filters enabled but no file types selected - excluding file: " + Path.GetFileName(filePath));
-                    return false;
-                }
                 
-                // Check exclude patterns (.NET 3.5 compatible)
+                // Check exclude patterns
                 if (!string.IsNullOrEmpty(filterSettings.ExcludePatterns))
                 {
                     string fileName = fileInfo.Name;
-                    string[] patterns = filterSettings.ExcludePatterns.Split(new char[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                    string[] patterns = filterSettings.ExcludePatterns.Split(',', ';');
                     
-                    for (int i = 0; i < patterns.Length; i++)
+                    foreach (string pattern in patterns)
                     {
-                        string trimmedPattern = patterns[i].Trim();
+                        string trimmedPattern = pattern.Trim();
                         if (!string.IsNullOrEmpty(trimmedPattern))
                         {
-                            // Simple wildcard matching (.NET 3.5 compatible)
+                            // Simple wildcard matching
                             if (trimmedPattern.Contains("*"))
                             {
                                 // Convert to regex pattern
                                 string regexPattern = trimmedPattern.Replace("*", ".*");
                                 if (Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase))
                                 {
-                                    Console.WriteLine("Excluded (pattern): " + fileName + " matched exclude pattern: " + trimmedPattern);
+                                    Console.WriteLine("File " + fileName + " matched exclude pattern: " + trimmedPattern);
                                     return false;
                                 }
                             }
                             else if (fileName.IndexOf(trimmedPattern, StringComparison.OrdinalIgnoreCase) >= 0)
                             {
-                                Console.WriteLine("Excluded (pattern): " + fileName + " matched exclude pattern: " + trimmedPattern);
+                                Console.WriteLine("File " + fileName + " matched exclude pattern: " + trimmedPattern);
                                 return false;
                             }
                         }
@@ -872,10 +668,7 @@ namespace syncer.ui.Services
                         kvp.Value.Stop();
                         kvp.Value.Dispose();
                     }
-                    catch (Exception ex)
-                    {
-                        ServiceLocator.LogService.LogWarning("Failed to stop/dispose timer: " + ex.Message);
-                    }
+                    catch { }
                 }
                 _jobTimers.Clear();
                 ServiceLocator.LogService.LogInfo("Job scheduler stopped");
@@ -984,10 +777,7 @@ namespace syncer.ui.Services
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogError("Failed to load connection '" + connectionName + "': " + ex.Message);
-            }
+            catch { }
 
             return null;
         }
@@ -1020,10 +810,7 @@ namespace syncer.ui.Services
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogError("Failed to load connections from registry: " + ex.Message);
-            }
+            catch { }
 
             return connections;
         }
@@ -1065,10 +852,7 @@ namespace syncer.ui.Services
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogError("Failed to delete connection '" + connectionName + "': " + ex.Message);
-            }
+            catch { }
 
             return false;
         }
@@ -1095,10 +879,7 @@ namespace syncer.ui.Services
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogError("Failed to get connection names from registry: " + ex.Message);
-            }
+            catch { }
 
             return names;
         }
@@ -1152,25 +933,11 @@ namespace syncer.ui.Services
                 else
                 {
                     _settings = new FilterSettings();
-                    // Set some default file types to prevent empty selection issue
-                    _settings.AllowedFileTypes = new string[] 
-                    {
-                        ".txt - Text files",
-                        ".doc - Word documents", 
-                        ".pdf - PDF documents"
-                    };
                 }
             }
             catch
             {
                 _settings = new FilterSettings();
-                // Set some default file types to prevent empty selection issue
-                _settings.AllowedFileTypes = new string[] 
-                {
-                    ".txt - Text files",
-                    ".doc - Word documents", 
-                    ".pdf - PDF documents"
-                };
             }
         }
 
@@ -1203,7 +970,6 @@ namespace syncer.ui.Services
             json += "  \"IncludeHiddenFiles\": " + settings.IncludeHiddenFiles.ToString().ToLower() + ",\n";
             json += "  \"IncludeSystemFiles\": " + settings.IncludeSystemFiles.ToString().ToLower() + ",\n";
             json += "  \"IncludeReadOnlyFiles\": " + settings.IncludeReadOnlyFiles.ToString().ToLower() + ",\n";
-            json += "  \"IncludeSubfolders\": " + settings.IncludeSubfolders.ToString().ToLower() + ",\n";
             json += "  \"ExcludePatterns\": \"" + (settings.ExcludePatterns ?? "") + "\",\n";
             json += "  \"AllowedFileTypes\": [";
             if (settings.AllowedFileTypes != null)
@@ -1240,8 +1006,6 @@ namespace syncer.ui.Services
                 if (json.Contains("\"IncludeSystemFiles\": true")) settings.IncludeSystemFiles = true;
                 if (json.Contains("\"IncludeReadOnlyFiles\": false")) settings.IncludeReadOnlyFiles = false;
                 else settings.IncludeReadOnlyFiles = true; // default
-                if (json.Contains("\"IncludeSubfolders\": false")) settings.IncludeSubfolders = false;
-                else settings.IncludeSubfolders = true; // default
                 
                 // Parse exclude patterns
                 var excludeMatch = System.Text.RegularExpressions.Regex.Match(json, "\"ExcludePatterns\":\\s*\"([^\"]*)\"");
@@ -1271,18 +1035,6 @@ namespace syncer.ui.Services
 
         public FilterSettings GetFilterSettings()
         {
-            Console.WriteLine("Getting filter settings - Enabled: " + (_settings != null ? _settings.FiltersEnabled.ToString() : "null") + 
-                            ", FileTypes: " + (_settings?.AllowedFileTypes != null ? _settings.AllowedFileTypes.Length.ToString() : "null"));
-            
-            if (_settings?.AllowedFileTypes != null)
-            {
-                Console.WriteLine("Current allowed file types:");
-                foreach (string fileType in _settings.AllowedFileTypes)
-                {
-                    Console.WriteLine("  - " + fileType);
-                }
-            }
-            
             return _settings;
         }
 
@@ -1291,21 +1043,6 @@ namespace syncer.ui.Services
             _settings = settings;
             SaveSettings();
             Console.WriteLine("Filter settings saved - Enabled: " + settings.FiltersEnabled + ", FileTypes: " + (settings.AllowedFileTypes != null ? settings.AllowedFileTypes.Length : 0));
-            
-            // Log the actual file types for debugging
-            if (settings.AllowedFileTypes != null)
-            {
-                Console.WriteLine("Allowed file types:");
-                foreach (string fileType in settings.AllowedFileTypes)
-                {
-                    Console.WriteLine("  - " + fileType);
-                }
-            }
-            else
-            {
-                Console.WriteLine("No allowed file types set!");
-            }
-            
             return true;
         }
 

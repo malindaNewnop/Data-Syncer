@@ -50,15 +50,12 @@ namespace syncer.ui
             this.gbActions.SuspendLayout();
             this.statusStrip1.SuspendLayout();
             this.SuspendLayout();
-            
             // dgvLogs
             this.dgvLogs.AllowUserToAddRows = false;
             this.dgvLogs.AllowUserToDeleteRows = false;
             this.dgvLogs.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.dgvLogs.BackgroundColor = System.Drawing.SystemColors.Window;
-            this.dgvLogs.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
             this.dgvLogs.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.dgvLogs.Location = new System.Drawing.Point(12, 100);
             this.dgvLogs.MultiSelect = false;
@@ -68,7 +65,6 @@ namespace syncer.ui
             this.dgvLogs.Size = new System.Drawing.Size(860, 420);
             this.dgvLogs.TabIndex = 0;
             this.dgvLogs.CellFormatting += new System.Windows.Forms.DataGridViewCellFormattingEventHandler(this.dgvLogs_CellFormatting);
-            
             // gbSearch
             this.gbSearch.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
@@ -85,7 +81,6 @@ namespace syncer.ui
             this.gbSearch.TabIndex = 1;
             this.gbSearch.TabStop = false;
             this.gbSearch.Text = "Search & Filter";
-            
             // lblSearch
             this.lblSearch.AutoSize = true;
             this.lblSearch.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
@@ -94,7 +89,6 @@ namespace syncer.ui
             this.lblSearch.Size = new System.Drawing.Size(48, 15);
             this.lblSearch.TabIndex = 0;
             this.lblSearch.Text = "Search:";
-            
             // txtSearch
             this.txtSearch.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.txtSearch.Location = new System.Drawing.Point(70, 22);
@@ -102,9 +96,8 @@ namespace syncer.ui
             this.txtSearch.Size = new System.Drawing.Size(250, 21);
             this.txtSearch.TabIndex = 1;
             this.txtSearch.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.txtSearch_KeyPress);
-            
             // btnSearch
-            this.btnSearch.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
+            this.btnSearch.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
             this.btnSearch.Location = new System.Drawing.Point(330, 21);
             this.btnSearch.Name = "btnSearch";
             this.btnSearch.Size = new System.Drawing.Size(60, 23);
@@ -112,9 +105,8 @@ namespace syncer.ui
             this.btnSearch.Text = "Search";
             this.btnSearch.UseVisualStyleBackColor = true;
             this.btnSearch.Click += new System.EventHandler(this.btnSearch_Click);
-            
             // btnClearSearch
-            this.btnClearSearch.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
+            this.btnClearSearch.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
             this.btnClearSearch.Location = new System.Drawing.Point(400, 21);
             this.btnClearSearch.Name = "btnClearSearch";
             this.btnClearSearch.Size = new System.Drawing.Size(60, 23);
@@ -122,7 +114,6 @@ namespace syncer.ui
             this.btnClearSearch.Text = "Clear";
             this.btnClearSearch.UseVisualStyleBackColor = true;
             this.btnClearSearch.Click += new System.EventHandler(this.btnClearSearch_Click);
-            
             // lblLogLevel
             this.lblLogLevel.AutoSize = true;
             this.lblLogLevel.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
@@ -131,7 +122,6 @@ namespace syncer.ui
             this.lblLogLevel.Size = new System.Drawing.Size(64, 15);
             this.lblLogLevel.TabIndex = 4;
             this.lblLogLevel.Text = "Log Level:";
-            
             // cmbLogLevel
             this.cmbLogLevel.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cmbLogLevel.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
@@ -146,7 +136,6 @@ namespace syncer.ui
             this.cmbLogLevel.Size = new System.Drawing.Size(100, 23);
             this.cmbLogLevel.TabIndex = 5;
             this.cmbLogLevel.SelectedIndexChanged += new System.EventHandler(this.cmbLogLevel_SelectedIndexChanged);
-            
             // gbActions
             this.gbActions.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.gbActions.Controls.Add(this.btnRefresh);
@@ -160,51 +149,46 @@ namespace syncer.ui
             this.gbActions.TabIndex = 2;
             this.gbActions.TabStop = false;
             this.gbActions.Text = "Actions";
-            
             // btnRefresh
             this.btnRefresh.BackColor = System.Drawing.Color.LightBlue;
-            this.btnRefresh.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
+            this.btnRefresh.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
             this.btnRefresh.Location = new System.Drawing.Point(15, 20);
             this.btnRefresh.Name = "btnRefresh";
-            this.btnRefresh.Size = new System.Drawing.Size(100, 25);
+            this.btnRefresh.Size = new System.Drawing.Size(70, 25);
             this.btnRefresh.TabIndex = 0;
             this.btnRefresh.Text = "Refresh";
             this.btnRefresh.UseVisualStyleBackColor = false;
             this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
-            
             // btnClearLogs
             this.btnClearLogs.BackColor = System.Drawing.Color.LightCoral;
-            this.btnClearLogs.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
-            this.btnClearLogs.Location = new System.Drawing.Point(125, 20);
+            this.btnClearLogs.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
+            this.btnClearLogs.Location = new System.Drawing.Point(95, 20);
             this.btnClearLogs.Name = "btnClearLogs";
-            this.btnClearLogs.Size = new System.Drawing.Size(100, 25);
+            this.btnClearLogs.Size = new System.Drawing.Size(70, 25);
             this.btnClearLogs.TabIndex = 1;
             this.btnClearLogs.Text = "Clear Logs";
             this.btnClearLogs.UseVisualStyleBackColor = false;
             this.btnClearLogs.Click += new System.EventHandler(this.btnClearLogs_Click);
-            
             // btnExport
             this.btnExport.BackColor = System.Drawing.Color.LightGreen;
-            this.btnExport.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
+            this.btnExport.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
             this.btnExport.Location = new System.Drawing.Point(15, 50);
             this.btnExport.Name = "btnExport";
-            this.btnExport.Size = new System.Drawing.Size(100, 25);
+            this.btnExport.Size = new System.Drawing.Size(70, 25);
             this.btnExport.TabIndex = 2;
             this.btnExport.Text = "Export";
             this.btnExport.UseVisualStyleBackColor = false;
             this.btnExport.Click += new System.EventHandler(this.btnExport_Click);
-            
             // btnClose
             this.btnClose.BackColor = System.Drawing.Color.LightGray;
-            this.btnClose.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
-            this.btnClose.Location = new System.Drawing.Point(125, 50);
+            this.btnClose.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
+            this.btnClose.Location = new System.Drawing.Point(95, 50);
             this.btnClose.Name = "btnClose";
-            this.btnClose.Size = new System.Drawing.Size(100, 25);
+            this.btnClose.Size = new System.Drawing.Size(70, 25);
             this.btnClose.TabIndex = 3;
             this.btnClose.Text = "Close";
             this.btnClose.UseVisualStyleBackColor = false;
             this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
-            
             // statusStrip1
             this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.lblLogCount});
@@ -213,12 +197,10 @@ namespace syncer.ui
             this.statusStrip1.Size = new System.Drawing.Size(884, 22);
             this.statusStrip1.TabIndex = 3;
             this.statusStrip1.Text = "statusStrip1";
-            
             // lblLogCount
             this.lblLogCount.Name = "lblLogCount";
             this.lblLogCount.Size = new System.Drawing.Size(68, 17);
             this.lblLogCount.Text = "Total Logs: 0";
-            
             // FormLogs
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -227,10 +209,8 @@ namespace syncer.ui
             this.Controls.Add(this.gbActions);
             this.Controls.Add(this.gbSearch);
             this.Controls.Add(this.dgvLogs);
-            this.MinimumSize = new System.Drawing.Size(800, 500);
             this.Name = "FormLogs";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Data Syncer Log Viewer";
+            this.Text = "Log Viewer";
             ((System.ComponentModel.ISupportInitialize)(this.dgvLogs)).EndInit();
             this.gbSearch.ResumeLayout(false);
             this.gbSearch.PerformLayout();

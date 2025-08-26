@@ -17,9 +17,6 @@ namespace syncer.ui
         bool StartJob(int id);
         bool StopJob(int id);
         string GetJobStatus(int id);
-        
-        // Filter methods
-        List<string> ApplyCurrentFiltersToFileList(string[] filePaths);
     }
 
     /// <summary>

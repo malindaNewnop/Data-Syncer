@@ -69,10 +69,7 @@ namespace syncer.core
                         _pipeClient?.Close();
                         _pipeClient?.Dispose();
                     }
-                    catch (Exception cleanupEx)
-                    {
-                        System.Diagnostics.Debug.WriteLine("Failed to cleanup pipe client: " + cleanupEx.Message);
-                    }
+                    catch { }
                     
                     _pipeClient = null;
                 }

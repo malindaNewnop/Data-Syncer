@@ -73,11 +73,7 @@ namespace syncer.core
                             File.Copy(backupFile, _settingsFilePath, true);
                             File.Delete(backupFile);
                         }
-                        catch (Exception backupEx)
-                        {
-                            // Log but don't throw - backup restore failure isn't critical
-                            System.Diagnostics.Debug.WriteLine("Failed to restore settings backup: " + backupEx.Message);
-                        }
+                        catch { }
                     }
                     
                     return false;

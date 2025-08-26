@@ -20,17 +20,6 @@ namespace syncer.ui.Interfaces
         bool RegisterTimerJob(long jobId, string folderPath, string remotePath, double intervalMs);
         
         /// <summary>
-        /// Registers a timer job that will run automatically with filter settings
-        /// </summary>
-        /// <param name="jobId">The ID of the job</param>
-        /// <param name="folderPath">The local folder path to monitor and upload</param>
-        /// <param name="remotePath">The remote path to upload to</param>
-        /// <param name="intervalMs">The timer interval in milliseconds</param>
-        /// <param name="filterSettings">Filter settings to apply when selecting files to upload</param>
-        /// <returns>True if the job was registered successfully</returns>
-        bool RegisterTimerJob(long jobId, string folderPath, string remotePath, double intervalMs, FilterSettings filterSettings);
-        
-        /// <summary>
         /// Starts a timer job
         /// </summary>
         /// <param name="jobId">The ID of the job to start</param>
