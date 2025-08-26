@@ -296,9 +296,54 @@ namespace syncer.ui.Services
                 // Get all files in the directory, including any newly added files
                 string[] currentFiles = Directory.GetFiles(job.FolderPath, "*", SearchOption.AllDirectories);
                 
+                // Also ensure empty directories are created on remote
+                string[] allDirectories = Directory.GetDirectories(job.FolderPath, "*", SearchOption.AllDirectories);
+                
+                _logService.LogInfo(string.Format("Found {0} files and {1} directories in folder {2}", 
+                    currentFiles.Length, allDirectories.Length, job.FolderPath));
+                
+                // Create empty directories first
+                foreach (string directory in allDirectories)
+                {
+                    try
+                    {
+                        string relativeDirPath = directory.Substring(job.FolderPath.Length);
+                        if (relativeDirPath.StartsWith("\\") || relativeDirPath.StartsWith("/"))
+                        {
+                            relativeDirPath = relativeDirPath.Substring(1);
+                        }
+                        
+                        string normalizedRemotePath = job.RemotePath.Replace('\\', '/');
+                        if (!normalizedRemotePath.EndsWith("/")) normalizedRemotePath += "/";
+                        
+                        string remoteDirectory = normalizedRemotePath + relativeDirPath.Replace('\\', '/');
+                        
+                        string dirError = null;
+                        if (job.TransferClient.EnsureDirectory(job.ConnectionSettings, remoteDirectory, out dirError))
+                        {
+                            _logService.LogInfo(string.Format("Created/ensured remote directory: {0}", remoteDirectory));
+                        }
+                        else
+                        {
+                            _logService.LogWarning(string.Format("Failed to create remote directory {0}: {1}", 
+                                remoteDirectory, dirError ?? "Unknown error"));
+                        }
+                    }
+                    catch (Exception dirEx)
+                    {
+                        _logService.LogError(string.Format("Error processing directory {0}: {1}", directory, dirEx.Message));
+                    }
+                }
+                
+                if (currentFiles.Length == 0 && allDirectories.Length == 0)
+                {
+                    _logService.LogWarning(string.Format("No files or directories found in folder {0} for timer job {1}", job.FolderPath, jobId));
+                    return;
+                }
+                
                 if (currentFiles.Length == 0)
                 {
-                    _logService.LogWarning(string.Format("No files found in folder {0} for timer job {1}", job.FolderPath, jobId));
+                    _logService.LogInfo(string.Format("No files to upload, but {0} empty directories were processed for timer job {1}", allDirectories.Length, jobId));
                     return;
                 }
                 
@@ -324,6 +369,11 @@ namespace syncer.ui.Services
                 _logService.LogInfo(string.Format("Connection: {0}@{1}:{2}", 
                     job.ConnectionSettings.Username, job.ConnectionSettings.Host, job.ConnectionSettings.Port));
                 
+                // Track upload statistics
+                int successfulUploads = 0;
+                int failedUploads = 0;
+                int skippedFiles = 0;
+                
                 // Dictionary to track created remote folders
                 Dictionary<string, bool> createdRemoteFolders = new Dictionary<string, bool>();
                 
@@ -335,6 +385,22 @@ namespace syncer.ui.Services
                         if (!File.Exists(localFile))
                         {
                             _logService.LogWarning(string.Format("File does not exist: {0}", localFile));
+                            skippedFiles++;
+                            continue;
+                        }
+                        
+                        // Skip files that are currently being written to or locked
+                        try
+                        {
+                            using (FileStream stream = File.Open(localFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+                            {
+                                // File is accessible
+                            }
+                        }
+                        catch (IOException)
+                        {
+                            _logService.LogWarning(string.Format("File is locked or being used: {0}", localFile));
+                            skippedFiles++;
                             continue;
                         }
                         
@@ -403,19 +469,48 @@ namespace syncer.ui.Services
                             string errorMsg = string.Format("Failed to upload {0}: {1}", 
                                 fileName, error == null ? "Unknown error" : error);
                             _logService.LogError(errorMsg);
+                            failedUploads++;
+                            
+                            // Don't break here - continue trying to upload other files
+                            // This ensures all files get an attempt even if some fail
                         }
                         else
                         {
-                            _logService.LogInfo(string.Format("Successfully uploaded: {0}", fileName));
+                            _logService.LogInfo(string.Format("Successfully uploaded: {0} ({1} bytes)", fileName, fileInfo.Length));
+                            successfulUploads++;
+                            
+                            // Verify upload by checking if file exists remotely (optional)
+                            try
+                            {
+                                bool remoteFileExists = false;
+                                string verifyError = null;
+                                if (job.TransferClient.FileExists(job.ConnectionSettings, remoteFile, out remoteFileExists, out verifyError))
+                                {
+                                    if (remoteFileExists)
+                                    {
+                                        _logService.LogInfo(string.Format("Upload verified: {0} exists on remote server", fileName));
+                                    }
+                                    else
+                                    {
+                                        _logService.LogWarning(string.Format("Upload completed but file not found on remote: {0}", fileName));
+                                    }
+                                }
+                            }
+                            catch (Exception verifyEx)
+                            {
+                                _logService.LogWarning(string.Format("Could not verify upload of {0}: {1}", fileName, verifyEx.Message));
+                            }
                         }
                     }
                     catch (Exception fileEx)
                     {
                         _logService.LogError(string.Format("Error uploading file: {0}", fileEx.Message));
+                        failedUploads++;
                     }
                 }
                 
-                _logService.LogInfo(string.Format("Folder upload completed for job {0}", job.JobId));
+                _logService.LogInfo(string.Format("Folder upload completed for job {0}. Results: {1} successful, {2} failed, {3} skipped out of {4} total files", 
+                    job.JobId, successfulUploads, failedUploads, skippedFiles, localFilePaths.Length));
             }
             catch (Exception ex)
             {

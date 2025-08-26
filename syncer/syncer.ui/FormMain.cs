@@ -112,6 +112,12 @@ namespace syncer.ui
             UpdateServiceStatus();
             UpdateConnectionStatus();
             RefreshTimerJobsGrid();
+            
+            // Set up auto-refresh timer for timer jobs grid (every 30 seconds)
+            Timer refreshTimer = new Timer();
+            refreshTimer.Interval = 30000; // 30 seconds
+            refreshTimer.Tick += (sender, e) => RefreshTimerJobsGrid();
+            refreshTimer.Start();
         }
 
         private void FormMain_Activated(object sender, EventArgs e)

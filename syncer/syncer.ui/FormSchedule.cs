@@ -309,7 +309,7 @@ namespace syncer.ui
 
             // Subtitle
             Label lblSubtitle = new Label();
-            lblSubtitle.Text = "Configure automatic file uploads with custom filters and schedules";
+            lblSubtitle.Text = "Configure automatic file uploads and manual transfers - Simple and reliable";
             lblSubtitle.Location = new Point(20, 40);
             lblSubtitle.Size = new Size(500, 20);
             lblSubtitle.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular);
@@ -358,51 +358,29 @@ namespace syncer.ui
 
         private void InitializeFilterControls()
         {
-            // Initialize filter settings from default or existing job
+            // Note: Advanced filtering has been simplified for easier job creation
+            // Basic file selection will be done through folder browsing only
+            
+            // Initialize filter settings as minimal/disabled by default
             if (_jobFilterSettings == null)
             {
                 _jobFilterSettings = new FilterSettings();
-                _jobFilterSettings.FiltersEnabled = true; // Enable by default for better user experience
-                _jobFilterSettings.IncludeHiddenFiles = false; // Usually don't want hidden files
-                _jobFilterSettings.IncludeSystemFiles = false; // Usually don't want system files
-                _jobFilterSettings.IncludeReadOnlyFiles = true; // Usually want read-only files
-                _jobFilterSettings.MinFileSize = 0; // No minimum
-                _jobFilterSettings.MaxFileSize = 100; // 100 MB default max
+                _jobFilterSettings.FiltersEnabled = false; // Disabled by default for simplicity
+                _jobFilterSettings.IncludeHiddenFiles = false;
+                _jobFilterSettings.IncludeSystemFiles = false; 
+                _jobFilterSettings.IncludeReadOnlyFiles = true;
+                _jobFilterSettings.MinFileSize = 0;
+                _jobFilterSettings.MaxFileSize = 1000; // 1GB default max
             }
 
-            // Create main filter group box with better design
-            gbFilters = new GroupBox();
-            gbFilters.Text = "File Filters";
-            gbFilters.Size = new Size(920, 320); // Better width and height
-            gbFilters.Location = new Point(20, 250); // Moved up for better spacing
-            gbFilters.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Bold);
-
-            // Enable filters checkbox - prominent at the top
-            chkEnableFilters = new CheckBox();
-            chkEnableFilters.Text = "Enable file filtering for this job";
-            chkEnableFilters.Location = new Point(15, 25);
-            chkEnableFilters.Size = new Size(300, 25);
-            chkEnableFilters.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular);
-            chkEnableFilters.Checked = _jobFilterSettings.FiltersEnabled;
-            chkEnableFilters.CheckedChanged += chkEnableFilters_CheckedChanged;
-
-            // Create left panel for file types
-            CreateFileTypesPanel();
-            
-            // Create middle panel for file size controls
-            CreateFileSizePanel();
-            
-            // Create right panel for attributes and patterns
-            CreateAttributesPanel();
-
-            // Add main group box to form
-            this.Controls.Add(gbFilters);
-
-            // Create action buttons
-            CreateActionButtons();
-
-            // Update filter control states
-            UpdateFilterControlStates();
+            // Create a simple message instead of complex filter controls
+            Label lblFilterNote = new Label();
+            lblFilterNote.Text = "File Selection: All files in the selected folder will be uploaded automatically.\nNo advanced filtering is available in this version.";
+            lblFilterNote.Location = new Point(20, 250);
+            lblFilterNote.Size = new Size(600, 40);
+            lblFilterNote.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular);
+            lblFilterNote.ForeColor = Color.DarkBlue;
+            this.Controls.Add(lblFilterNote);
         }
 
         private void CreateFileTypesPanel()
@@ -582,21 +560,6 @@ namespace syncer.ui
             btnTestFilters.Click += btnTestFilters_Click;
             gbFilters.Controls.Add(btnTestFilters);
 
-            // Preview Job button (repositioned from designer)
-            if (btnPreview != null)
-            {
-                // Remove from main form if it was added there
-                if (this.Controls.Contains(btnPreview))
-                    this.Controls.Remove(btnPreview);
-                
-                // Add to filter group with proper positioning
-                btnPreview.Location = new Point(470, 245);
-                btnPreview.Size = new Size(100, 25);
-                btnPreview.Font = new Font("Microsoft Sans Serif", 8F);
-                btnPreview.BackColor = Color.LightGreen;
-                btnPreview.Text = "Preview Job";
-                gbFilters.Controls.Add(btnPreview);
-            }
 
             // Status label for filter info
             Label lblFilterStatus = new Label();
@@ -683,64 +646,17 @@ namespace syncer.ui
         {
             FilterSettings settings = new FilterSettings();
             
-            // Basic filter enable/disable
-            settings.FiltersEnabled = chkEnableFilters != null && chkEnableFilters.Checked;
+            // Basic filter enable/disable - now always disabled for simplicity
+            settings.FiltersEnabled = false;
             
-            // File types
-            if (clbFileTypes != null && clbFileTypes.CheckedItems.Count > 0)
-            {
-                List<string> checkedTypes = new List<string>();
-                foreach (string item in clbFileTypes.CheckedItems)
-                {
-                    checkedTypes.Add(item);
-                }
-                settings.AllowedFileTypes = checkedTypes.ToArray();
-            }
-            
-            // File sizes (convert to MB for storage)
-            if (numMinFileSize != null && cmbFileSizeUnit != null && cmbFileSizeUnit.SelectedItem != null)
-            {
-                decimal minSize = numMinFileSize.Value;
-                string unit = cmbFileSizeUnit.SelectedItem.ToString();
-                
-                // Convert to MB for storage
-                if (unit == "KB")
-                    settings.MinFileSize = minSize / 1024;
-                else if (unit == "MB")
-                    settings.MinFileSize = minSize;
-                else if (unit == "GB")
-                    settings.MinFileSize = minSize * 1024;
-                else
-                    settings.MinFileSize = minSize; // Default to MB
-            }
-            
-            if (numMaxFileSize != null && cmbFileSizeUnit != null && cmbFileSizeUnit.SelectedItem != null)
-            {
-                decimal maxSize = numMaxFileSize.Value;
-                string unit = cmbFileSizeUnit.SelectedItem.ToString();
-                
-                // Convert to MB for storage
-                if (unit == "KB")
-                    settings.MaxFileSize = maxSize / 1024;
-                else if (unit == "MB")
-                    settings.MaxFileSize = maxSize;
-                else if (unit == "GB")
-                    settings.MaxFileSize = maxSize * 1024;
-                else
-                    settings.MaxFileSize = maxSize; // Default to MB
-            }
-            
-            // File attributes
-            if (chkIncludeHiddenFiles != null)
-                settings.IncludeHiddenFiles = chkIncludeHiddenFiles.Checked;
-            if (chkIncludeSystemFiles != null)
-                settings.IncludeSystemFiles = chkIncludeSystemFiles.Checked;
-            if (chkIncludeReadOnlyFiles != null)
-                settings.IncludeReadOnlyFiles = chkIncludeReadOnlyFiles.Checked;
-            
-            // Exclude patterns
-            if (txtExcludePatterns != null)
-                settings.ExcludePatterns = txtExcludePatterns.Text;
+            // Set basic defaults for all files
+            settings.AllowedFileTypes = null; // Allow all file types
+            settings.MinFileSize = 0; // No minimum
+            settings.MaxFileSize = 0; // No maximum
+            settings.IncludeHiddenFiles = false;
+            settings.IncludeSystemFiles = false;
+            settings.IncludeReadOnlyFiles = true;
+            settings.ExcludePatterns = null;
             
             return settings;
         }
@@ -801,146 +717,14 @@ namespace syncer.ui
 
         private void btnTestFilters_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(_selectedFolderForTimer))
-            {
-                MessageBox.Show("Please select a folder first using the 'Browse Files' button before testing filters.", 
-                    "No Folder Selected", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            try
-            {
-                // Get current filter settings
-                FilterSettings currentFilters = GetCurrentFilterSettings();
-                
-                // Get all files in the selected folder
-                string[] allFiles = Directory.GetFiles(_selectedFolderForTimer, "*", SearchOption.AllDirectories);
-                
-                // Apply filters
-                List<string> includedFiles = new List<string>();
-                List<string> excludedFiles = new List<string>();
-                
-                foreach (string file in allFiles)
-                {
-                    if (ShouldIncludeFileForTimer(file, currentFilters))
-                    {
-                        includedFiles.Add(Path.GetFileName(file));
-                    }
-                    else
-                    {
-                        excludedFiles.Add(Path.GetFileName(file));
-                    }
-                }
-                
-                // Show results
-                string message = string.Format(
-                    "Filter Test Results for folder: {0}\n\n" +
-                    "Total files found: {1}\n" +
-                    "Files that WILL be uploaded: {2}\n" +
-                    "Files that will be EXCLUDED: {3}\n\n" +
-                    "Included files (first 10): {4}\n\n" +
-                    "Excluded files (first 10): {5}",
-                    Path.GetFileName(_selectedFolderForTimer),
-                    allFiles.Length,
-                    includedFiles.Count,
-                    excludedFiles.Count,
-                    string.Join(", ", includedFiles.Take(10).ToArray()),
-                    string.Join(", ", excludedFiles.Take(10).ToArray())
-                );
-                
-                MessageBox.Show(message, "Filter Test Results", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error testing filters: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            MessageBox.Show("Advanced filtering has been removed for simplicity.\nAll files in the selected folder will be uploaded automatically.", 
+                "Filter Testing Disabled", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private bool ShouldIncludeFileForTimer(string filePath, FilterSettings filterSettings)
         {
-            if (filterSettings == null || !filterSettings.FiltersEnabled)
-                return true;
-            
-            try
-            {
-                var fileInfo = new FileInfo(filePath);
-                
-                // Check file attributes
-                if (!filterSettings.IncludeHiddenFiles && (fileInfo.Attributes & FileAttributes.Hidden) != 0)
-                    return false;
-                
-                if (!filterSettings.IncludeSystemFiles && (fileInfo.Attributes & FileAttributes.System) != 0)
-                    return false;
-                
-                if (!filterSettings.IncludeReadOnlyFiles && (fileInfo.Attributes & FileAttributes.ReadOnly) != 0)
-                    return false;
-                
-                // Check file size (assume MB for now)
-                long fileSizeBytes = fileInfo.Length;
-                long minSizeBytes = (long)(filterSettings.MinFileSize * 1024 * 1024);
-                long maxSizeBytes = (long)(filterSettings.MaxFileSize * 1024 * 1024);
-                
-                if (minSizeBytes > 0 && fileSizeBytes < minSizeBytes)
-                    return false;
-                
-                if (maxSizeBytes > 0 && fileSizeBytes > maxSizeBytes)
-                    return false;
-                
-                // Check file extensions
-                if (filterSettings.AllowedFileTypes != null && filterSettings.AllowedFileTypes.Length > 0)
-                {
-                    string fileExtension = fileInfo.Extension;
-                    bool matchesExtension = false;
-                    
-                    foreach (string allowedType in filterSettings.AllowedFileTypes)
-                    {
-                        // Extract extension from format like ".txt - Text files"
-                        string allowedExt = allowedType.Split(' ')[0].Trim();
-                        if (string.Equals(fileExtension, allowedExt, StringComparison.OrdinalIgnoreCase))
-                        {
-                            matchesExtension = true;
-                            break;
-                        }
-                    }
-                    
-                    if (!matchesExtension)
-                        return false;
-                }
-                
-                // Check exclude patterns
-                if (!string.IsNullOrEmpty(filterSettings.ExcludePatterns))
-                {
-                    string fileName = fileInfo.Name;
-                    string[] patterns = filterSettings.ExcludePatterns.Split(',', ';');
-                    
-                    foreach (string pattern in patterns)
-                    {
-                        string trimmedPattern = pattern.Trim();
-                        if (!string.IsNullOrEmpty(trimmedPattern))
-                        {
-                            // Simple wildcard matching
-                            if (trimmedPattern.Contains("*"))
-                            {
-                                // Convert to regex pattern
-                                string regexPattern = trimmedPattern.Replace("*", ".*");
-                                if (Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase))
-                                    return false;
-                            }
-                            else if (fileName.IndexOf(trimmedPattern, StringComparison.OrdinalIgnoreCase) >= 0)
-                            {
-                                return false;
-                            }
-                        }
-                    }
-                }
-                
-                return true;
-            }
-            catch (Exception)
-            {
-                // If we can't check the file, include it by default
-                return true;
-            }
+            // Simplified: Always include files since advanced filtering is removed
+            return true;
         }
 
         protected override void OnFormClosed(FormClosedEventArgs e)
@@ -1943,7 +1727,7 @@ namespace syncer.ui
             {
                 if (string.IsNullOrEmpty(_selectedFolderForTimer))
                 {
-                    ServiceLocator.LogService.LogError("No folder selected for automatic upload");
+                    ServiceLocator.LogService.LogWarning("No folder selected for automatic upload");
                     return;
                 }
                 
@@ -2142,15 +1926,116 @@ namespace syncer.ui
         {
             if (!ValidateConnection()) return;
 
-            using (OpenFileDialog dialog = new OpenFileDialog())
+            // Ask user if they want to upload files or a folder
+            DialogResult choice = MessageBox.Show(
+                "Do you want to upload:\n\n" +
+                "YES = Individual files\n" +
+                "NO = Entire folder\n" +
+                "CANCEL = Cancel operation",
+                "Upload Type Selection",
+                MessageBoxButtons.YesNoCancel,
+                MessageBoxIcon.Question);
+
+            if (choice == DialogResult.Cancel)
+                return;
+
+            if (choice == DialogResult.Yes)
             {
-                dialog.Title = "Select File(s) to Upload";
-                dialog.Filter = "All Files (*.*)|*.*";
-                dialog.Multiselect = true;
-                
-                if (dialog.ShowDialog() == DialogResult.OK)
+                // Upload individual files
+                using (OpenFileDialog dialog = new OpenFileDialog())
                 {
-                    UploadFiles(dialog.FileNames);
+                    dialog.Title = "Select File(s) to Upload";
+                    dialog.Filter = "All Files (*.*)|*.*";
+                    dialog.Multiselect = true;
+                    
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        UploadFiles(dialog.FileNames);
+                    }
+                }
+            }
+            else if (choice == DialogResult.No)
+            {
+                // Upload entire folder
+                using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+                {
+                    dialog.Description = "Select folder to upload (all files and subfolders will be uploaded)";
+                    dialog.ShowNewFolderButton = false;
+                    
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        string folderPath = dialog.SelectedPath;
+                        
+                        // Get all files in the folder including subfolders
+                        string[] allFiles = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories);
+                        
+                        if (allFiles.Length == 0)
+                        {
+                            MessageBox.Show("The selected folder is empty. No files to upload.", 
+                                "Empty Folder", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+                        
+                        DialogResult confirmResult = MessageBox.Show(
+                            string.Format("Found {0} files in the selected folder.\n\nDo you want to upload all files?", allFiles.Length),
+                            "Confirm Folder Upload",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Question);
+                            
+                        if (confirmResult == DialogResult.Yes)
+                        {
+                            // Ask for upload destination
+                            using (Form inputForm = new Form())
+                            {
+                                inputForm.Text = "Upload Destination";
+                                inputForm.Size = new Size(450, 180);
+                                inputForm.StartPosition = FormStartPosition.CenterParent;
+                                inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                                inputForm.MaximizeBox = false;
+                                inputForm.MinimizeBox = false;
+                                
+                                Label label = new Label(); 
+                                label.Left = 10; 
+                                label.Top = 20; 
+                                label.Text = "Enter remote destination path:"; 
+                                label.AutoSize = true;
+                                
+                                TextBox textBox = new TextBox(); 
+                                textBox.Left = 10; 
+                                textBox.Top = 50; 
+                                textBox.Width = 400;
+                                textBox.Text = "/";
+                                
+                                Button buttonOk = new Button(); 
+                                buttonOk.Text = "OK"; 
+                                buttonOk.Left = 220; 
+                                buttonOk.Top = 90; 
+                                buttonOk.DialogResult = DialogResult.OK;
+                                
+                                Button buttonCancel = new Button(); 
+                                buttonCancel.Text = "Cancel"; 
+                                buttonCancel.Left = 320; 
+                                buttonCancel.Top = 90; 
+                                buttonCancel.DialogResult = DialogResult.Cancel;
+                                
+                                inputForm.Controls.Add(label); 
+                                inputForm.Controls.Add(textBox); 
+                                inputForm.Controls.Add(buttonOk); 
+                                inputForm.Controls.Add(buttonCancel);
+                                inputForm.AcceptButton = buttonOk;
+                                inputForm.CancelButton = buttonCancel;
+                                
+                                if (inputForm.ShowDialog() == DialogResult.OK)
+                                {
+                                    string remotePath = textBox.Text.Trim();
+                                    if (string.IsNullOrEmpty(remotePath))
+                                        remotePath = "/";
+                                        
+                                    PerformFolderUpload(folderPath, allFiles, remotePath);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
