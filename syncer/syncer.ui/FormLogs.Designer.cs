@@ -5,12 +5,6 @@ namespace syncer.ui
         private System.ComponentModel.IContainer components = null;
         private System.Windows.Forms.DataGridView dgvLogs;
         
-        // DataGridView Columns
-        private System.Windows.Forms.DataGridViewTextBoxColumn colDateTime;
-        private System.Windows.Forms.DataGridViewTextBoxColumn colLevel;
-        private System.Windows.Forms.DataGridViewTextBoxColumn colJobId;
-        private System.Windows.Forms.DataGridViewTextBoxColumn colMessage;
-        
         // Search Filter section
         private System.Windows.Forms.GroupBox gbSearchFilter;
         private System.Windows.Forms.Label lblSearch;
@@ -26,6 +20,10 @@ namespace syncer.ui
         private System.Windows.Forms.Label lblTo;
         private System.Windows.Forms.DateTimePicker dtpFrom;
         private System.Windows.Forms.DateTimePicker dtpTo;
+        private System.Windows.Forms.Label lblFromTime;
+        private System.Windows.Forms.Label lblToTime;
+        private System.Windows.Forms.DateTimePicker dtpFromTime;
+        private System.Windows.Forms.DateTimePicker dtpToTime;
         private System.Windows.Forms.CheckBox chkEnableTimeFilter;
         
         // Job Filter section
@@ -57,10 +55,6 @@ namespace syncer.ui
         private void InitializeComponent()
         {
             this.dgvLogs = new System.Windows.Forms.DataGridView();
-            this.colDateTime = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.colLevel = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.colJobId = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.colMessage = new System.Windows.Forms.DataGridViewTextBoxColumn();
             
             // Search Filter
             this.gbSearchFilter = new System.Windows.Forms.GroupBox();
@@ -77,6 +71,10 @@ namespace syncer.ui
             this.lblTo = new System.Windows.Forms.Label();
             this.dtpFrom = new System.Windows.Forms.DateTimePicker();
             this.dtpTo = new System.Windows.Forms.DateTimePicker();
+            this.lblFromTime = new System.Windows.Forms.Label();
+            this.lblToTime = new System.Windows.Forms.Label();
+            this.dtpFromTime = new System.Windows.Forms.DateTimePicker();
+            this.dtpToTime = new System.Windows.Forms.DateTimePicker();
             this.chkEnableTimeFilter = new System.Windows.Forms.CheckBox();
             
             // Job Filter
@@ -111,53 +109,16 @@ namespace syncer.ui
             | System.Windows.Forms.AnchorStyles.Right)));
             this.dgvLogs.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
             this.dgvLogs.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.dgvLogs.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
-            this.colDateTime,
-            this.colLevel,
-            this.colJobId,
-            this.colMessage});
-            this.dgvLogs.Location = new System.Drawing.Point(12, 165);
+            this.dgvLogs.AutoGenerateColumns = true;
+            this.dgvLogs.Location = new System.Drawing.Point(12, 195);
             this.dgvLogs.MultiSelect = false;
             this.dgvLogs.Name = "dgvLogs";
             this.dgvLogs.ReadOnly = true;
             this.dgvLogs.RowHeadersWidth = 25;
             this.dgvLogs.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dgvLogs.Size = new System.Drawing.Size(860, 365);
+            this.dgvLogs.Size = new System.Drawing.Size(860, 335);
             this.dgvLogs.TabIndex = 5;
             this.dgvLogs.CellFormatting += new System.Windows.Forms.DataGridViewCellFormattingEventHandler(this.dgvLogs_CellFormatting);
-            
-            // Column definitions
-            // DateTime column
-            this.colDateTime.DataPropertyName = "DateTime";
-            this.colDateTime.HeaderText = "Timestamp";
-            this.colDateTime.Name = "DateTime";
-            this.colDateTime.Width = 140;
-            this.colDateTime.MinimumWidth = 140;
-            this.colDateTime.Visible = true;
-            this.colDateTime.DefaultCellStyle.Format = "dd/MM/yyyy HH:mm";
-            this.colDateTime.DefaultCellStyle.NullValue = "(Current Time)";
-            this.colDateTime.ReadOnly = true;
-            
-            // Level column
-            this.colLevel.DataPropertyName = "Level";
-            this.colLevel.HeaderText = "Level";
-            this.colLevel.Name = "Level";
-            this.colLevel.Width = 70;
-            this.colLevel.ReadOnly = true;
-            
-            // JobId column
-            this.colJobId.DataPropertyName = "JobId";
-            this.colJobId.HeaderText = "JobId";
-            this.colJobId.Name = "JobId";
-            this.colJobId.Width = 70;
-            this.colJobId.ReadOnly = true;
-            
-            // Message column
-            this.colMessage.DataPropertyName = "Message";
-            this.colMessage.HeaderText = "Message";
-            this.colMessage.Name = "Message";
-            this.colMessage.Width = 350;
-            this.colMessage.ReadOnly = true;
             
             // Search Filter GroupBox
             this.gbSearchFilter.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
@@ -196,16 +157,20 @@ namespace syncer.ui
             | System.Windows.Forms.AnchorStyles.Right)));
             this.gbTimeFilter.Controls.Add(this.lblFrom);
             this.gbTimeFilter.Controls.Add(this.dtpFrom);
+            this.gbTimeFilter.Controls.Add(this.lblFromTime);
+            this.gbTimeFilter.Controls.Add(this.dtpFromTime);
             this.gbTimeFilter.Controls.Add(this.lblTo);
             this.gbTimeFilter.Controls.Add(this.dtpTo);
+            this.gbTimeFilter.Controls.Add(this.lblToTime);
+            this.gbTimeFilter.Controls.Add(this.dtpToTime);
             this.gbTimeFilter.Controls.Add(this.chkEnableTimeFilter);
             this.gbTimeFilter.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.gbTimeFilter.Location = new System.Drawing.Point(380, 12);
             this.gbTimeFilter.Name = "gbTimeFilter";
-            this.gbTimeFilter.Size = new System.Drawing.Size(300, 80);
+            this.gbTimeFilter.Size = new System.Drawing.Size(300, 110);
             this.gbTimeFilter.TabIndex = 2;
             this.gbTimeFilter.TabStop = false;
-            this.gbTimeFilter.Text = "Time Filter";
+            this.gbTimeFilter.Text = "Date & Time Filter";
             
             // From label
             this.lblFrom.AutoSize = true;
@@ -225,31 +190,69 @@ namespace syncer.ui
             this.dtpFrom.TabIndex = 1;
             this.dtpFrom.ValueChanged += new System.EventHandler(this.dtpFrom_ValueChanged);
             
+            // From Time label
+            this.lblFromTime.AutoSize = true;
+            this.lblFromTime.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblFromTime.Location = new System.Drawing.Point(165, 25);
+            this.lblFromTime.Name = "lblFromTime";
+            this.lblFromTime.Size = new System.Drawing.Size(36, 15);
+            this.lblFromTime.TabIndex = 2;
+            this.lblFromTime.Text = "Time:";
+            
+            // From Time DateTimePicker
+            this.dtpFromTime.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.dtpFromTime.Format = System.Windows.Forms.DateTimePickerFormat.Time;
+            this.dtpFromTime.ShowUpDown = true;
+            this.dtpFromTime.Location = new System.Drawing.Point(205, 22);
+            this.dtpFromTime.Name = "dtpFromTime";
+            this.dtpFromTime.Size = new System.Drawing.Size(85, 21);
+            this.dtpFromTime.TabIndex = 3;
+            this.dtpFromTime.ValueChanged += new System.EventHandler(this.dtpFrom_ValueChanged);
+            
             // To label
             this.lblTo.AutoSize = true;
             this.lblTo.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.lblTo.Location = new System.Drawing.Point(165, 25);
+            this.lblTo.Location = new System.Drawing.Point(15, 55);
             this.lblTo.Name = "lblTo";
             this.lblTo.Size = new System.Drawing.Size(24, 15);
-            this.lblTo.TabIndex = 2;
+            this.lblTo.TabIndex = 4;
             this.lblTo.Text = "To:";
             
             // To DateTimePicker
             this.dtpTo.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.dtpTo.Format = System.Windows.Forms.DateTimePickerFormat.Short;
-            this.dtpTo.Location = new System.Drawing.Point(195, 22);
+            this.dtpTo.Location = new System.Drawing.Point(60, 52);
             this.dtpTo.Name = "dtpTo";
             this.dtpTo.Size = new System.Drawing.Size(95, 21);
-            this.dtpTo.TabIndex = 3;
+            this.dtpTo.TabIndex = 5;
             this.dtpTo.ValueChanged += new System.EventHandler(this.dtpTo_ValueChanged);
+            
+            // To Time label
+            this.lblToTime.AutoSize = true;
+            this.lblToTime.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblToTime.Location = new System.Drawing.Point(165, 55);
+            this.lblToTime.Name = "lblToTime";
+            this.lblToTime.Size = new System.Drawing.Size(36, 15);
+            this.lblToTime.TabIndex = 6;
+            this.lblToTime.Text = "Time:";
+            
+            // To Time DateTimePicker
+            this.dtpToTime.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.dtpToTime.Format = System.Windows.Forms.DateTimePickerFormat.Time;
+            this.dtpToTime.ShowUpDown = true;
+            this.dtpToTime.Location = new System.Drawing.Point(205, 52);
+            this.dtpToTime.Name = "dtpToTime";
+            this.dtpToTime.Size = new System.Drawing.Size(85, 21);
+            this.dtpToTime.TabIndex = 7;
+            this.dtpToTime.ValueChanged += new System.EventHandler(this.dtpTo_ValueChanged);
             
             // Enable Time Filtering Checkbox
             this.chkEnableTimeFilter.AutoSize = true;
             this.chkEnableTimeFilter.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.chkEnableTimeFilter.Location = new System.Drawing.Point(60, 50);
+            this.chkEnableTimeFilter.Location = new System.Drawing.Point(60, 80);
             this.chkEnableTimeFilter.Name = "chkEnableTimeFilter";
             this.chkEnableTimeFilter.Size = new System.Drawing.Size(133, 19);
-            this.chkEnableTimeFilter.TabIndex = 4;
+            this.chkEnableTimeFilter.TabIndex = 8;
             this.chkEnableTimeFilter.Text = "Enable Time Filtering";
             this.chkEnableTimeFilter.UseVisualStyleBackColor = true;
             this.chkEnableTimeFilter.CheckedChanged += new System.EventHandler(this.chkEnableTimeFilter_CheckedChanged);
@@ -299,7 +302,7 @@ namespace syncer.ui
             this.gbJobFilter.Controls.Add(this.lblJob);
             this.gbJobFilter.Controls.Add(this.cmbJobs);
             this.gbJobFilter.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.gbJobFilter.Location = new System.Drawing.Point(12, 95);
+            this.gbJobFilter.Location = new System.Drawing.Point(12, 125);
             this.gbJobFilter.Name = "gbJobFilter";
             this.gbJobFilter.Size = new System.Drawing.Size(360, 60);
             this.gbJobFilter.TabIndex = 3;
@@ -338,7 +341,7 @@ namespace syncer.ui
             this.gbActions.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.gbActions.Location = new System.Drawing.Point(690, 12);
             this.gbActions.Name = "gbActions";
-            this.gbActions.Size = new System.Drawing.Size(182, 143);
+            this.gbActions.Size = new System.Drawing.Size(182, 173);
             this.gbActions.TabIndex = 4;
             this.gbActions.TabStop = false;
             this.gbActions.Text = "Actions";

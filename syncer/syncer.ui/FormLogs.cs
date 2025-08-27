@@ -50,7 +50,12 @@ namespace syncer.ui
 
             // Set default values for date time pickers
             dtpFrom.Value = DateTime.Today.AddDays(-7); // Default to 7 days ago
-            dtpTo.Value = DateTime.Now; // Default to current date/time
+            dtpTo.Value = DateTime.Today; // Default to current date
+            
+            // Set default values for time pickers
+            dtpFromTime.Value = DateTime.Today; // Default to 00:00:00
+            dtpToTime.Value = DateTime.Today.AddDays(1).AddSeconds(-1); // Default to 23:59:59
+            
             chkEnableTimeFilter.Checked = true; // Default to enabled time filtering
 
             // Initialize log data
@@ -130,16 +135,18 @@ namespace syncer.ui
                     }
                 }
 
-                // Time filter
-                if (chkEnableTimeFilter.Checked && dt.Columns.Contains("DateTime"))
+                // Time filter - use the single Timestamp column
+                if (chkEnableTimeFilter.Checked && dt.Columns.Contains("Timestamp"))
                 {
-                    DateTime fromDate = dtpFrom.Value.Date;
-                    DateTime toDate = dtpTo.Value.Date.AddDays(1).AddSeconds(-1); // End of day
+                    DateTime fromDateTime = dtpFrom.Value.Date.Add(dtpFromTime.Value.TimeOfDay);
+                    DateTime toDateTime = dtpTo.Value.Date.Add(dtpToTime.Value.TimeOfDay);
 
-                    string timeFilter = $"DateTime >= #{fromDate.ToString("yyyy-MM-dd HH:mm:ss")}# AND DateTime <= #{toDate.ToString("yyyy-MM-dd HH:mm:ss")}#";
+                    string timeFilter = string.Format("Timestamp >= #{0}# AND Timestamp <= #{1}#", 
+                        fromDateTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                        toDateTime.ToString("yyyy-MM-dd HH:mm:ss"));
 
                     filterExpression = string.IsNullOrEmpty(filterExpression) ?
-                        timeFilter : $"({filterExpression}) AND {timeFilter}";
+                        timeFilter : string.Format("({0}) AND {1}", filterExpression, timeFilter);
                 }
 
                 // Apply the filter
@@ -186,11 +193,13 @@ namespace syncer.ui
         {
             dtpFrom.Enabled = chkEnableTimeFilter.Checked;
             dtpTo.Enabled = chkEnableTimeFilter.Checked;
+            dtpFromTime.Enabled = chkEnableTimeFilter.Checked;
+            dtpToTime.Enabled = chkEnableTimeFilter.Checked;
             ApplyFilters();
         }
 
         /// <summary>
-        /// Event handler for From date selection change
+        /// Event handler for From date/time selection change
         /// </summary>
         private void dtpFrom_ValueChanged(object sender, EventArgs e)
         {
@@ -201,7 +210,7 @@ namespace syncer.ui
         }
 
         /// <summary>
-        /// Event handler for To date selection change
+        /// Event handler for To date/time selection change
         /// </summary>
         private void dtpTo_ValueChanged(object sender, EventArgs e)
         {
@@ -223,64 +232,8 @@ namespace syncer.ui
                     return;
                 }
 
-                // Get logs from service (UI interface doesn't need parameters)
-                _logsDataTable = _logService.GetLogs();
-                
-                // Ensure DateTime column has the right type and format
-                if (_logsDataTable != null && _logsDataTable.Columns.Contains("DateTime"))
-                {
-                    // Make sure the column is of DateTime type
-                    if (_logsDataTable.Columns["DateTime"].DataType != typeof(DateTime))
-                    {
-                        // Create a new DateTime column if needed
-                        DataColumn newDateTimeCol = new DataColumn("TempDateTime", typeof(DateTime));
-                        _logsDataTable.Columns.Add(newDateTimeCol);
-                        
-                        // Convert string values to DateTime
-                        foreach (DataRow row in _logsDataTable.Rows)
-                        {
-                            try
-                            {
-                                if (row["DateTime"] != DBNull.Value)
-                                {
-                                    DateTime dt;
-                                    if (DateTime.TryParse(row["DateTime"].ToString(), out dt))
-                                    {
-                                        row["TempDateTime"] = dt;
-                                    }
-                                }
-                            }
-                            catch
-                            {
-                                // Ignore conversion errors for individual rows
-                            }
-                        }
-                        
-                        // Replace original column
-                        _logsDataTable.Columns.Remove("DateTime");
-                        _logsDataTable.Columns["TempDateTime"].ColumnName = "DateTime";
-                    }
-                }
-
-                // Bind to DataGridView
-                if (dgvLogs != null && _logsDataTable != null)
-                {
-                    dgvLogs.DataSource = _logsDataTable;
-
-                    // Use a timer to configure columns after a short delay
-                    var timer = new Timer();
-                    timer.Interval = 100; // 100ms delay
-                    timer.Tick += (s, timerArgs) =>
-                    {
-                        timer.Stop();
-                        timer.Dispose();
-                        ConfigureLogColumns();
-                    };
-                    timer.Start();
-
-                    // Force the DataGridView to process the data binding
-                    dgvLogs.Refresh();
-                }
+                // Load logs using the consistent LoadLogs method
+                LoadLogs();
             }
             catch (Exception ex)
             {
@@ -306,58 +259,25 @@ namespace syncer.ui
                 // Add a small delay to ensure DataGridView has fully processed the binding
                 Application.DoEvents();
 
-                // First, hide all columns that we don't need
-                foreach (DataGridViewColumn col in dgvLogs.Columns)
-                {
-                    if (col.Name != "DateTime" && col.Name != "Level" && 
-                        col.Name != "JobId" && col.Name != "Message")
-                    {
-                        col.Visible = false;
-                    }
-                    else
-                    {
-                        col.Visible = true; // Ensure the desired columns are visible
-                    }
-                }
-
-                // Use actual column names from UI LogService
-                // We only want these columns: Timestamp, Level, JobId, Message
-
-                // Configure DateTime column
+                // Configure timestamp column - should now always be "Timestamp"
                 try
                 {
-                    if (dgvLogs.Columns.Contains("DateTime"))
+                    if (dgvLogs.Columns.Contains("Timestamp"))
                     {
-                        var dateTimeColumn = dgvLogs.Columns["DateTime"];
-                        if (dateTimeColumn != null)
-                        {
-                            // Force visible timestamp column 
-                            dateTimeColumn.HeaderText = "Timestamp";
-                            dateTimeColumn.Width = 140;
-                            dateTimeColumn.DisplayIndex = 0; // First column
-                            dateTimeColumn.Visible = true; // Make sure timestamp is visible
-                            dateTimeColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; // Prevent auto-sizing
-                            dateTimeColumn.DefaultCellStyle.Format = "dd/MM/yyyy HH:mm"; // Format to match screenshot
-                            dateTimeColumn.DefaultCellStyle.NullValue = DateTime.Now.ToString("dd/MM/yyyy HH:mm"); // Default value for nulls
-                            
-                            // Add custom cell formatting for DateTime column to ensure proper display
-                            dgvLogs.CellFormatting += (sender, e) => {
-                                if (e.ColumnIndex == dateTimeColumn.Index && e.Value != null)
-                                {
-                                    if (e.Value is DateTime)
-                                    {
-                                        e.Value = ((DateTime)e.Value).ToString("dd/MM/yyyy HH:mm");
-                                        e.FormattingApplied = true;
-                                    }
-                                }
-                            };
-                        }
+                        var timestampColumn = dgvLogs.Columns["Timestamp"];
+                        timestampColumn.HeaderText = "Timestamp";
+                        timestampColumn.Width = 150;
+                        timestampColumn.DisplayIndex = 0; // First column
+                        timestampColumn.Visible = true;
+                        timestampColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                        timestampColumn.DefaultCellStyle.Format = "dd/MM/yyyy HH:mm:ss";
+                        timestampColumn.DefaultCellStyle.NullValue = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
                     }
                 }
                 catch (Exception ex)
                 {
                     if (_logService != null)
-                        _logService.LogError("Error configuring DateTime column: " + ex.Message, "UI");
+                        _logService.LogError("Error configuring timestamp column: " + ex.Message, "UI");
                 }
 
                 // Configure Level column
@@ -366,12 +286,10 @@ namespace syncer.ui
                     if (dgvLogs.Columns.Contains("Level"))
                     {
                         var levelColumn = dgvLogs.Columns["Level"];
-                        if (levelColumn != null)
-                        {
-                            levelColumn.HeaderText = "Level";
-                            levelColumn.Width = 70;
-                            levelColumn.DisplayIndex = 1; // Second column
-                        }
+                        levelColumn.HeaderText = "Level";
+                        levelColumn.Width = 80;
+                        levelColumn.DisplayIndex = 1;
+                        levelColumn.Visible = true;
                     }
                 }
                 catch (Exception ex)
@@ -380,18 +298,24 @@ namespace syncer.ui
                         _logService.LogError("Error configuring Level column: " + ex.Message, "UI");
                 }
 
-                // Configure Job column
+                // Configure JobName column
                 try
                 {
-                    if (dgvLogs.Columns.Contains("Job"))
+                    if (dgvLogs.Columns.Contains("JobName"))
                     {
-                        var jobColumn = dgvLogs.Columns["Job"];
-                        if (jobColumn != null)
-                        {
-                            jobColumn.HeaderText = "Job";
-                            jobColumn.Width = 70;
-                            jobColumn.DisplayIndex = 2; // Third column
-                        }
+                        var jobNameColumn = dgvLogs.Columns["JobName"];
+                        jobNameColumn.HeaderText = "Job";
+                        jobNameColumn.Width = 100;
+                        jobNameColumn.DisplayIndex = 2;
+                        jobNameColumn.Visible = true;
+                    }
+                    else if (dgvLogs.Columns.Contains("JobId"))
+                    {
+                        var jobIdColumn = dgvLogs.Columns["JobId"];
+                        jobIdColumn.HeaderText = "Job";
+                        jobIdColumn.Width = 100;
+                        jobIdColumn.DisplayIndex = 2;
+                        jobIdColumn.Visible = true;
                     }
                 }
                 catch (Exception ex)
@@ -400,62 +324,37 @@ namespace syncer.ui
                         _logService.LogError("Error configuring Job column: " + ex.Message, "UI");
                 }
 
-                // Configure JobId column
+                // Configure Source column
                 try
                 {
-                    if (dgvLogs.Columns.Contains("JobId"))
+                    if (dgvLogs.Columns.Contains("Source"))
                     {
-                        var jobIdColumn = dgvLogs.Columns["JobId"];
-                        if (jobIdColumn != null)
-                        {
-                            jobIdColumn.HeaderText = "JobId";
-                            jobIdColumn.Width = 70;
-                            jobIdColumn.DisplayIndex = 3; // Fourth column
-                        }
+                        var sourceColumn = dgvLogs.Columns["Source"];
+                        sourceColumn.HeaderText = "Source";
+                        sourceColumn.Width = 80;
+                        sourceColumn.DisplayIndex = 3;
+                        sourceColumn.Visible = true;
                     }
                 }
                 catch (Exception ex)
                 {
                     if (_logService != null)
-                        _logService.LogError("Error configuring JobId column: " + ex.Message, "UI");
+                        _logService.LogError("Error configuring Source column: " + ex.Message, "UI");
                 }
 
-                // Configure Status column
-                try
-                {
-                    if (dgvLogs.Columns.Contains("Status"))
-                    {
-                        var statusColumn = dgvLogs.Columns["Status"];
-                        if (statusColumn != null)
-                        {
-                            statusColumn.HeaderText = "Status";
-                            statusColumn.Width = 80;
-                            statusColumn.DisplayIndex = 4; // Fifth column
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    if (_logService != null)
-                        _logService.LogError("Error configuring Status column: " + ex.Message, "UI");
-                }
-
-                // Configure Message column with extra safety
+                // Configure Message column
                 try
                 {
                     if (dgvLogs.Columns.Contains("Message"))
                     {
                         var messageColumn = dgvLogs.Columns["Message"];
-                        if (messageColumn != null)
+                        messageColumn.HeaderText = "Message";
+                        messageColumn.Width = 400;
+                        messageColumn.DisplayIndex = 4;
+                        messageColumn.Visible = true;
+                        if (dgvLogs.IsHandleCreated)
                         {
-                            messageColumn.HeaderText = "Message";
-                            messageColumn.Width = 400;
-                            messageColumn.DisplayIndex = 5; // Last column
-                            // Extra safety check before setting AutoSizeMode
-                            if (messageColumn != null && dgvLogs.IsHandleCreated)
-                            {
-                                messageColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-                            }
+                            messageColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
                         }
                     }
                 }
@@ -463,6 +362,24 @@ namespace syncer.ui
                 {
                     if (_logService != null)
                         _logService.LogError("Error configuring Message column: " + ex.Message, "UI");
+                }
+
+                // Hide unwanted columns
+                try
+                {
+                    string[] hiddenColumns = { "Exception", "FileName", "FileSize", "Duration", "RemotePath", "LocalPath" };
+                    foreach (string columnName in hiddenColumns)
+                    {
+                        if (dgvLogs.Columns.Contains(columnName))
+                        {
+                            dgvLogs.Columns[columnName].Visible = false;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_logService != null)
+                        _logService.LogError("Error hiding unwanted columns: " + ex.Message, "UI");
                 }
             }
             catch (Exception ex)
@@ -487,94 +404,46 @@ namespace syncer.ui
                     return;
                 }
 
-                // Load logs from service (UI interface)
-                _logsDataTable = _logService.GetLogs();
+                // Load logs from service with broader date range to ensure we get all logs
+                DateTime fromDate = DateTime.Today.AddDays(-30);
+                DateTime toDate = DateTime.Now.AddDays(1);
                 
-                // Create a DateTime column if it doesn't exist or ensure it has the correct format
+                _logsDataTable = _logService.GetLogs(fromDate, toDate, null);
+                
+                // Remove duplicate entries based on timestamp and message to fix issue #3
+                if (_logsDataTable != null && _logsDataTable.Rows.Count > 0)
+                {
+                    _logsDataTable = RemoveDuplicateLogEntries(_logsDataTable);
+                }
+                
+                // Ensure consistent DateTime column structure
                 if (_logsDataTable != null)
                 {
-                    // Check if DateTime column exists
-                    bool hasDateTimeColumn = _logsDataTable.Columns.Contains("DateTime");
-                    
-                    // If no DateTime column, add one
-                    if (!hasDateTimeColumn)
-                    {
-                        DataColumn dateTimeCol = new DataColumn("DateTime", typeof(DateTime));
-                        _logsDataTable.Columns.Add(dateTimeCol);
-                        
-                        // Add default values (current timestamp) for missing data
-                        foreach (DataRow row in _logsDataTable.Rows)
-                        {
-                            row["DateTime"] = DateTime.Now;
-                        }
-                    }
-                    // If DateTime column exists but has wrong type
-                    else if (_logsDataTable.Columns["DateTime"].DataType != typeof(DateTime))
-                    {
-                        // Create a new properly typed DateTime column
-                        DataColumn newDateTimeCol = new DataColumn("TempDateTime", typeof(DateTime));
-                        _logsDataTable.Columns.Add(newDateTimeCol);
-                        
-                        // Convert string values to DateTime
-                        foreach (DataRow row in _logsDataTable.Rows)
-                        {
-                            try
-                            {
-                                if (row["DateTime"] != DBNull.Value)
-                                {
-                                    DateTime dt;
-                                    if (DateTime.TryParse(row["DateTime"].ToString(), out dt))
-                                    {
-                                        row["TempDateTime"] = dt;
-                                    }
-                                    else
-                                    {
-                                        // Use current time if parsing fails
-                                        row["TempDateTime"] = DateTime.Now;
-                                    }
-                                }
-                                else
-                                {
-                                    // Use current time if value is null
-                                    row["TempDateTime"] = DateTime.Now;
-                                }
-                            }
-                            catch
-                            {
-                                // Use current time if any error occurs
-                                try { row["TempDateTime"] = DateTime.Now; } catch { }
-                            }
-                        }
-                        
-                        // Replace original column
-                        _logsDataTable.Columns.Remove("DateTime");
-                        _logsDataTable.Columns["TempDateTime"].ColumnName = "DateTime";
-                    }
-                    
-                    // Ensure DateTime column is at the beginning
-                    _logsDataTable.Columns["DateTime"].SetOrdinal(0);
+                    _logsDataTable = EnsureConsistentLogStructure(_logsDataTable);
                 }
 
                 if (dgvLogs != null && _logsDataTable != null)
                 {
-                    // Clear any existing data binding
+                    // Clear any existing data binding to prevent structure issues
                     dgvLogs.DataSource = null;
+                    dgvLogs.Refresh();
                     
-                    // Create a DataView with DateTime sorting enabled
+                    // Create a DataView with Timestamp sorting enabled
                     DataView dv = new DataView(_logsDataTable);
-                    dv.Sort = "DateTime DESC"; // Sort by datetime descending (newest first)
+                    // Always sort by Timestamp column (we ensure this exists in EnsureConsistentLogStructure)
+                    dv.Sort = "Timestamp DESC"; // Sort by timestamp descending (newest first)
                     
                     // Set new data source
                     dgvLogs.DataSource = dv;
 
-                    // Use a timer to configure columns after a short delay
+                    // Use a timer to configure columns after data binding is complete
                     var timer = new Timer();
                     timer.Interval = 200; // 200ms delay to ensure proper rendering
                     timer.Tick += (s, timerArgs) =>
                     {
                         timer.Stop();
 
-                        // Configure columns first
+                        // Configure columns consistently
                         ConfigureLogColumns();
                         
                         // After loading, apply any filters
@@ -585,9 +454,6 @@ namespace syncer.ui
                         timer.Dispose();
                     };
                     timer.Start();
-
-                    // Force the DataGridView to process the data binding
-                    dgvLogs.Refresh();
                 }
 
                 UpdateLogCount();
@@ -604,11 +470,221 @@ namespace syncer.ui
             }
         }
 
+        /// <summary>
+        /// Remove duplicate log entries based on timestamp and message content
+        /// </summary>
+        private DataTable RemoveDuplicateLogEntries(DataTable originalTable)
+        {
+            if (originalTable == null || originalTable.Rows.Count == 0)
+                return originalTable;
+
+            try
+            {
+                DataTable deduplicatedTable = originalTable.Clone();
+                var seenEntries = new System.Collections.Generic.HashSet<string>();
+
+                // Always use Timestamp column (ensured by EnsureConsistentLogStructure)
+                string timestampColumn = "Timestamp";
+                string messageColumn = "Message";
+
+                foreach (DataRow row in originalTable.Rows)
+                {
+                    // Create a unique key based on timestamp and message
+                    string timestamp = row[timestampColumn].ToString();
+                    string message = row[messageColumn].ToString();
+                    string uniqueKey = timestamp + "|" + message;
+
+                    if (!seenEntries.Contains(uniqueKey))
+                    {
+                        seenEntries.Add(uniqueKey);
+                        deduplicatedTable.ImportRow(row);
+                    }
+                }
+
+                return deduplicatedTable;
+            }
+            catch (Exception ex)
+            {
+                if (_logService != null)
+                {
+                    _logService.LogError("Error removing duplicate log entries: " + ex.Message, "UI");
+                }
+                return originalTable; // Return original if deduplication fails
+            }
+        }
+
+        /// <summary>
+        /// Ensure the log DataTable has a consistent structure with a single proper DateTime column
+        /// </summary>
+        private DataTable EnsureConsistentLogStructure(DataTable originalTable)
+        {
+            if (originalTable == null)
+                return null;
+
+            try
+            {
+                // Check what timestamp columns we have
+                bool hasTimestamp = originalTable.Columns.Contains("Timestamp");
+                bool hasDateTime = originalTable.Columns.Contains("DateTime");
+                
+                // If we have both, remove DateTime and keep only Timestamp
+                if (hasTimestamp && hasDateTime)
+                {
+                    originalTable.Columns.Remove("DateTime");
+                    hasDateTime = false;
+                }
+                
+                // If we have Timestamp column, ensure it's DateTime type
+                if (hasTimestamp)
+                {
+                    if (originalTable.Columns["Timestamp"].DataType != typeof(DateTime))
+                    {
+                        DataColumn newTimestampCol = new DataColumn("TempTimestamp", typeof(DateTime));
+                        originalTable.Columns.Add(newTimestampCol);
+                        
+                        foreach (DataRow row in originalTable.Rows)
+                        {
+                            try
+                            {
+                                if (row["Timestamp"] != DBNull.Value)
+                                {
+                                    DateTime dt;
+                                    if (DateTime.TryParse(row["Timestamp"].ToString(), out dt))
+                                    {
+                                        row["TempTimestamp"] = dt;
+                                    }
+                                    else
+                                    {
+                                        row["TempTimestamp"] = DateTime.Now;
+                                    }
+                                }
+                                else
+                                {
+                                    row["TempTimestamp"] = DateTime.Now;
+                                }
+                            }
+                            catch
+                            {
+                                row["TempTimestamp"] = DateTime.Now;
+                            }
+                        }
+                        
+                        originalTable.Columns.Remove("Timestamp");
+                        originalTable.Columns["TempTimestamp"].ColumnName = "Timestamp";
+                    }
+                }
+                // If we only have DateTime column, rename it to Timestamp for consistency
+                else if (hasDateTime)
+                {
+                    if (originalTable.Columns["DateTime"].DataType != typeof(DateTime))
+                    {
+                        // Fix DateTime column type first
+                        DataColumn newDateTimeCol = new DataColumn("TempTimestamp", typeof(DateTime));
+                        originalTable.Columns.Add(newDateTimeCol);
+                        
+                        foreach (DataRow row in originalTable.Rows)
+                        {
+                            try
+                            {
+                                if (row["DateTime"] != DBNull.Value)
+                                {
+                                    DateTime dt;
+                                    if (DateTime.TryParse(row["DateTime"].ToString(), out dt))
+                                    {
+                                        row["TempTimestamp"] = dt;
+                                    }
+                                    else
+                                    {
+                                        row["TempTimestamp"] = DateTime.Now;
+                                    }
+                                }
+                                else
+                                {
+                                    row["TempTimestamp"] = DateTime.Now;
+                                }
+                            }
+                            catch
+                            {
+                                row["TempTimestamp"] = DateTime.Now;
+                            }
+                        }
+                        
+                        originalTable.Columns.Remove("DateTime");
+                        originalTable.Columns["TempTimestamp"].ColumnName = "Timestamp";
+                    }
+                    else
+                    {
+                        // Just rename the column
+                        originalTable.Columns["DateTime"].ColumnName = "Timestamp";
+                    }
+                }
+                else
+                {
+                    // Create a Timestamp column if neither exists
+                    DataColumn timestampCol = new DataColumn("Timestamp", typeof(DateTime));
+                    originalTable.Columns.Add(timestampCol);
+                    
+                    foreach (DataRow row in originalTable.Rows)
+                    {
+                        row["Timestamp"] = DateTime.Now;
+                    }
+                }
+                
+                return originalTable;
+            }
+            catch (Exception ex)
+            {
+                if (_logService != null)
+                {
+                    _logService.LogError("Error ensuring consistent log structure: " + ex.Message, "UI");
+                }
+                return originalTable;
+            }
+        }
+
         private void UpdateLogCount()
         {
-            if (lblLogCount != null && _logsDataTable != null)
+            if (lblLogCount != null)
             {
-                lblLogCount.Text = "Total Logs: " + _logsDataTable.Rows.Count;
+                try
+                {
+                    int totalCount = 0;
+                    int filteredCount = 0;
+
+                    if (dgvLogs != null && dgvLogs.DataSource != null)
+                    {
+                        if (dgvLogs.DataSource is DataView)
+                        {
+                            DataView dv = (DataView)dgvLogs.DataSource;
+                            totalCount = dv.Table.Rows.Count;
+                            filteredCount = dv.Count;
+                        }
+                        else if (dgvLogs.DataSource is DataTable)
+                        {
+                            DataTable dt = (DataTable)dgvLogs.DataSource;
+                            totalCount = dt.Rows.Count;
+                            filteredCount = dt.DefaultView.Count;
+                        }
+                    }
+                    else if (_logsDataTable != null)
+                    {
+                        totalCount = _logsDataTable.Rows.Count;
+                        filteredCount = totalCount;
+                    }
+
+                    if (filteredCount == totalCount)
+                    {
+                        lblLogCount.Text = "Total Logs: " + totalCount;
+                    }
+                    else
+                    {
+                        lblLogCount.Text = string.Format("Showing {0} of {1} logs", filteredCount, totalCount);
+                    }
+                }
+                catch
+                {
+                    lblLogCount.Text = "Total Logs: 0";
+                }
             }
         }
 
@@ -622,6 +698,11 @@ namespace syncer.ui
                 {
                     // Clear filter
                     DataTable dt = dgvLogs != null ? dgvLogs.DataSource as DataTable : null;
+                    if (dt == null && dgvLogs.DataSource is DataView)
+                    {
+                        dt = ((DataView)dgvLogs.DataSource).Table;
+                    }
+                    
                     if (dt != null)
                     {
                         dt.DefaultView.RowFilter = string.Empty;
@@ -629,14 +710,35 @@ namespace syncer.ui
                 }
                 else
                 {
-                    // Apply filter - use correct column names from UI LogService
-                    // Columns: DateTime, Level, Job, File, Status, Message
+                    // Apply filter - search across JobName, Source, and Message columns
                     string safe = searchText.Replace("'", "''");
-                    string filter = "Job LIKE '%" + safe + "%' OR File LIKE '%" + safe + "%' OR Message LIKE '%" + safe + "%'";
+                    string filter = string.Empty;
+                    
                     DataTable dt = dgvLogs != null ? dgvLogs.DataSource as DataTable : null;
+                    if (dt == null && dgvLogs.DataSource is DataView)
+                    {
+                        dt = ((DataView)dgvLogs.DataSource).Table;
+                    }
+                    
                     if (dt != null)
                     {
-                        dt.DefaultView.RowFilter = filter;
+                        // Build dynamic filter based on available columns
+                        var filterParts = new System.Collections.Generic.List<string>();
+                        
+                        if (dt.Columns.Contains("JobName"))
+                            filterParts.Add("JobName LIKE '%" + safe + "%'");
+                        if (dt.Columns.Contains("JobId"))
+                            filterParts.Add("JobId LIKE '%" + safe + "%'");
+                        if (dt.Columns.Contains("Source"))
+                            filterParts.Add("Source LIKE '%" + safe + "%'");
+                        if (dt.Columns.Contains("Message"))
+                            filterParts.Add("Message LIKE '%" + safe + "%'");
+                        
+                        if (filterParts.Count > 0)
+                        {
+                            filter = string.Join(" OR ", filterParts.ToArray());
+                            dt.DefaultView.RowFilter = filter;
+                        }
                     }
                 }
 
@@ -657,6 +759,11 @@ namespace syncer.ui
             }
 
             DataTable dt = dgvLogs != null ? dgvLogs.DataSource as DataTable : null;
+            if (dt == null && dgvLogs != null && dgvLogs.DataSource is DataView)
+            {
+                dt = ((DataView)dgvLogs.DataSource).Table;
+            }
+            
             if (dt != null)
             {
                 dt.DefaultView.RowFilter = string.Empty;
@@ -789,15 +896,16 @@ namespace syncer.ui
 
             try
             {
-                // Special handling for DateTime column
-                if (dgvLogs.Columns[e.ColumnIndex].Name == "DateTime")
+                // Special handling for timestamp column
+                string columnName = dgvLogs.Columns[e.ColumnIndex].Name;
+                if (columnName == "Timestamp")
                 {
                     try
                     {
                         // Handle null values
                         if (e.Value == null || e.Value == DBNull.Value)
                         {
-                            e.Value = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+                            e.Value = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
                             e.FormattingApplied = true;
                             return;
                         }
@@ -805,9 +913,9 @@ namespace syncer.ui
                         // Handle DateTime values
                         if (e.Value is DateTime)
                         {
-                            // Format datetime value to match the screenshot (dd/MM/yyyy HH:mm)
+                            // Format datetime value with time precision
                             DateTime dateValue = (DateTime)e.Value;
-                            e.Value = dateValue.ToString("dd/MM/yyyy HH:mm");
+                            e.Value = dateValue.ToString("dd/MM/yyyy HH:mm:ss");
                             e.FormattingApplied = true;
                         }
                         // Handle string values
@@ -817,7 +925,7 @@ namespace syncer.ui
                             DateTime dateValue;
                             if (DateTime.TryParse(e.Value.ToString(), out dateValue))
                             {
-                                e.Value = dateValue.ToString("dd/MM/yyyy HH:mm");
+                                e.Value = dateValue.ToString("dd/MM/yyyy HH:mm:ss");
                                 e.FormattingApplied = true;
                             }
                             // If can't parse, still display something
@@ -829,21 +937,21 @@ namespace syncer.ui
                             else
                             {
                                 // Use current date for empty strings
-                                e.Value = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+                                e.Value = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
                                 e.FormattingApplied = true;
                             }
                         }
                         // Handle any other type
                         else
                         {
-                            e.Value = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+                            e.Value = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
                             e.FormattingApplied = true;
                         }
                     }
                     catch
                     {
                         // If there's an error formatting, use current date
-                        e.Value = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+                        e.Value = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
                         e.FormattingApplied = true;
                     }
                 }
@@ -865,6 +973,14 @@ namespace syncer.ui
                     e.CellStyle.ForeColor = Color.White;
                     e.CellStyle.SelectionBackColor = Color.DarkRed;
                     e.CellStyle.SelectionForeColor = Color.White;
+                }
+                else if (logLevel == "Warning")
+                {
+                    // Format Warning rows with yellow background
+                    e.CellStyle.BackColor = Color.LightYellow;
+                    e.CellStyle.ForeColor = Color.Black;
+                    e.CellStyle.SelectionBackColor = Color.Orange;
+                    e.CellStyle.SelectionForeColor = Color.Black;
                 }
                 else if (logLevel == "Info")
                 {
