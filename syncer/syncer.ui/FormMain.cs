@@ -17,6 +17,12 @@ namespace syncer.ui
         // System tray components
         private SystemTrayManager _trayManager;
         private NotificationService _notificationService;
+        
+        // Full screen state management
+        private bool _isFullScreen = false;
+        private FormWindowState _previousWindowState;
+        private FormBorderStyle _previousBorderStyle;
+        private bool _previousMenuVisible;
 
         public FormMain()
         {
@@ -101,9 +107,13 @@ namespace syncer.ui
         private void InitializeCustomComponents()
         {
             this.Text = "DataSyncer - Main Dashboard";
-            this.Size = new Size(900, 700);
+            this.Size = new Size(1200, 760);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new Size(800, 600);
+            
+            // Initialize full screen menu state
+            fullScreenToolStripMenuItem.Enabled = true;
+            normalViewToolStripMenuItem.Enabled = false;
             
             // Add event handler to refresh timer jobs when form is activated
             this.Activated += FormMain_Activated;
@@ -424,6 +434,72 @@ namespace syncer.ui
             {
                 Hide();
                 // Show notification via tray manager instead of here
+            }
+        }
+        
+        // Full screen functionality
+        private void fullScreenToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            ToggleFullScreen(true);
+        }
+        
+        private void normalViewToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            ToggleFullScreen(false);
+        }
+        
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            // Handle F11 for full screen toggle
+            if (keyData == Keys.F11)
+            {
+                ToggleFullScreen(!_isFullScreen);
+                return true;
+            }
+            // Handle Escape to exit full screen
+            else if (keyData == Keys.Escape && _isFullScreen)
+            {
+                ToggleFullScreen(false);
+                return true;
+            }
+            
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+        
+        private void ToggleFullScreen(bool fullScreen)
+        {
+            if (fullScreen && !_isFullScreen)
+            {
+                // Save current state
+                _previousWindowState = WindowState;
+                _previousBorderStyle = FormBorderStyle;
+                _previousMenuVisible = menuStrip1.Visible;
+                
+                // Set full screen properties
+                menuStrip1.Visible = false;
+                FormBorderStyle = FormBorderStyle.None;
+                WindowState = FormWindowState.Maximized;
+                TopMost = true;
+                
+                _isFullScreen = true;
+                
+                // Update menu items
+                fullScreenToolStripMenuItem.Enabled = false;
+                normalViewToolStripMenuItem.Enabled = true;
+            }
+            else if (!fullScreen && _isFullScreen)
+            {
+                // Restore previous state
+                TopMost = false;
+                FormBorderStyle = _previousBorderStyle;
+                WindowState = _previousWindowState;
+                menuStrip1.Visible = _previousMenuVisible;
+                
+                _isFullScreen = false;
+                
+                // Update menu items
+                fullScreenToolStripMenuItem.Enabled = true;
+                normalViewToolStripMenuItem.Enabled = false;
             }
         }
         
