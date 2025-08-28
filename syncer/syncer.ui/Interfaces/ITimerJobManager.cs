@@ -20,6 +20,17 @@ namespace syncer.ui.Interfaces
         bool RegisterTimerJob(long jobId, string folderPath, string remotePath, double intervalMs);
         
         /// <summary>
+        /// Registers a timer job that will run automatically with a custom name
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <param name="jobName">The custom name for the job</param>
+        /// <param name="folderPath">The local folder path to monitor and upload</param>
+        /// <param name="remotePath">The remote path to upload to</param>
+        /// <param name="intervalMs">The timer interval in milliseconds</param>
+        /// <returns>True if the job was registered successfully</returns>
+        bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs);
+        
+        /// <summary>
         /// Starts a timer job
         /// </summary>
         /// <param name="jobId">The ID of the job to start</param>
@@ -87,5 +98,16 @@ namespace syncer.ui.Interfaces
         /// <param name="jobId">The ID of the job</param>
         /// <returns>The job name or null if job not found</returns>
         string GetTimerJobName(long jobId);
+        
+        /// <summary>
+        /// Updates a timer job with new settings
+        /// </summary>
+        /// <param name="jobId">The ID of the job to update</param>
+        /// <param name="jobName">The new job name</param>
+        /// <param name="folderPath">The new local folder path</param>
+        /// <param name="remotePath">The new remote path</param>
+        /// <param name="intervalMs">The new timer interval in milliseconds</param>
+        /// <returns>True if the job was updated successfully</returns>
+        bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs);
     }
 }

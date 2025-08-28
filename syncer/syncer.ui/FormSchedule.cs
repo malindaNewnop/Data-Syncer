@@ -522,10 +522,54 @@ namespace syncer.ui
                 if (txtJobName != null) txtJobName.Text = _currentJob.Name;
                 if (chkEnableJob != null) chkEnableJob.Checked = _currentJob.IsEnabled;
                 
-                // Load timer settings (if available from job data)
-                if (chkEnableTimer != null) chkEnableTimer.Checked = false; // Default for new timer feature
-                if (numTimerInterval != null) numTimerInterval.Value = 5; // Default 5 minute interval
-                if (cmbTimerUnit != null) cmbTimerUnit.SelectedIndex = 1; // Minutes
+                // Load timer settings (from job data for timer jobs)
+                if (chkEnableTimer != null) 
+                {
+                    // For timer jobs, enable the timer checkbox
+                    chkEnableTimer.Checked = _currentJob.TransferMode == "Upload" || _currentJob.TransferMode == "Timer";
+                }
+                
+                // Load interval settings
+                if (numTimerInterval != null && cmbTimerUnit != null) 
+                {
+                    // Convert from minutes (stored format) to appropriate display unit
+                    int intervalInMinutes = _currentJob.IntervalValue;
+                    
+                    if (intervalInMinutes >= 60 && intervalInMinutes % 60 == 0)
+                    {
+                        // Use hours if it's a whole number of hours
+                        numTimerInterval.Value = intervalInMinutes / 60;
+                        cmbTimerUnit.SelectedIndex = 2; // Hours
+                    }
+                    else if (intervalInMinutes < 1)
+                    {
+                        // Use seconds for sub-minute intervals
+                        numTimerInterval.Value = intervalInMinutes * 60;
+                        cmbTimerUnit.SelectedIndex = 0; // Seconds
+                    }
+                    else
+                    {
+                        // Use minutes
+                        numTimerInterval.Value = intervalInMinutes;
+                        cmbTimerUnit.SelectedIndex = 1; // Minutes
+                    }
+                }
+                
+                // Load source folder for timer jobs
+                if (!string.IsNullOrEmpty(_currentJob.SourcePath))
+                {
+                    _selectedFolderForTimer = _currentJob.SourcePath;
+                    if (lblNoFilesSelected != null)
+                    {
+                        lblNoFilesSelected.Text = "Selected: " + Path.GetFileName(_selectedFolderForTimer);
+                    }
+                }
+                
+                // Load destination path for timer jobs
+                if (!string.IsNullOrEmpty(_currentJob.DestinationPath))
+                {
+                    _timerUploadDestination = _currentJob.DestinationPath;
+                }
                 
                 // Load filter settings
                 LoadFilterSettings();
@@ -647,7 +691,7 @@ namespace syncer.ui
                 ServiceLocator.LogService.LogInfo("Job '" + _currentJob.Name + "' created");
             }
             
-            // If the timer is enabled and we have a folder selected, register the job with the timer job manager
+            // If the timer is enabled and we have a folder selected, register/update the job with the timer job manager
             if (chkEnableTimer != null && chkEnableTimer.Checked && !string.IsNullOrEmpty(_selectedFolderForTimer))
             {
                 try 
@@ -655,31 +699,48 @@ namespace syncer.ui
                     // First, try to get the timer job manager from the service locator
                     ITimerJobManager timerJobManager = ServiceLocator.TimerJobManager;
                     
-                    // Register the job with the timer job manager
+                    // Register or update the job with the timer job manager
                     if (timerJobManager != null)
                     {
                         double intervalMs = CalculateTimerInterval();
-                        bool registered = timerJobManager.RegisterTimerJob(_currentJob.Id, 
-                            _selectedFolderForTimer, _timerUploadDestination, intervalMs);
                         
-                        if (registered && _isTimerRunning)
+                        if (_isEditMode && timerJobManager.GetRegisteredTimerJobs().Contains(_currentJob.Id))
                         {
-                            // If the timer is already running, start the job in the manager
-                            timerJobManager.StartTimerJob(_currentJob.Id);
-                            ServiceLocator.LogService.LogInfo(string.Format(
-                                "Job '{0}' registered and started in background timer service", _currentJob.Name));
+                            // Update existing timer job
+                            bool updated = timerJobManager.UpdateTimerJob(_currentJob.Id, _currentJob.Name,
+                                _selectedFolderForTimer, _timerUploadDestination, intervalMs);
+                            
+                            if (updated)
+                            {
+                                ServiceLocator.LogService.LogInfo(string.Format(
+                                    "Timer job '{0}' updated successfully", _currentJob.Name));
+                            }
                         }
-                        else if (registered)
+                        else
                         {
-                            ServiceLocator.LogService.LogInfo(string.Format(
-                                "Job '{0}' registered in background timer service", _currentJob.Name));
+                            // Register new timer job
+                            bool registered = timerJobManager.RegisterTimerJob(_currentJob.Id, _currentJob.Name,
+                                _selectedFolderForTimer, _timerUploadDestination, intervalMs);
+                            
+                            if (registered && _isTimerRunning)
+                            {
+                                // If the timer is already running, start the job in the manager
+                                timerJobManager.StartTimerJob(_currentJob.Id);
+                                ServiceLocator.LogService.LogInfo(string.Format(
+                                    "Job '{0}' registered and started in background timer service", _currentJob.Name));
+                            }
+                            else if (registered)
+                            {
+                                ServiceLocator.LogService.LogInfo(string.Format(
+                                    "Job '{0}' registered in background timer service", _currentJob.Name));
+                            }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
                     ServiceLocator.LogService.LogError(string.Format(
-                        "Failed to register job '{0}' with timer service: {1}", _currentJob.Name, ex.Message));
+                        "Failed to register/update job '{0}' with timer service: {1}", _currentJob.Name, ex.Message));
                 }
             }
         }

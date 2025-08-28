@@ -556,12 +556,18 @@ namespace syncer.ui
             
             // Add selection changed event
             dgvTimerJobs.SelectionChanged += dgvTimerJobs_SelectionChanged;
+            
+            // Initially disable action buttons
+            btnStopTimerJob.Enabled = false;
+            btnEditTimerJob.Enabled = false;
         }
         
         private void dgvTimerJobs_SelectionChanged(object sender, EventArgs e)
         {
-            // Enable or disable the stop button based on selection
-            btnStopTimerJob.Enabled = dgvTimerJobs.SelectedRows.Count > 0;
+            // Enable or disable buttons based on selection
+            bool hasSelection = dgvTimerJobs.SelectedRows.Count > 0;
+            btnStopTimerJob.Enabled = hasSelection;
+            btnEditTimerJob.Enabled = hasSelection;
         }
         
         private void RefreshTimerJobsGrid()
@@ -663,6 +669,75 @@ namespace syncer.ui
             {
                 MessageBox.Show("Error stopping timer job: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 try { ServiceLocator.LogService.LogError("Error stopping timer job: " + ex.Message); } catch { }
+            }
+        }
+        
+        private void btnEditTimerJob_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (dgvTimerJobs.SelectedRows.Count == 0) return;
+                
+                // Get selected job ID and details
+                DataGridViewRow selectedRow = dgvTimerJobs.SelectedRows[0];
+                long jobId = Convert.ToInt64(selectedRow.Cells["JobId"].Value);
+                
+                // Get the timer job manager
+                ITimerJobManager timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager == null) 
+                {
+                    MessageBox.Show("Timer job manager is not available.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                
+                // Get job details from TimerJobManager
+                string jobName = timerJobManager.GetTimerJobName(jobId);
+                string folderPath = timerJobManager.GetTimerJobFolderPath(jobId);
+                string remotePath = timerJobManager.GetTimerJobRemotePath(jobId);
+                double intervalMs = timerJobManager.GetTimerJobInterval(jobId);
+                bool isRunning = timerJobManager.IsTimerJobRunning(jobId);
+                DateTime? lastUpload = timerJobManager.GetLastUploadTime(jobId);
+                
+                // Create a SyncJob object to pass to the FormSchedule
+                SyncJob jobToEdit = new SyncJob
+                {
+                    Id = (int)jobId,
+                    Name = jobName ?? "Timer Job " + jobId,
+                    SourcePath = folderPath ?? "",
+                    DestinationPath = remotePath ?? "/",
+                    IsEnabled = isRunning,
+                    LastRun = lastUpload,
+                    TransferMode = "Upload",
+                    // Convert interval from milliseconds to minutes for display
+                    IntervalValue = (int)(intervalMs / 60000), // Convert ms to minutes
+                    IntervalType = "Minutes"
+                };
+                
+                // Open the FormSchedule in edit mode
+                using (FormSchedule editForm = new FormSchedule(jobToEdit))
+                {
+                    editForm.Text = "Edit Timer Job - " + jobName;
+                    
+                    if (editForm.ShowDialog() == DialogResult.OK)
+                    {
+                        // The job has been updated, refresh the grid
+                        RefreshTimerJobsGrid();
+                        
+                        ServiceLocator.LogService.LogInfo(string.Format("Timer job '{0}' (ID: {1}) has been edited", jobName, jobId));
+                        
+                        // Show confirmation message
+                        MessageBox.Show(
+                            "Timer job has been updated successfully!\n\nNote: The changes will take effect after the job is restarted.",
+                            "Job Updated",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error editing timer job: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                try { ServiceLocator.LogService.LogError("Error editing timer job: " + ex.Message); } catch { }
             }
         }
         

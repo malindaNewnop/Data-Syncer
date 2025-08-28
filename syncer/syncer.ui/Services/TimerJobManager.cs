@@ -25,6 +25,7 @@ namespace syncer.ui.Services
         private class TimerJobInfo
         {
             public long JobId { get; set; }
+            public string JobName { get; set; }
             public string FolderPath { get; set; }
             public string RemotePath { get; set; }
             public System.Timers.Timer Timer { get; set; }
@@ -44,6 +45,11 @@ namespace syncer.ui.Services
         
         public bool RegisterTimerJob(long jobId, string folderPath, string remotePath, double intervalMs)
         {
+            return RegisterTimerJob(jobId, "Timer Job " + jobId, folderPath, remotePath, intervalMs);
+        }
+        
+        public bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs)
+        {
             try
             {
                 // Check if the job already exists
@@ -51,6 +57,7 @@ namespace syncer.ui.Services
                 {
                     // Update existing job
                     var job = _timerJobs[jobId];
+                    job.JobName = jobName ?? ("Timer Job " + jobId);
                     job.FolderPath = folderPath;
                     job.RemotePath = remotePath;
                     job.IntervalMs = intervalMs;
@@ -61,7 +68,7 @@ namespace syncer.ui.Services
                         job.Timer.Interval = intervalMs;
                     }
                     
-                    _logService.LogInfo(string.Format("Updated timer job {0} for folder {1}", jobId, folderPath));
+                    _logService.LogInfo(string.Format("Updated timer job {0} ({1}) for folder {2}", jobId, jobName, folderPath));
                     return true;
                 }
                 
@@ -97,6 +104,7 @@ namespace syncer.ui.Services
                 var newJob = new TimerJobInfo
                 {
                     JobId = jobId,
+                    JobName = jobName ?? ("Timer Job " + jobId),
                     FolderPath = folderPath,
                     RemotePath = remotePath,
                     IntervalMs = intervalMs,
@@ -108,7 +116,7 @@ namespace syncer.ui.Services
                 
                 _timerJobs.Add(jobId, newJob);
                 
-                _logService.LogInfo(string.Format("Registered timer job {0} for folder {1}", jobId, folderPath));
+                _logService.LogInfo(string.Format("Registered timer job {0} ({1}) for folder {2}", jobId, jobName, folderPath));
                 return true;
             }
             catch (Exception ex)
@@ -275,9 +283,56 @@ namespace syncer.ui.Services
                 return null;
             }
             
-            // For now, return a generated name based on the job ID
-            // In the future, we could store a custom name
-            return "Timer Job " + jobId.ToString();
+            return _timerJobs[jobId].JobName ?? ("Timer Job " + jobId);
+        }
+        
+        public bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs)
+        {
+            try
+            {
+                if (!_timerJobs.ContainsKey(jobId))
+                {
+                    _logService.LogError(string.Format("Cannot update timer job {0}: Job not found", jobId));
+                    return false;
+                }
+                
+                TimerJobInfo job = _timerJobs[jobId];
+                bool wasRunning = job.IsRunning;
+                
+                // Stop the timer temporarily if it's running
+                if (wasRunning && job.Timer != null)
+                {
+                    job.Timer.Stop();
+                }
+                
+                // Update job properties
+                job.JobName = jobName ?? ("Timer Job " + jobId);
+                job.FolderPath = folderPath;
+                job.RemotePath = remotePath;
+                job.IntervalMs = intervalMs;
+                
+                // Update timer interval if the timer exists
+                if (job.Timer != null)
+                {
+                    job.Timer.Interval = intervalMs;
+                    
+                    // Restart the timer if it was running
+                    if (wasRunning)
+                    {
+                        job.Timer.Start();
+                    }
+                }
+                
+                _logService.LogInfo(string.Format("Updated timer job {0}: folder={1}, remote={2}, interval={3}ms", 
+                    jobId, folderPath, remotePath, intervalMs));
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(string.Format("Failed to update timer job {0}: {1}", jobId, ex.Message));
+                return false;
+            }
         }
         
         private void OnTimerElapsed(long jobId)

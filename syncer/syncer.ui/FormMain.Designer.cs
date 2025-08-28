@@ -27,6 +27,7 @@ namespace syncer.ui
         private System.Windows.Forms.DataGridView dgvTimerJobs;
         private System.Windows.Forms.Button btnRefreshTimerJobs;
         private System.Windows.Forms.Button btnStopTimerJob;
+        private System.Windows.Forms.Button btnEditTimerJob;
         private System.Windows.Forms.Label lblRunningTimerJobs;
 
         protected override void Dispose(bool disposing)
@@ -64,6 +65,7 @@ namespace syncer.ui
             this.dgvTimerJobs = new System.Windows.Forms.DataGridView();
             this.btnRefreshTimerJobs = new System.Windows.Forms.Button();
             this.btnStopTimerJob = new System.Windows.Forms.Button();
+            this.btnEditTimerJob = new System.Windows.Forms.Button();
             this.lblRunningTimerJobs = new System.Windows.Forms.Label();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvTimerJobs)).BeginInit();
@@ -222,6 +224,7 @@ namespace syncer.ui
             this.gbTimerJobs.Controls.Add(this.dgvTimerJobs);
             this.gbTimerJobs.Controls.Add(this.btnRefreshTimerJobs);
             this.gbTimerJobs.Controls.Add(this.btnStopTimerJob);
+            this.gbTimerJobs.Controls.Add(this.btnEditTimerJob);
             this.gbTimerJobs.Controls.Add(this.lblRunningTimerJobs);
             this.gbTimerJobs.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.gbTimerJobs.Location = new System.Drawing.Point(12, 125);
@@ -268,6 +271,17 @@ namespace syncer.ui
             this.btnStopTimerJob.Text = "Stop Selected Job";
             this.btnStopTimerJob.UseVisualStyleBackColor = false;
             this.btnStopTimerJob.Click += new System.EventHandler(this.btnStopTimerJob_Click);
+
+            // btnEditTimerJob
+            this.btnEditTimerJob.BackColor = System.Drawing.Color.LightBlue;
+            this.btnEditTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnEditTimerJob.Location = new System.Drawing.Point(472, 22);
+            this.btnEditTimerJob.Name = "btnEditTimerJob";
+            this.btnEditTimerJob.Size = new System.Drawing.Size(120, 35);
+            this.btnEditTimerJob.TabIndex = 3;
+            this.btnEditTimerJob.Text = "Edit Selected Job";
+            this.btnEditTimerJob.UseVisualStyleBackColor = false;
+            this.btnEditTimerJob.Click += new System.EventHandler(this.btnEditTimerJob_Click);
 
             // lblRunningTimerJobs
             this.lblRunningTimerJobs.AutoSize = true;
