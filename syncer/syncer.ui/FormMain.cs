@@ -110,9 +110,10 @@ namespace syncer.ui
         private void InitializeCustomComponents()
         {
             this.Text = "DataSyncer - Main Dashboard";
-            this.Size = new Size(1200, 760);
+            this.Size = new Size(1000, 600);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.MinimumSize = new Size(800, 600);
+            this.MinimumSize = new Size(800, 500);
+            this.WindowState = FormWindowState.Normal;
             
             // Initialize full screen menu state
             fullScreenToolStripMenuItem.Enabled = true;
@@ -131,6 +132,17 @@ namespace syncer.ui
             refreshTimer.Interval = 30000; // 30 seconds
             refreshTimer.Tick += (sender, e) => RefreshTimerJobsGrid();
             refreshTimer.Start();
+            
+            // Show Quick Launch popup on startup
+            Timer startupTimer = new Timer();
+            startupTimer.Interval = 1000; // 1 second delay to ensure form is fully loaded
+            startupTimer.Tick += (sender, e) => 
+            {
+                startupTimer.Stop();
+                startupTimer.Dispose();
+                ShowQuickLaunchPopup();
+            };
+            startupTimer.Start();
         }
 
         private void FormMain_Activated(object sender, EventArgs e)
@@ -808,23 +820,18 @@ namespace syncer.ui
             try
             {
                 var configService = ServiceLocator.SavedJobConfigurationService;
-                var connectionService = ServiceLocator.ConnectionService;
-                var timerJobManager = ServiceLocator.TimerJobManager;
                 
-                // Open the load configuration form
-                using (var loadForm = new Forms.FormLoadJobConfiguration(
-                    configService, 
-                    connectionService, 
-                    timerJobManager))
+                // Open the simplified load configuration form
+                using (var loadForm = new Forms.FormSimpleLoadConfiguration(configService))
                 {
-                    if (loadForm.ShowDialog() == DialogResult.OK && loadForm.LoadedConfiguration != null)
+                    if (loadForm.ShowDialog() == DialogResult.OK && loadForm.SelectedConfiguration != null)
                     {
-                        var config = loadForm.LoadedConfiguration;
+                        var config = loadForm.SelectedConfiguration;
                         
                         // Apply the loaded configuration
-                        ApplyLoadedConfiguration(config, loadForm.StartJobAfterLoad);
+                        ApplyLoadedConfiguration(config, loadForm.LoadAndStart);
                         
-                        MessageBox.Show($"Configuration '{config.DisplayName}' loaded successfully!", 
+                        MessageBox.Show("Configuration '" + config.Name + "' loaded successfully!", 
                             "Load Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
@@ -952,17 +959,20 @@ namespace syncer.ui
         {
             try
             {
-                using (var loadForm = new FormLoadJobConfiguration(_savedJobConfigService, _connectionService, 
-                    ServiceLocator.TimerJobManager))
+                using (var loadForm = new FormSimpleLoadConfiguration(_savedJobConfigService))
                 {
-                    if (loadForm.ShowDialog() == DialogResult.OK)
+                    if (loadForm.ShowDialog() == DialogResult.OK && loadForm.SelectedConfiguration != null)
                     {
-                        // Configuration will be loaded by the FormLoadJobConfiguration
+                        var config = loadForm.SelectedConfiguration;
+                        
+                        // Apply the loaded configuration
+                        ApplyLoadedConfiguration(config, loadForm.LoadAndStart);
+                        
                         // Refresh any displays if needed
                         UpdateConnectionStatus();
                         UpdateServiceStatus();
                         
-                        MessageBox.Show("Configuration loaded successfully!", "Load Configuration", 
+                        MessageBox.Show("Configuration '" + config.Name + "' loaded successfully!", "Load Configuration", 
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
@@ -971,6 +981,71 @@ namespace syncer.ui
             {
                 MessageBox.Show(string.Format("Error loading configuration: {0}", ex.Message), 
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        #endregion
+
+        #region Quick Launch Popup
+
+        private FormQuickLaunch _quickLaunchForm;
+
+        private void showQuickLaunchToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            ShowQuickLaunchPopup();
+        }
+
+        private void ShowQuickLaunchPopup()
+        {
+            try
+            {
+                if (_quickLaunchForm == null || _quickLaunchForm.IsDisposed)
+                {
+                    _quickLaunchForm = new FormQuickLaunch(this);
+                }
+
+                // Position the popup at a nice location relative to the main form
+                Point location = new Point(
+                    this.Location.X + 50,
+                    this.Location.Y + 50
+                );
+
+                _quickLaunchForm.ShowAtPosition(location);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error showing Quick Launch popup: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        public void LoadConfigurationAndStart(SavedJobConfiguration configuration)
+        {
+            try
+            {
+                // Load the job configuration and start it
+                if (configuration?.JobSettings != null)
+                {
+                    // This method would typically load the configuration and start the sync job
+                    // For now, show a message indicating the job would be started
+                    string message = $"Loading and starting job configuration: {configuration.Name}\n" +
+                                   $"Source: {configuration.JobSettings.SourcePath}\n" +
+                                   $"Destination: {configuration.JobSettings.DestinationPath}\n" +
+                                   $"Interval: {configuration.JobSettings.IntervalValue} {configuration.JobSettings.IntervalType}";
+                    
+                    // Here you would implement the actual job loading and starting logic
+                    // For example:
+                    // - Load connection settings
+                    // - Configure the sync job
+                    // - Start the timer/scheduler
+                    
+                    ServiceLocator.LogService.LogInfo($"Quick Launch: {message}", "QuickLaunch");
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError($"Error loading job configuration: {ex.Message}", "QuickLaunch");
+                throw;
             }
         }
 

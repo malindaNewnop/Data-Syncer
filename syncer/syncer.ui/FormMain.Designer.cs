@@ -32,6 +32,9 @@ namespace syncer.ui
         private System.Windows.Forms.Button btnStopTimerJob;
         private System.Windows.Forms.Button btnEditTimerJob;
         private System.Windows.Forms.Label lblRunningTimerJobs;
+        
+        // Quick Launch menu item
+        private System.Windows.Forms.ToolStripMenuItem showQuickLaunchToolStripMenuItem;
 
         protected override void Dispose(bool disposing)
         {
@@ -73,6 +76,7 @@ namespace syncer.ui
             this.btnStopTimerJob = new System.Windows.Forms.Button();
             this.btnEditTimerJob = new System.Windows.Forms.Button();
             this.lblRunningTimerJobs = new System.Windows.Forms.Label();
+            this.showQuickLaunchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvTimerJobs)).BeginInit();
             this.statusStrip1.SuspendLayout();
@@ -100,10 +104,19 @@ namespace syncer.ui
             this.menuStrip1.Text = "menuStrip1";
             // fileToolStripMenuItem
             this.fileToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.showQuickLaunchToolStripMenuItem,
+            this.toolStripSeparator2,
             this.exitToolStripMenuItem});
             this.fileToolStripMenuItem.Name = "fileToolStripMenuItem";
             this.fileToolStripMenuItem.Size = new System.Drawing.Size(37, 20);
             this.fileToolStripMenuItem.Text = "File";
+            
+            // showQuickLaunchToolStripMenuItem
+            this.showQuickLaunchToolStripMenuItem.Name = "showQuickLaunchToolStripMenuItem";
+            this.showQuickLaunchToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.showQuickLaunchToolStripMenuItem.Text = "Quick Launch Panel";
+            this.showQuickLaunchToolStripMenuItem.Enabled = true;
+            this.showQuickLaunchToolStripMenuItem.Click += new System.EventHandler(this.showQuickLaunchToolStripMenuItem_Click);
             // exitToolStripMenuItem
             this.exitToolStripMenuItem.Name = "exitToolStripMenuItem";
             this.exitToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
@@ -243,7 +256,7 @@ namespace syncer.ui
             this.gbControls.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.gbControls.Location = new System.Drawing.Point(12, 35);
             this.gbControls.Name = "gbControls";
-            this.gbControls.Size = new System.Drawing.Size(1176, 75);
+            this.gbControls.Size = new System.Drawing.Size(976, 75);
             this.gbControls.TabIndex = 7;
             this.gbControls.TabStop = false;
             this.gbControls.Text = "Controls";
@@ -258,9 +271,9 @@ namespace syncer.ui
             this.gbTimerJobs.Controls.Add(this.btnEditTimerJob);
             this.gbTimerJobs.Controls.Add(this.lblRunningTimerJobs);
             this.gbTimerJobs.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.gbTimerJobs.Location = new System.Drawing.Point(12, 125);
+            this.gbTimerJobs.Location = new System.Drawing.Point(12, 120);
             this.gbTimerJobs.Name = "gbTimerJobs";
-            this.gbTimerJobs.Size = new System.Drawing.Size(1176, 600);
+            this.gbTimerJobs.Size = new System.Drawing.Size(976, 447);
             this.gbTimerJobs.TabIndex = 8;
             this.gbTimerJobs.TabStop = false;
             this.gbTimerJobs.Text = "Running Timer Jobs";
@@ -279,7 +292,7 @@ namespace syncer.ui
             this.dgvTimerJobs.ReadOnly = true;
             this.dgvTimerJobs.RowHeadersWidth = 51;
             this.dgvTimerJobs.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dgvTimerJobs.Size = new System.Drawing.Size(1164, 526);
+            this.dgvTimerJobs.Size = new System.Drawing.Size(964, 373);
             this.dgvTimerJobs.TabIndex = 0;
 
             // btnRefreshTimerJobs
@@ -314,6 +327,7 @@ namespace syncer.ui
             this.btnEditTimerJob.UseVisualStyleBackColor = false;
             this.btnEditTimerJob.Click += new System.EventHandler(this.btnEditTimerJob_Click);
 
+            
             // lblRunningTimerJobs
             this.lblRunningTimerJobs.AutoSize = true;
             this.lblRunningTimerJobs.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
@@ -326,17 +340,17 @@ namespace syncer.ui
             // FormMain
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1200, 760);
+            this.ClientSize = new System.Drawing.Size(1000, 600);
             this.Controls.Add(this.gbTimerJobs);
             this.Controls.Add(this.gbControls);
             this.Controls.Add(this.statusStrip1);
             this.Controls.Add(this.menuStrip1);
             this.MainMenuStrip = this.menuStrip1;
-            this.MinimumSize = new System.Drawing.Size(800, 600);
+            this.MinimumSize = new System.Drawing.Size(800, 500);
             this.Name = "FormMain";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "DataSyncer - Main Dashboard";
-            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
+            this.WindowState = System.Windows.Forms.FormWindowState.Normal;
             this.menuStrip1.ResumeLayout(false);
             this.menuStrip1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvTimerJobs)).EndInit();
