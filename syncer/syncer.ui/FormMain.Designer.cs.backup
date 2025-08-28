@@ -323,10 +323,79 @@ namespace syncer.ui
             this.lblRunningTimerJobs.TabIndex = 3;
             this.lblRunningTimerJobs.Text = "Running Timer Jobs: 0";
 
+            // 
+            // gbQuickLaunch
+            // 
+            this.gbQuickLaunch.Controls.Add(this.listBoxQuickLaunch);
+            this.gbQuickLaunch.Controls.Add(this.btnQuickLoadAndStart);
+            this.gbQuickLaunch.Controls.Add(this.btnEditSelectedJob);
+            this.gbQuickLaunch.Controls.Add(this.btnCloseQuickLaunch);
+            this.gbQuickLaunch.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            this.gbQuickLaunch.ForeColor = System.Drawing.Color.DarkBlue;
+            this.gbQuickLaunch.Location = new System.Drawing.Point(620, 170);
+            this.gbQuickLaunch.Name = "gbQuickLaunch";
+            this.gbQuickLaunch.Size = new System.Drawing.Size(565, 300);
+            this.gbQuickLaunch.TabIndex = 6;
+            this.gbQuickLaunch.TabStop = false;
+            this.gbQuickLaunch.Text = "Quick Launch Configurations";
+
+            // 
+            // listBoxQuickLaunch
+            // 
+            this.listBoxQuickLaunch.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
+            this.listBoxQuickLaunch.FormattingEnabled = true;
+            this.listBoxQuickLaunch.Location = new System.Drawing.Point(10, 25);
+            this.listBoxQuickLaunch.Name = "listBoxQuickLaunch";
+            this.listBoxQuickLaunch.Size = new System.Drawing.Size(545, 225);
+            this.listBoxQuickLaunch.TabIndex = 0;
+
+            // 
+            // btnQuickLoadAndStart
+            // 
+            this.btnQuickLoadAndStart.BackColor = System.Drawing.Color.LightGreen;
+            this.btnQuickLoadAndStart.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
+            this.btnQuickLoadAndStart.ForeColor = System.Drawing.Color.Black;
+            this.btnQuickLoadAndStart.Location = new System.Drawing.Point(10, 260);
+            this.btnQuickLoadAndStart.Name = "btnQuickLoadAndStart";
+            this.btnQuickLoadAndStart.Size = new System.Drawing.Size(120, 30);
+            this.btnQuickLoadAndStart.TabIndex = 1;
+            this.btnQuickLoadAndStart.Text = "Load && Start Job";
+            this.btnQuickLoadAndStart.UseVisualStyleBackColor = false;
+            this.btnQuickLoadAndStart.Click += new System.EventHandler(this.btnQuickLoadAndStart_Click);
+
+            // 
+            // btnEditSelectedJob
+            // 
+            this.btnEditSelectedJob.BackColor = System.Drawing.Color.LightSteelBlue;
+            this.btnEditSelectedJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
+            this.btnEditSelectedJob.ForeColor = System.Drawing.Color.Black;
+            this.btnEditSelectedJob.Location = new System.Drawing.Point(140, 260);
+            this.btnEditSelectedJob.Name = "btnEditSelectedJob";
+            this.btnEditSelectedJob.Size = new System.Drawing.Size(120, 30);
+            this.btnEditSelectedJob.TabIndex = 2;
+            this.btnEditSelectedJob.Text = "Edit Selected Job";
+            this.btnEditSelectedJob.UseVisualStyleBackColor = false;
+            this.btnEditSelectedJob.Click += new System.EventHandler(this.btnEditSelectedJob_Click);
+
+            // 
+            // btnCloseQuickLaunch
+            // 
+            this.btnCloseQuickLaunch.BackColor = System.Drawing.Color.LightCoral;
+            this.btnCloseQuickLaunch.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
+            this.btnCloseQuickLaunch.ForeColor = System.Drawing.Color.Black;
+            this.btnCloseQuickLaunch.Location = new System.Drawing.Point(480, 260);
+            this.btnCloseQuickLaunch.Name = "btnCloseQuickLaunch";
+            this.btnCloseQuickLaunch.Size = new System.Drawing.Size(75, 30);
+            this.btnCloseQuickLaunch.TabIndex = 3;
+            this.btnCloseQuickLaunch.Text = "Close";
+            this.btnCloseQuickLaunch.UseVisualStyleBackColor = false;
+            this.btnCloseQuickLaunch.Click += new System.EventHandler(this.btnCloseQuickLaunch_Click);
+
             // FormMain
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1200, 760);
+            this.Controls.Add(this.gbQuickLaunch);
             this.Controls.Add(this.gbTimerJobs);
             this.Controls.Add(this.gbControls);
             this.Controls.Add(this.statusStrip1);
@@ -345,6 +414,7 @@ namespace syncer.ui
             this.gbControls.ResumeLayout(false);
             this.gbTimerJobs.ResumeLayout(false);
             this.gbTimerJobs.PerformLayout();
+            this.gbQuickLaunch.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
         }

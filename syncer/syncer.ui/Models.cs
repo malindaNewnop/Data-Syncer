@@ -495,4 +495,157 @@ namespace syncer.ui
             }
         }
     }
+
+    /// <summary>
+    /// Represents a saved job configuration with connection settings
+    /// </summary>
+    [Serializable]
+    public class SavedJobConfiguration
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public DateTime? LastUsed { get; set; }
+        public string CreatedBy { get; set; }
+        public bool IsDefault { get; set; }
+        public string Category { get; set; }
+        public List<string> Tags { get; set; }
+
+        // Job Settings
+        public SyncJob JobSettings { get; set; }
+        
+        // Connection Settings
+        public SavedConnection SourceConnection { get; set; }
+        public SavedConnection DestinationConnection { get; set; }
+        
+        // Quick Launch Settings
+        public bool EnableQuickLaunch { get; set; }
+        public bool AutoStartOnLoad { get; set; }
+        public bool ShowNotificationOnStart { get; set; }
+        
+        // Statistics
+        public int TimesUsed { get; set; }
+        public DateTime? LastSuccessfulRun { get; set; }
+        public TimeSpan? LastExecutionTime { get; set; }
+        
+        public SavedJobConfiguration()
+        {
+            Id = Guid.NewGuid().ToString();
+            CreatedDate = DateTime.Now;
+            CreatedBy = Environment.UserName;
+            IsDefault = false;
+            Tags = new List<string>();
+            Category = "General";
+            EnableQuickLaunch = true;
+            AutoStartOnLoad = false;
+            ShowNotificationOnStart = true;
+            TimesUsed = 0;
+            
+            JobSettings = new SyncJob();
+            SourceConnection = new SavedConnection();
+            DestinationConnection = new SavedConnection();
+        }
+        
+        /// <summary>
+        /// Updates usage statistics
+        /// </summary>
+        public void UpdateUsageStatistics()
+        {
+            TimesUsed++;
+            LastUsed = DateTime.Now;
+        }
+        
+        /// <summary>
+        /// Gets a display name for the configuration
+        /// </summary>
+        public string DisplayName
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(Name))
+                    return Name;
+                if (JobSettings != null && !string.IsNullOrEmpty(JobSettings.Name))
+                    return JobSettings.Name;
+                return "Unnamed Configuration";
+            }
+        }
+        
+        /// <summary>
+        /// Gets a formatted description for display
+        /// </summary>
+        public string FormattedDescription
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(Description))
+                    return Description;
+                    
+                if (JobSettings != null)
+                {
+                    var source = SourceConnection?.Settings?.IsLocalConnection == true ? "Local" : SourceConnection?.Settings?.Host ?? "Unknown";
+                    var dest = DestinationConnection?.Settings?.IsLocalConnection == true ? "Local" : DestinationConnection?.Settings?.Host ?? "Unknown";
+                    return string.Format("Transfer from {0} to {1}", source, dest);
+                }
+                
+                return "No description available";
+            }
+        }
+        
+        /// <summary>
+        /// Validates the configuration
+        /// </summary>
+        public List<string> ValidateConfiguration()
+        {
+            var errors = new List<string>();
+            
+            if (string.IsNullOrEmpty(Name))
+                errors.Add("Configuration name is required");
+                
+            if (JobSettings == null)
+                errors.Add("Job settings are required");
+            else
+                errors.AddRange(JobSettings.ValidateConfiguration());
+                
+            if (SourceConnection?.Settings == null)
+                errors.Add("Source connection settings are required");
+                
+            if (DestinationConnection?.Settings == null)
+                errors.Add("Destination connection settings are required");
+                
+            return errors;
+        }
+    }
+    
+    /// <summary>
+    /// Represents a quick launch item for saved configurations
+    /// </summary>
+    [Serializable]
+    public class QuickLaunchItem
+    {
+        public string ConfigurationId { get; set; }
+        public string DisplayName { get; set; }
+        public string Description { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public DateTime? LastUsed { get; set; }
+        public bool IsFavorite { get; set; }
+        public int SortOrder { get; set; }
+        public string IconPath { get; set; }
+        public string Hotkey { get; set; }
+        
+        // Reference to the full configuration
+        public SavedJobConfiguration Configuration { get; set; }
+        
+        public QuickLaunchItem()
+        {
+            CreatedDate = DateTime.Now;
+            IsFavorite = false;
+            SortOrder = 0;
+        }
+        
+        public override string ToString()
+        {
+            return DisplayName ?? "Unnamed Configuration";
+        }
+    }
 }

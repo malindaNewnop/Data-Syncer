@@ -50,7 +50,6 @@
     <Compile Include="Core\Interfaces.cs" />
     <Compile Include="Core\Paths.cs" />
     <Compile Include="Core\ServiceFactory.cs" />
-    <Compile Include="Core\StringExtensions.cs" />
     <Compile Include="Services\PreviewService.cs" />
     <Compile Include="Services\AutoStartService.cs" />
     <Compile Include="Services\JobRunner.cs" />

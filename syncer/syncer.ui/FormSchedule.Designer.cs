@@ -49,6 +49,7 @@ namespace syncer.ui
             this.btnUploadFiles = new System.Windows.Forms.Button();
             this.btnDownloadFile = new System.Windows.Forms.Button();
             this.btnSaveTimerJob = new System.Windows.Forms.Button();
+            this.btnLoadConfiguration = new System.Windows.Forms.Button();
             this.btnSave = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
             this.gbJobDetails.SuspendLayout();
@@ -296,6 +297,17 @@ namespace syncer.ui
             this.btnSaveTimerJob.UseVisualStyleBackColor = false;
             this.btnSaveTimerJob.Click += new System.EventHandler(this.btnSaveTimerJob_Click);
             // 
+            // btnLoadConfiguration
+            // 
+            this.btnLoadConfiguration.BackColor = System.Drawing.Color.LightGreen;
+            this.btnLoadConfiguration.Location = new System.Drawing.Point(470, 220);
+            this.btnLoadConfiguration.Name = "btnLoadConfiguration";
+            this.btnLoadConfiguration.Size = new System.Drawing.Size(100, 30);
+            this.btnLoadConfiguration.TabIndex = 3;
+            this.btnLoadConfiguration.Text = "Load Configuration";
+            this.btnLoadConfiguration.UseVisualStyleBackColor = false;
+            this.btnLoadConfiguration.Click += new System.EventHandler(this.btnLoadConfiguration_Click);
+            // 
             // btnSave
             // 
             this.btnSave.Location = new System.Drawing.Point(580, 220);
@@ -367,6 +379,7 @@ namespace syncer.ui
         private System.Windows.Forms.Button btnUploadFiles;
         private System.Windows.Forms.Button btnDownloadFile;
         private System.Windows.Forms.Button btnSaveTimerJob;
+        private System.Windows.Forms.Button btnLoadConfiguration;
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
     }

@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
+using System.Linq;
 using syncer.ui.Services;
 using syncer.ui.Interfaces;
 using syncer.ui.Forms;
@@ -13,6 +14,7 @@ namespace syncer.ui
         private ISyncJobService _jobService;
         private IServiceManager _serviceManager;
         private IConnectionService _connectionService;
+        private ISavedJobConfigurationService _savedJobConfigService;
         
         // System tray components
         private SystemTrayManager _trayManager;
@@ -47,6 +49,7 @@ namespace syncer.ui
                 _jobService = ServiceLocator.SyncJobService;
                 _serviceManager = ServiceLocator.ServiceManager;
                 _connectionService = ServiceLocator.ConnectionService;
+                _savedJobConfigService = ServiceLocator.SavedJobConfigurationService;
             }
             catch (Exception ex)
             {
@@ -741,6 +744,238 @@ namespace syncer.ui
             }
         }
         
+        #endregion
+
+        #region Configuration Management Event Handlers
+
+        private void saveConfigurationToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Check if we have a current job and connection to save
+                var connectionService = ServiceLocator.ConnectionService;
+                var configService = ServiceLocator.SavedJobConfigurationService;
+                
+                // Get current connection settings
+                var currentConnection = connectionService.GetConnectionSettings();
+                if (currentConnection == null)
+                {
+                    MessageBox.Show("No connection settings found. Please configure a connection first.", 
+                        "No Connection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                
+                // Create a sample job if none exists (user would normally have created one)
+                var currentJob = new SyncJob
+                {
+                    Name = "Current Job Configuration",
+                    Description = "Job configuration saved from main form",
+                    SourcePath = "",
+                    DestinationPath = "",
+                    IntervalValue = 60,
+                    IntervalType = "Minutes",
+                    TransferMode = "Copy (Keep both files)",
+                    IncludeSubFolders = true,
+                    OverwriteExisting = true,
+                    IsEnabled = true
+                };
+                
+                // Open the save configuration form
+                using (var saveForm = new Forms.FormSaveJobConfiguration(
+                    currentJob, 
+                    currentConnection, 
+                    currentConnection, // Using same connection for both source and destination as example
+                    configService,
+                    connectionService))
+                {
+                    if (saveForm.ShowDialog() == DialogResult.OK)
+                    {
+                        MessageBox.Show("Configuration saved successfully!", "Save Successful", 
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error saving configuration: {ex.Message}", "Save Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError($"Error saving configuration: {ex.Message}", "UI");
+            }
+        }
+
+        private void loadConfigurationToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var configService = ServiceLocator.SavedJobConfigurationService;
+                var connectionService = ServiceLocator.ConnectionService;
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                
+                // Open the load configuration form
+                using (var loadForm = new Forms.FormLoadJobConfiguration(
+                    configService, 
+                    connectionService, 
+                    timerJobManager))
+                {
+                    if (loadForm.ShowDialog() == DialogResult.OK && loadForm.LoadedConfiguration != null)
+                    {
+                        var config = loadForm.LoadedConfiguration;
+                        
+                        // Apply the loaded configuration
+                        ApplyLoadedConfiguration(config, loadForm.StartJobAfterLoad);
+                        
+                        MessageBox.Show($"Configuration '{config.DisplayName}' loaded successfully!", 
+                            "Load Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading configuration: {ex.Message}", "Load Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError($"Error loading configuration: {ex.Message}", "UI");
+            }
+        }
+
+        private void ApplyLoadedConfiguration(SavedJobConfiguration config, bool startAfterLoad)
+        {
+            try
+            {
+                var connectionService = ServiceLocator.ConnectionService;
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                
+                // Apply connection settings
+                if (config.SourceConnection?.Settings != null)
+                {
+                    connectionService.SaveConnectionSettings(config.SourceConnection.Settings);
+                    
+                    // Small delay to ensure connection is properly applied (.NET 3.5 compatibility)
+                    System.Threading.Thread.Sleep(100);
+                }
+                
+                // If the job should be started automatically
+                if (startAfterLoad && config.JobSettings != null)
+                {
+                    // Register and start the timer job
+                    var intervalMs = GetIntervalInMilliseconds(config.JobSettings.IntervalValue, config.JobSettings.IntervalType);
+                    
+                    var jobId = DateTime.Now.Ticks; // Use timestamp as unique ID
+                    
+                    if (timerJobManager.RegisterTimerJob(
+                        jobId,
+                        config.JobSettings.Name,
+                        config.JobSettings.SourcePath,
+                        config.JobSettings.DestinationPath,
+                        intervalMs))
+                    {
+                        if (timerJobManager.StartTimerJob(jobId))
+                        {
+                            ServiceLocator.LogService.LogInfo($"Auto-started job '{config.JobSettings.Name}' from loaded configuration", "UI");
+                        }
+                    }
+                }
+                
+                // Update usage statistics
+                var configService = ServiceLocator.SavedJobConfigurationService;
+                configService.UpdateUsageStatistics(config.Id);
+                
+                // Show notification if enabled
+                if (config.ShowNotificationOnStart && _notificationService != null)
+                {
+                    _notificationService.ShowNotification(
+                        "Configuration Loaded",
+                        $"Configuration '{config.DisplayName}' has been loaded successfully.",
+                        ToolTipIcon.Info);
+                }
+                
+                // Refresh the UI and update status displays
+                RefreshTimerJobsGrid();
+                UpdateConnectionStatus(); // Update connection status display
+                UpdateServiceStatus(); // Update service status display
+                
+                // Force UI refresh for .NET 3.5 compatibility
+                Application.DoEvents();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error applying configuration: {ex.Message}", "Apply Configuration Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError($"Error applying configuration: {ex.Message}", "UI");
+            }
+        }
+
+        private double GetIntervalInMilliseconds(int intervalValue, string intervalType)
+        {
+            switch (intervalType?.ToLower())
+            {
+                case "seconds":
+                    return intervalValue * 1000;
+                case "minutes":
+                    return intervalValue * 60 * 1000;
+                case "hours":
+                    return intervalValue * 60 * 60 * 1000;
+                default:
+                    return intervalValue * 60 * 1000; // Default to minutes
+            }
+        }
+
+        #region Configuration Button Event Handlers
+
+        private void btnSaveCurrentConfig_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Create a basic job configuration from current settings
+                var currentJob = new SyncJob();
+                var sourceConn = new ConnectionSettings();
+                var destConn = new ConnectionSettings();
+                
+                // Open the save dialog to let user enter details
+                using (var saveForm = new FormSaveJobConfiguration(currentJob, sourceConn, destConn, 
+                    _savedJobConfigService, _connectionService))
+                {
+                    if (saveForm.ShowDialog() == DialogResult.OK)
+                    {
+                        MessageBox.Show("Configuration saved successfully!", "Save Configuration", 
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(string.Format("Error saving configuration: {0}", ex.Message), 
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnLoadConfiguration_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (var loadForm = new FormLoadJobConfiguration(_savedJobConfigService, _connectionService, 
+                    ServiceLocator.TimerJobManager))
+                {
+                    if (loadForm.ShowDialog() == DialogResult.OK)
+                    {
+                        // Configuration will be loaded by the FormLoadJobConfiguration
+                        // Refresh any displays if needed
+                        UpdateConnectionStatus();
+                        UpdateServiceStatus();
+                        
+                        MessageBox.Show("Configuration loaded successfully!", "Load Configuration", 
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(string.Format("Error loading configuration: {0}", ex.Message), 
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        #endregion
+
         #endregion
     }
 }

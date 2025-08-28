@@ -17,6 +17,7 @@ namespace syncer.ui
         private static IServiceManager _serviceManager;
         private static IConfigurationService _configurationService;
         private static ITimerJobManager _timerJobManager; // New service for managing timer jobs
+        private static ISavedJobConfigurationService _savedJobConfigService; // New service for saved configurations
 
         // New field for log rotation
         private static bool _logRotationEnabled = true;
@@ -58,6 +59,9 @@ namespace syncer.ui
                 
                 // Create the timer job manager
                 _timerJobManager = new TimerJobManager();
+                
+                // Create the saved job configuration service
+                _savedJobConfigService = new Services.SavedJobConfigurationService();
                 
                 // Log initialization
                 _logService.LogInfo("Data Syncer UI started with core backend", "UI");
@@ -145,6 +149,8 @@ namespace syncer.ui
             _logService = new LogService();
             _serviceManager = new ServiceManager();
             _configurationService = new ConfigurationService();
+            _timerJobManager = new Services.TimerJobManager();
+            _savedJobConfigService = new Services.SavedJobConfigurationService();
             
             Console.WriteLine("Initialized with stub implementations");
         }
@@ -253,6 +259,11 @@ namespace syncer.ui
         public static ITimerJobManager TimerJobManager
         {
             get { return _timerJobManager ?? (_timerJobManager = new Services.TimerJobManager()); }
+        }
+        
+        public static ISavedJobConfigurationService SavedJobConfigurationService
+        {
+            get { return _savedJobConfigService ?? (_savedJobConfigService = new Services.SavedJobConfigurationService()); }
         }
 
         public static void SetSyncJobService(ISyncJobService service) { _syncJobService = service; }

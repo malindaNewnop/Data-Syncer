@@ -1150,11 +1150,14 @@ namespace syncer.ui
             
             try
             {
-                // Save the job without closing the form
+                // Save the job using traditional method
                 SaveJob();
                 
+                // Also save as a reusable configuration
+                SaveAsConfiguration();
+                
                 MessageBox.Show(
-                    "Timer job saved successfully! The job will continue running even if you close this window.",
+                    "Timer job saved successfully! The job configuration has also been saved for future use.\n\nYou can load this configuration later from the File menu.",
                     "Timer Job Saved",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
@@ -1172,6 +1175,246 @@ namespace syncer.ui
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
                 ServiceLocator.LogService.LogError("Error saving timer job: " + ex.Message);
+            }
+        }
+
+        private void SaveAsConfiguration()
+        {
+            try
+            {
+                var configService = ServiceLocator.SavedJobConfigurationService;
+                var connectionService = ServiceLocator.ConnectionService;
+                
+                // Get current connection settings
+                var currentConnection = connectionService.GetConnectionSettings();
+                if (currentConnection == null)
+                {
+                    // Create a default connection if none exists
+                    currentConnection = new ConnectionSettings();
+                }
+                
+                // Create a SyncJob from current form data
+                var currentJob = CreateSyncJobFromForm();
+                
+                // Open the save configuration form
+                using (var saveForm = new Forms.FormSaveJobConfiguration(
+                    currentJob, 
+                    currentConnection, 
+                    currentConnection, // Using same connection for both source and destination
+                    configService,
+                    connectionService))
+                {
+                    // Pre-fill with current job name and auto-generated description
+                    if (saveForm.ShowDialog() == DialogResult.OK)
+                    {
+                        ServiceLocator.LogService.LogInfo($"Configuration saved for job '{txtJobName.Text}'", "UI");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Don't throw exception if configuration saving fails - the main job save should still work
+                ServiceLocator.LogService.LogError($"Error saving configuration: {ex.Message}", "UI");
+            }
+        }
+
+        private SyncJob CreateSyncJobFromForm()
+        {
+            var job = new SyncJob
+            {
+                Name = txtJobName.Text.Trim(),
+                Description = $"Timer job for uploading from {_selectedFolderForTimer}",
+                SourcePath = _selectedFolderForTimer ?? "",
+                DestinationPath = _timerUploadDestination ?? "/",
+                IsEnabled = chkEnableJob.Checked,
+                IncludeSubFolders = true, // Default value
+                OverwriteExisting = true, // Default value
+                IntervalValue = (int)numTimerInterval.Value,
+                IntervalType = "Minutes", // Based on the form's timer setting
+                TransferMode = "Upload", // This is a timer upload job
+                CreatedDate = DateTime.Now,
+                LastStatus = "Ready to run",
+                ShowTransferProgress = true,
+                ValidateTransfer = true,
+                MaxRetries = 3,
+                RetryDelaySeconds = 5
+            };
+            
+            // Apply filter settings if available
+            if (_jobFilterSettings != null)
+            {
+                job.FilterSettings = _jobFilterSettings;
+            }
+            
+            return job;
+        }
+
+        private void btnLoadConfiguration_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var configService = ServiceLocator.SavedJobConfigurationService;
+                var connectionService = ServiceLocator.ConnectionService;
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                
+                // Open the load configuration form
+                using (var loadForm = new Forms.FormLoadJobConfiguration(
+                    configService, 
+                    connectionService, 
+                    timerJobManager))
+                {
+                    if (loadForm.ShowDialog() == DialogResult.OK && loadForm.LoadedConfiguration != null)
+                    {
+                        var config = loadForm.LoadedConfiguration;
+                        
+                        // Apply the loaded configuration to the form
+                        ApplyConfigurationToForm(config);
+                        
+                        // If user chose to start the job automatically
+                        if (loadForm.StartJobAfterLoad)
+                        {
+                            StartTimerJobFromConfiguration(config);
+                        }
+                        
+                        MessageBox.Show($"Configuration '{config.DisplayName}' loaded successfully!", 
+                            "Configuration Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            
+                        ServiceLocator.LogService.LogInfo($"Configuration '{config.DisplayName}' loaded in FormSchedule", "UI");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading configuration: {ex.Message}", "Load Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError($"Error loading configuration: {ex.Message}", "UI");
+            }
+        }
+
+        private void ApplyConfigurationToForm(SavedJobConfiguration config)
+        {
+            try
+            {
+                if (config.JobSettings != null)
+                {
+                    // Apply job settings to form controls
+                    txtJobName.Text = config.JobSettings.Name ?? "";
+                    chkEnableJob.Checked = config.JobSettings.IsEnabled;
+                    
+                    // Set source and destination paths
+                    _selectedFolderForTimer = config.JobSettings.SourcePath;
+                    _timerUploadDestination = config.JobSettings.DestinationPath;
+                    
+                    // Set timer interval
+                    if (config.JobSettings.IntervalType?.ToLower() == "minutes")
+                    {
+                        numTimerInterval.Value = Math.Max(1, Math.Min((decimal)numTimerInterval.Maximum, config.JobSettings.IntervalValue));
+                    }
+                    else if (config.JobSettings.IntervalType?.ToLower() == "seconds")
+                    {
+                        // Convert seconds to minutes
+                        var minutes = Math.Max(1, config.JobSettings.IntervalValue / 60);
+                        numTimerInterval.Value = Math.Max(1, Math.Min((decimal)numTimerInterval.Maximum, minutes));
+                    }
+                    
+                    // Apply filter settings if available
+                    if (config.JobSettings.FilterSettings != null)
+                    {
+                        _jobFilterSettings = config.JobSettings.FilterSettings;
+                    }
+                }
+                
+                // Apply connection settings
+                if (config.SourceConnection?.Settings != null)
+                {
+                    var connectionService = ServiceLocator.ConnectionService;
+                    connectionService.SaveConnectionSettings(config.SourceConnection.Settings);
+                    
+                    // Refresh connection display or status if needed
+                    InitializeTransferClient();
+                }
+                
+                // Update form display
+                UpdateFormDisplayForLoadedConfiguration(config);
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError($"Error applying configuration to form: {ex.Message}", "UI");
+                throw;
+            }
+        }
+
+        private void UpdateFormDisplayForLoadedConfiguration(SavedJobConfiguration config)
+        {
+            // Update the form title to show loaded configuration
+            if (!string.IsNullOrEmpty(config.Name))
+            {
+                this.Text = $"Timer Job - {config.Name} (Loaded Configuration)";
+            }
+            
+            // Enable/disable controls based on configuration
+            if (!string.IsNullOrEmpty(_selectedFolderForTimer))
+            {
+                // Update any status labels or displays to show the selected folder
+                ServiceLocator.LogService.LogInfo($"Folder selected from configuration: {_selectedFolderForTimer}", "UI");
+            }
+        }
+
+        private void StartTimerJobFromConfiguration(SavedJobConfiguration config)
+        {
+            try
+            {
+                if (config.JobSettings != null && !string.IsNullOrEmpty(_selectedFolderForTimer))
+                {
+                    var intervalMs = GetIntervalInMilliseconds(config.JobSettings.IntervalValue, config.JobSettings.IntervalType);
+                    
+                    // Start the timer job similar to btnStartTimer_Click
+                    if (_uploadTimer == null)
+                    {
+                        _uploadTimer = new System.Timers.Timer();
+                        _uploadTimer.Elapsed += OnTimerElapsed;
+                        _uploadTimer.AutoReset = true;
+                    }
+                    
+                    _uploadTimer.Interval = intervalMs;
+                    _uploadTimer.Start();
+                    _isTimerRunning = true;
+                    
+                    // Update UI if controls exist
+                    try
+                    {
+                        if (lblTimerStatus != null) lblTimerStatus.Text = "Timer running (from loaded config)";
+                        if (btnStartTimer != null) btnStartTimer.Enabled = false;
+                        if (btnStopTimer != null) btnStopTimer.Enabled = true;
+                    }
+                    catch
+                    {
+                        // Ignore UI update errors
+                    }
+                    
+                    ServiceLocator.LogService.LogInfo($"Timer job started automatically from configuration: {config.DisplayName}", "UI");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error starting timer job: {ex.Message}", "Start Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ServiceLocator.LogService.LogError($"Error starting timer job from configuration: {ex.Message}", "UI");
+            }
+        }
+
+        private double GetIntervalInMilliseconds(int intervalValue, string intervalType)
+        {
+            switch (intervalType?.ToLower())
+            {
+                case "seconds":
+                    return intervalValue * 1000;
+                case "minutes":
+                    return intervalValue * 60 * 1000;
+                case "hours":
+                    return intervalValue * 60 * 60 * 1000;
+                default:
+                    return intervalValue * 60 * 1000; // Default to minutes
             }
         }
 
