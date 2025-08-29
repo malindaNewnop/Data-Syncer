@@ -171,14 +171,37 @@ namespace syncer.ui.Forms
             }
         }
 
-        private void btnClose_Click(object sender, EventArgs e)
+        private void btnManageConfigurations_Click(object sender, EventArgs e)
         {
-            this.Hide();
-        }
-
-        private void btnRefresh_Click(object sender, EventArgs e)
-        {
-            LoadQuickLaunchConfigurations();
+            try
+            {
+                // Hide the Quick Launch form before opening the manage dialog
+                this.Hide();
+                
+                // Open the full configuration management form
+                using (var manageForm = new FormSimpleLoadConfiguration(_configService))
+                {
+                    DialogResult result = manageForm.ShowDialog();
+                    
+                    // Show the Quick Launch form again after the manage dialog is closed
+                    this.Show();
+                    this.BringToFront();
+                    
+                    if (result == DialogResult.OK)
+                    {
+                        // Refresh the list after any changes
+                        LoadQuickLaunchConfigurations();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening configuration manager: " + ex.Message, 
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // Make sure to show the form again even if there's an error
+                this.Show();
+                this.BringToFront();
+            }
         }
 
         // Override ProcessCmdKey to handle Escape key

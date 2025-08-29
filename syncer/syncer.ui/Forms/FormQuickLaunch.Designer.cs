@@ -31,8 +31,7 @@ namespace syncer.ui.Forms
             this.lbQuickLaunch = new System.Windows.Forms.ListBox();
             this.btnLoadAndStartJob = new System.Windows.Forms.Button();
             this.btnEditSelectedJob = new System.Windows.Forms.Button();
-            this.btnClose = new System.Windows.Forms.Button();
-            this.btnRefresh = new System.Windows.Forms.Button();
+            this.btnManageConfigurations = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // lbQuickLaunch
@@ -71,37 +70,23 @@ namespace syncer.ui.Forms
             this.btnEditSelectedJob.UseVisualStyleBackColor = false;
             this.btnEditSelectedJob.Click += new System.EventHandler(this.btnEditSelectedJob_Click);
             // 
-            // btnClose
+            // btnManageConfigurations
             // 
-            this.btnClose.BackColor = System.Drawing.Color.LightCoral;
-            this.btnClose.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnClose.Location = new System.Drawing.Point(482, 250);
-            this.btnClose.Name = "btnClose";
-            this.btnClose.Size = new System.Drawing.Size(75, 30);
-            this.btnClose.TabIndex = 4;
-            this.btnClose.Text = "Close";
-            this.btnClose.UseVisualStyleBackColor = false;
-            this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
-            // 
-            // btnRefresh
-            // 
-            this.btnRefresh.BackColor = System.Drawing.Color.LightYellow;
-            this.btnRefresh.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnRefresh.Location = new System.Drawing.Point(272, 250);
-            this.btnRefresh.Name = "btnRefresh";
-            this.btnRefresh.Size = new System.Drawing.Size(75, 30);
-            this.btnRefresh.TabIndex = 3;
-            this.btnRefresh.Text = "Refresh";
-            this.btnRefresh.UseVisualStyleBackColor = false;
-            this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
+            this.btnManageConfigurations.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnManageConfigurations.Location = new System.Drawing.Point(400, 250);
+            this.btnManageConfigurations.Name = "btnManageConfigurations";
+            this.btnManageConfigurations.Size = new System.Drawing.Size(150, 30);
+            this.btnManageConfigurations.TabIndex = 3;
+            this.btnManageConfigurations.Text = "Manage Configurations";
+            this.btnManageConfigurations.UseVisualStyleBackColor = true;
+            this.btnManageConfigurations.Click += new System.EventHandler(this.btnManageConfigurations_Click);
             // 
             // FormQuickLaunch
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(569, 295);
-            this.Controls.Add(this.btnRefresh);
-            this.Controls.Add(this.btnClose);
+            this.Controls.Add(this.btnManageConfigurations);
             this.Controls.Add(this.btnEditSelectedJob);
             this.Controls.Add(this.btnLoadAndStartJob);
             this.Controls.Add(this.lbQuickLaunch);
@@ -123,7 +108,6 @@ namespace syncer.ui.Forms
         private System.Windows.Forms.ListBox lbQuickLaunch;
         private System.Windows.Forms.Button btnLoadAndStartJob;
         private System.Windows.Forms.Button btnEditSelectedJob;
-        private System.Windows.Forms.Button btnClose;
-        private System.Windows.Forms.Button btnRefresh;
+        private System.Windows.Forms.Button btnManageConfigurations;
     }
 }

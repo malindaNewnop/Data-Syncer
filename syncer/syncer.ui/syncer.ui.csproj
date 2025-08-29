@@ -12,6 +12,7 @@
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -156,6 +157,9 @@
     <Compile Include="Examples\ConnectionFormUsageExample.cs" />
     <EmbeddedResource Include="FormSchedule.resx">
       <DependentUpon>FormSchedule.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FormSimpleLoadConfiguration.resx">
+      <DependentUpon>FormSimpleLoadConfiguration.cs</DependentUpon>
     </EmbeddedResource>
     <!-- Resources -->
     <EmbeddedResource Include="Properties\Resources.resx">

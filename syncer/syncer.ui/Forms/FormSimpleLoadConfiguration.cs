@@ -31,12 +31,18 @@ namespace syncer.ui.Forms
 
         private void InitializeForm()
         {
-            this.Text = "Load Configuration";
-            this.Size = new Size(650, 430);
+            this.Text = "Configuration Manager";
+            // Don't override the designer size - let the designer settings take precedence
+            // this.Size = new Size(650, 430);  // Commented out to use designer size
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
+            
+            // Enable DPI awareness for better scaling
+            this.AutoScaleMode = AutoScaleMode.Dpi;
+            // Use default system font instead of custom font
+            // this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
             
             // Setup event handlers
             this.Load += FormSimpleLoadConfiguration_Load;
