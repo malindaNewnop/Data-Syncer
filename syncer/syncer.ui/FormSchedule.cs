@@ -31,6 +31,14 @@ namespace syncer.ui
         private string _selectedFolderForTimer; // Base folder path for relative path calculation
         private string _timerUploadDestination = "/"; // Default destination path
 
+        // Timer-based download functionality
+        private System.Timers.Timer _downloadTimer;
+        private bool _isDownloadTimerRunning = false;
+        private DateTime _lastDownloadTime;
+        private string _selectedRemoteFolderForTimer; // Remote folder path for download monitoring
+        private string _timerDownloadDestination; // Local destination path for downloads
+        private string _currentTransferMode = "Upload"; // "Upload" or "Download"
+
         // Filter controls - simplified filtering (most advanced filtering features removed)
         // private GroupBox gbFilters; // Unused - filtering simplified
         // private CheckBox chkEnableFilters; // Unused - filtering simplified
@@ -61,10 +69,11 @@ namespace syncer.ui
         private void FormSchedule_FormClosing(object sender, FormClosingEventArgs e)
         {
             // If a timer is running and no job has been saved, warn the user
-            if (_isTimerRunning && _currentJob?.Id == null)
+            if ((_isTimerRunning || _isDownloadTimerRunning) && _currentJob?.Id == null)
             {
+                string timerType = _isTimerRunning ? "upload" : "download";
                 DialogResult result = MessageBox.Show(
-                    "You have a timer running but haven't saved the job. The timer will stop when the form closes.\n\n" +
+                    $"You have a {timerType} timer running but haven't saved the job. The timer will stop when the form closes.\n\n" +
                     "Would you like to save this job before closing?",
                     "Timer Running",
                     MessageBoxButtons.YesNoCancel,
@@ -111,7 +120,7 @@ namespace syncer.ui
                 // For "No" we'll just continue and close
             }
             
-            // Always stop and clean up the timer when form is closing
+            // Always stop and clean up both timers when form is closing
             if (_uploadTimer != null)
             {
                 try
@@ -120,11 +129,27 @@ namespace syncer.ui
                     _uploadTimer.Elapsed -= OnTimerElapsed;
                     _uploadTimer.Dispose();
                     _isTimerRunning = false;
-                    ServiceLocator.LogService.LogInfo("Timer stopped and disposed during form closing");
+                    ServiceLocator.LogService.LogInfo("Upload timer stopped and disposed during form closing");
                 }
                 catch (Exception ex)
                 {
-                    ServiceLocator.LogService.LogError("Error stopping timer during form closing: " + ex.Message);
+                    ServiceLocator.LogService.LogError("Error stopping upload timer during form closing: " + ex.Message);
+                }
+            }
+            
+            if (_downloadTimer != null)
+            {
+                try
+                {
+                    _downloadTimer.Stop();
+                    _downloadTimer.Elapsed -= OnDownloadTimerElapsed;
+                    _downloadTimer.Dispose();
+                    _isDownloadTimerRunning = false;
+                    ServiceLocator.LogService.LogInfo("Download timer stopped and disposed during form closing");
+                }
+                catch (Exception ex)
+                {
+                    ServiceLocator.LogService.LogError("Error stopping download timer during form closing: " + ex.Message);
                 }
             }
         }
@@ -137,8 +162,8 @@ namespace syncer.ui
 
         private void InitializeCustomComponents()
         {
-            this.Text = _isEditMode ? "Edit Upload Timer Job" : "Add Upload Timer Settings";
-            this.Size = new Size(800, 320); // Wide enough to show both Timer Settings and File Manager sections
+            this.Text = _isEditMode ? "Edit Timer Job" : "Add Timer Settings";
+            this.Size = new Size(800, 400); // Increase height to accommodate download options
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -159,12 +184,15 @@ namespace syncer.ui
             // Add a header section
             CreateHeaderSection();
             
+            // Create transfer mode selection section
+            CreateTransferModeSection();
+            
             // Position timer settings at the top left with better spacing
             if (gbTimerSettings != null)
             {
-                gbTimerSettings.Location = new Point(12, 85);
+                gbTimerSettings.Location = new Point(12, 125); // Moved down to accommodate transfer mode
                 gbTimerSettings.Size = new Size(370, 120);
-                gbTimerSettings.Text = "Upload Timer Settings";
+                gbTimerSettings.Text = "Timer Settings";
                 
                 // Improve internal layout of timer controls
                 AdjustTimerControlsLayout();
@@ -173,7 +201,7 @@ namespace syncer.ui
             // Position file manager to the right of timer settings with proper spacing
             if (gbFileManager != null)
             {
-                gbFileManager.Location = new Point(398, 85);
+                gbFileManager.Location = new Point(398, 125);
                 gbFileManager.Size = new Size(370, 120);
                 gbFileManager.Text = "File Manager";
                 
@@ -298,7 +326,7 @@ namespace syncer.ui
 
             // Main title
             Label lblTitle = new Label();
-            lblTitle.Text = _isEditMode ? "Edit Upload Timer Job" : "Create New Upload Timer Job";
+            lblTitle.Text = _isEditMode ? "Edit Timer Job" : "Create New Timer Job";
             lblTitle.Location = new Point(20, 15);
             lblTitle.Size = new Size(400, 25);
             lblTitle.Font = new Font("Microsoft Sans Serif", 12F, FontStyle.Bold);
@@ -306,15 +334,56 @@ namespace syncer.ui
 
             // Subtitle
             Label lblSubtitle = new Label();
-            lblSubtitle.Text = "Configure automatic file uploads and manual transfers - Simple and reliable";
+            lblSubtitle.Text = "Configure automatic file uploads/downloads and manual transfers - Simple and reliable";
             lblSubtitle.Location = new Point(20, 40);
-            lblSubtitle.Size = new Size(500, 20);
+            lblSubtitle.Size = new Size(600, 20);
             lblSubtitle.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular);
             lblSubtitle.ForeColor = Color.DarkSlateGray;
 
             headerPanel.Controls.Add(lblTitle);
             headerPanel.Controls.Add(lblSubtitle);
             this.Controls.Add(headerPanel);
+        }
+
+        private void CreateTransferModeSection()
+        {
+            // Create transfer mode panel
+            Panel transferModePanel = new Panel();
+            transferModePanel.Location = new Point(12, 75);
+            transferModePanel.Size = new Size(756, 45);
+            transferModePanel.BackColor = Color.FromArgb(250, 250, 250);
+            transferModePanel.BorderStyle = BorderStyle.FixedSingle;
+
+            // Transfer mode label
+            Label lblTransferMode = new Label();
+            lblTransferMode.Text = "Transfer Mode:";
+            lblTransferMode.Location = new Point(10, 15);
+            lblTransferMode.Size = new Size(100, 20);
+            lblTransferMode.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Bold);
+
+            // Upload radio button
+            RadioButton rbUpload = new RadioButton();
+            rbUpload.Text = "Upload (Local → Remote)";
+            rbUpload.Location = new Point(120, 12);
+            rbUpload.Size = new Size(180, 25);
+            rbUpload.Checked = true; // Default selection
+            rbUpload.Font = new Font("Microsoft Sans Serif", 9F);
+            rbUpload.CheckedChanged += RbUpload_CheckedChanged;
+            rbUpload.Name = "rbUpload";
+
+            // Download radio button  
+            RadioButton rbDownload = new RadioButton();
+            rbDownload.Text = "Download (Remote → Local)";
+            rbDownload.Location = new Point(320, 12);
+            rbDownload.Size = new Size(200, 25);
+            rbDownload.Font = new Font("Microsoft Sans Serif", 9F);
+            rbDownload.CheckedChanged += RbDownload_CheckedChanged;
+            rbDownload.Name = "rbDownload";
+
+            transferModePanel.Controls.Add(lblTransferMode);
+            transferModePanel.Controls.Add(rbUpload);
+            transferModePanel.Controls.Add(rbDownload);
+            this.Controls.Add(transferModePanel);
         }
 
         private void InitializeTimerControls()
@@ -489,7 +558,7 @@ namespace syncer.ui
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
-            // Clean up timer when form is closed
+            // Clean up timers when form is closed
             if (_uploadTimer != null)
             {
                 _uploadTimer.Stop();
@@ -498,8 +567,71 @@ namespace syncer.ui
                 _uploadTimer = null;
             }
             
+            if (_downloadTimer != null)
+            {
+                _downloadTimer.Stop();
+                _downloadTimer.Elapsed -= OnDownloadTimerElapsed;
+                _downloadTimer.Dispose();
+                _downloadTimer = null;
+            }
+            
             base.OnFormClosed(e);
         }
+
+        #region Transfer Mode Event Handlers
+
+        private void RbUpload_CheckedChanged(object sender, EventArgs e)
+        {
+            RadioButton rb = sender as RadioButton;
+            if (rb != null && rb.Checked)
+            {
+                _currentTransferMode = "Upload";
+                UpdateUIForTransferMode();
+            }
+        }
+
+        private void RbDownload_CheckedChanged(object sender, EventArgs e)
+        {
+            RadioButton rb = sender as RadioButton;
+            if (rb != null && rb.Checked)
+            {
+                _currentTransferMode = "Download";
+                UpdateUIForTransferMode();
+            }
+        }
+
+        private void UpdateUIForTransferMode()
+        {
+            // Update timer settings label based on mode
+            if (gbTimerSettings != null)
+            {
+                gbTimerSettings.Text = _currentTransferMode + " Timer Settings";
+            }
+
+            // Update button text in File Manager
+            foreach (Control control in this.Controls)
+            {
+                if (control is GroupBox && ((GroupBox)control).Text == "File Manager")
+                {
+                    foreach (Control innerControl in control.Controls)
+                    {
+                        if (innerControl is Button)
+                        {
+                            Button btn = innerControl as Button;
+                            if (btn.Text.Contains("Browse"))
+                            {
+                                btn.Text = _currentTransferMode == "Upload" ? "Browse Local Folder" : "Browse Remote Folder";
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+
+            ServiceLocator.LogService.LogInfo($"Transfer mode changed to: {_currentTransferMode}");
+        }
+
+        #endregion
 
         private void SetDefaultValues()
         {
@@ -633,10 +765,23 @@ namespace syncer.ui
             _currentJob.Name = txtJobName.Text.Trim();
             _currentJob.IsEnabled = chkEnableJob.Checked;
             
-            // For timer jobs, use selected folder path
-            _currentJob.SourcePath = _selectedFolderForTimer ?? "";
-            _currentJob.DestinationPath = _timerUploadDestination ?? "/";
-            _currentJob.StartTime = DateTime.Now; // Set to current time for timer-based uploads
+            // Set paths based on transfer mode
+            if (_currentTransferMode == "Upload")
+            {
+                // For upload jobs: local source, remote destination
+                _currentJob.SourcePath = _selectedFolderForTimer ?? "";
+                _currentJob.DestinationPath = _timerUploadDestination ?? "/";
+                _currentJob.TransferMode = "Upload"; // Timer-based uploads
+            }
+            else if (_currentTransferMode == "Download")
+            {
+                // For download jobs: remote source, local destination
+                _currentJob.SourcePath = _selectedRemoteFolderForTimer ?? "/";
+                _currentJob.DestinationPath = _timerDownloadDestination ?? "";
+                _currentJob.TransferMode = "Download"; // Timer-based downloads
+            }
+            
+            _currentJob.StartTime = DateTime.Now; // Set to current time for timer-based transfers
             
             // For timer functionality, store interval in minutes for consistency
             if (numTimerInterval != null && cmbTimerUnit != null && cmbTimerUnit.SelectedItem != null)
@@ -660,18 +805,25 @@ namespace syncer.ui
                 _currentJob.IntervalType = "Minutes";
             }
             
-            _currentJob.TransferMode = "Upload"; // Timer-based uploads
-            
             // Save filter settings to the job
             _currentJob.FilterSettings = GetCurrentFilterSettings();
             
-            // Set connection settings for source and destination
+            // Set connection settings for source and destination based on transfer mode
             var currentConnection = _connectionService.GetConnectionSettings();
             if (currentConnection != null && currentConnection.IsRemoteConnection)
             {
-                // Timer upload scenario: local source, remote destination
-                _currentJob.SourceConnection = new ConnectionSettings(); // Local
-                _currentJob.DestinationConnection = currentConnection; // Remote
+                if (_currentTransferMode == "Upload")
+                {
+                    // Upload: local source, remote destination
+                    _currentJob.SourceConnection = new ConnectionSettings(); // Local
+                    _currentJob.DestinationConnection = currentConnection; // Remote
+                }
+                else if (_currentTransferMode == "Download")
+                {
+                    // Download: remote source, local destination
+                    _currentJob.SourceConnection = currentConnection; // Remote
+                    _currentJob.DestinationConnection = new ConnectionSettings(); // Local
+                }
             }
             else
             {
@@ -691,8 +843,11 @@ namespace syncer.ui
                 ServiceLocator.LogService.LogInfo("Job '" + _currentJob.Name + "' created");
             }
             
-            // If the timer is enabled and we have a folder selected, register/update the job with the timer job manager
-            if (chkEnableTimer != null && chkEnableTimer.Checked && !string.IsNullOrEmpty(_selectedFolderForTimer))
+            // If the timer is enabled and we have the required paths, register/update the job with the timer job manager
+            bool hasRequiredPaths = (_currentTransferMode == "Upload" && !string.IsNullOrEmpty(_selectedFolderForTimer)) ||
+                                   (_currentTransferMode == "Download" && !string.IsNullOrEmpty(_selectedRemoteFolderForTimer));
+                                   
+            if (chkEnableTimer != null && chkEnableTimer.Checked && hasRequiredPaths)
             {
                 try 
                 {
@@ -704,11 +859,14 @@ namespace syncer.ui
                     {
                         double intervalMs = CalculateTimerInterval();
                         
+                        string sourcePath = _currentTransferMode == "Upload" ? _selectedFolderForTimer : _selectedRemoteFolderForTimer;
+                        string destPath = _currentTransferMode == "Upload" ? _timerUploadDestination : _timerDownloadDestination;
+                        
                         if (_isEditMode && timerJobManager.GetRegisteredTimerJobs().Contains(_currentJob.Id))
                         {
                             // Update existing timer job
                             bool updated = timerJobManager.UpdateTimerJob(_currentJob.Id, _currentJob.Name,
-                                _selectedFolderForTimer, _timerUploadDestination, intervalMs);
+                                sourcePath, destPath, intervalMs);
                             
                             if (updated)
                             {
@@ -720,9 +878,12 @@ namespace syncer.ui
                         {
                             // Register new timer job
                             bool registered = timerJobManager.RegisterTimerJob(_currentJob.Id, _currentJob.Name,
-                                _selectedFolderForTimer, _timerUploadDestination, intervalMs);
+                                sourcePath, destPath, intervalMs);
                             
-                            if (registered && _isTimerRunning)
+                            bool isTimerCurrentlyRunning = (_currentTransferMode == "Upload" && _isTimerRunning) ||
+                                                         (_currentTransferMode == "Download" && _isDownloadTimerRunning);
+                            
+                            if (registered && isTimerCurrentlyRunning)
                             {
                                 // If the timer is already running, start the job in the manager
                                 timerJobManager.StartTimerJob(_currentJob.Id);
@@ -767,9 +928,21 @@ namespace syncer.ui
 
         private void btnBrowseFilesForTimer_Click(object sender, EventArgs e)
         {
+            if (_currentTransferMode == "Upload")
+            {
+                BrowseLocalFolderForUpload();
+            }
+            else if (_currentTransferMode == "Download")
+            {
+                BrowseRemoteFolderForDownload();
+            }
+        }
+
+        private void BrowseLocalFolderForUpload()
+        {
             using (FolderBrowserDialog dialog = new FolderBrowserDialog())
             {
-                dialog.Description = "Select folder for timed uploads (all files will be monitored)";
+                dialog.Description = "Select local folder for timed uploads (all files will be monitored)";
                 dialog.ShowNewFolderButton = true;
                 
                 if (dialog.ShowDialog() == DialogResult.OK)
@@ -825,12 +998,52 @@ namespace syncer.ui
                     string filterMessage = (currentFilters != null && currentFilters.FiltersEnabled) ? 
                         string.Format(" ({0} files after applying filters)", filteredFiles.Count) : "";
                     
-                    ServiceLocator.LogService.LogInfo(string.Format("Selected folder '{0}' with {1} files{2} for timer upload (will also include newly added files)", 
+                    ServiceLocator.LogService.LogInfo(string.Format("Selected local folder '{0}' with {1} files{2} for timer upload (will also include newly added files)", 
                         folderPath, allFiles.Length, filterMessage));
                     
                     // Ask for upload destination for timer uploads
                     AskForTimerUploadDestination();
                 }
+            }
+        }
+
+        private void BrowseRemoteFolderForDownload()
+        {
+            if (!ValidateConnection()) return;
+
+            try
+            {
+                using (FormRemoteDirectoryBrowser remoteBrowser = new FormRemoteDirectoryBrowser(_coreConnectionSettings))
+                {
+                    remoteBrowser.Text = "Select Remote Folder for Download Timer";
+                    remoteBrowser.IsUploadMode = false;
+                    
+                    if (remoteBrowser.ShowDialog() == DialogResult.OK)
+                    {
+                        if (!string.IsNullOrEmpty(remoteBrowser.SelectedRemotePath))
+                        {
+                            // Store the selected remote folder
+                            _selectedRemoteFolderForTimer = remoteBrowser.SelectedRemotePath;
+                            
+                            // Update the label to show selected remote folder
+                            if (lblNoFilesSelected != null)
+                            {
+                                lblNoFilesSelected.Text = "Remote: " + Path.GetFileName(_selectedRemoteFolderForTimer) + " (will monitor for new files)";
+                            }
+                            
+                            ServiceLocator.LogService.LogInfo($"Selected remote folder '{_selectedRemoteFolderForTimer}' for timer download");
+                            
+                            // Ask for local download destination
+                            AskForTimerDownloadDestination();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening remote folder browser: " + ex.Message, "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error browsing remote folder: " + ex.Message);
             }
         }
 
@@ -888,6 +1101,26 @@ namespace syncer.ui
             }
         }
 
+        private void AskForTimerDownloadDestination()
+        {
+            using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+            {
+                dialog.Description = "Select local folder for timer downloads";
+                dialog.ShowNewFolderButton = true;
+                
+                if (!string.IsNullOrEmpty(_timerDownloadDestination))
+                {
+                    dialog.SelectedPath = _timerDownloadDestination;
+                }
+                
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    _timerDownloadDestination = dialog.SelectedPath;
+                    ServiceLocator.LogService.LogInfo("Timer download destination set to: " + _timerDownloadDestination);
+                }
+            }
+        }
+
         private void btnStartTimer_Click(object sender, EventArgs e)
         {
             if (!ValidateConnection() || !ValidateTimerSettings()) return;
@@ -897,48 +1130,14 @@ namespace syncer.ui
                 // Calculate interval in milliseconds
                 double intervalMs = CalculateTimerInterval();
                 
-                if (_uploadTimer == null)
+                if (_currentTransferMode == "Upload")
                 {
-                    _uploadTimer = new System.Timers.Timer();
-                    _uploadTimer.Elapsed += OnTimerElapsed;
-                    _uploadTimer.AutoReset = true;
+                    StartUploadTimer(intervalMs);
                 }
-                
-                _uploadTimer.Interval = intervalMs;
-                _uploadTimer.Start();
-                _isTimerRunning = true;
-                
-                // Update UI
-                if (lblTimerStatus != null) lblTimerStatus.Text = "Timer running";
-                if (btnStartTimer != null) btnStartTimer.Enabled = false;
-                if (btnStopTimer != null) btnStopTimer.Enabled = true;
-                
-                // Ask if user wants to save this job configuration
-                DialogResult saveResult = MessageBox.Show(
-                    "Timer started successfully! Do you want to save this job configuration for future use?", 
-                    "Save Job Configuration", 
-                    MessageBoxButtons.YesNo, 
-                    MessageBoxIcon.Question);
-                
-                if (saveResult == DialogResult.Yes)
+                else if (_currentTransferMode == "Download")
                 {
-                    SaveJob();
-                    MessageBox.Show(
-                        "Job configuration saved. This timer will continue to run even if this window is closed.", 
-                        "Job Saved", 
-                        MessageBoxButtons.OK, 
-                        MessageBoxIcon.Information);
+                    StartDownloadTimer(intervalMs);
                 }
-                else
-                {
-                    MessageBox.Show(
-                        "Upload timer started successfully! Note: This timer will stop if the application is closed.",
-                        "Timer Started",
-                        MessageBoxButtons.OK, 
-                        MessageBoxIcon.Information);
-                }
-                
-                ServiceLocator.LogService.LogInfo(string.Format("Upload timer started with interval: {0} ms", intervalMs));
             }
             catch (Exception ex)
             {
@@ -948,24 +1147,132 @@ namespace syncer.ui
             }
         }
 
+        private void StartUploadTimer(double intervalMs)
+        {
+            if (_uploadTimer == null)
+            {
+                _uploadTimer = new System.Timers.Timer();
+                _uploadTimer.Elapsed += OnTimerElapsed;
+                _uploadTimer.AutoReset = true;
+            }
+            
+            _uploadTimer.Interval = intervalMs;
+            _uploadTimer.Start();
+            _isTimerRunning = true;
+            
+            // Update UI
+            if (lblTimerStatus != null) lblTimerStatus.Text = "Upload timer running";
+            if (btnStartTimer != null) btnStartTimer.Enabled = false;
+            if (btnStopTimer != null) btnStopTimer.Enabled = true;
+            
+            // Ask if user wants to save this job configuration
+            DialogResult saveResult = MessageBox.Show(
+                "Upload timer started successfully! Do you want to save this job configuration for future use?", 
+                "Save Job Configuration", 
+                MessageBoxButtons.YesNo, 
+                MessageBoxIcon.Question);
+            
+            if (saveResult == DialogResult.Yes)
+            {
+                SaveJob();
+                MessageBox.Show(
+                    "Job configuration saved. This timer will continue to run even if this window is closed.", 
+                    "Job Saved", 
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show(
+                    "Upload timer started successfully! Note: This timer will stop if the application is closed.",
+                    "Timer Started",
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Information);
+            }
+            
+            ServiceLocator.LogService.LogInfo(string.Format("Upload timer started with interval: {0} ms", intervalMs));
+        }
+
+        private void StartDownloadTimer(double intervalMs)
+        {
+            if (_downloadTimer == null)
+            {
+                _downloadTimer = new System.Timers.Timer();
+                _downloadTimer.Elapsed += OnDownloadTimerElapsed;
+                _downloadTimer.AutoReset = true;
+            }
+            
+            _downloadTimer.Interval = intervalMs;
+            _downloadTimer.Start();
+            _isDownloadTimerRunning = true;
+            
+            // Update UI
+            if (lblTimerStatus != null) lblTimerStatus.Text = "Download timer running";
+            if (btnStartTimer != null) btnStartTimer.Enabled = false;
+            if (btnStopTimer != null) btnStopTimer.Enabled = true;
+            
+            // Ask if user wants to save this job configuration
+            DialogResult saveResult = MessageBox.Show(
+                "Download timer started successfully! Do you want to save this job configuration for future use?", 
+                "Save Job Configuration", 
+                MessageBoxButtons.YesNo, 
+                MessageBoxIcon.Question);
+            
+            if (saveResult == DialogResult.Yes)
+            {
+                SaveJob();
+                MessageBox.Show(
+                    "Job configuration saved. This timer will continue to run even if this window is closed.", 
+                    "Job Saved", 
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show(
+                    "Download timer started successfully! Note: This timer will stop if the application is closed.",
+                    "Timer Started",
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Information);
+            }
+            
+            ServiceLocator.LogService.LogInfo(string.Format("Download timer started with interval: {0} ms", intervalMs));
+        }
+
         private void btnStopTimer_Click(object sender, EventArgs e)
         {
             try
             {
-                if (_uploadTimer != null)
+                bool timerStopped = false;
+                string timerType = "";
+                
+                if (_uploadTimer != null && _isTimerRunning)
                 {
                     _uploadTimer.Stop();
                     _isTimerRunning = false;
-                    
+                    timerType = "Upload";
+                    timerStopped = true;
+                }
+                
+                if (_downloadTimer != null && _isDownloadTimerRunning)
+                {
+                    _downloadTimer.Stop();
+                    _isDownloadTimerRunning = false;
+                    timerType = "Download";
+                    timerStopped = true;
+                }
+                
+                if (timerStopped)
+                {
                     // Update UI
                     if (lblTimerStatus != null) lblTimerStatus.Text = "Timer stopped";
                     if (btnStartTimer != null) btnStartTimer.Enabled = chkEnableTimer != null && chkEnableTimer.Checked;
                     if (btnStopTimer != null) btnStopTimer.Enabled = false;
                     
-                    MessageBox.Show("Upload timer stopped.", "Timer Stopped", 
+                    MessageBox.Show($"{timerType} timer stopped.", "Timer Stopped", 
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     
-                    ServiceLocator.LogService.LogInfo("Upload timer stopped");
+                    ServiceLocator.LogService.LogInfo($"{timerType} timer stopped");
                 }
             }
             catch (Exception ex)
@@ -986,12 +1293,32 @@ namespace syncer.ui
                 return false;
             }
             
-            if (string.IsNullOrEmpty(_selectedFolderForTimer))
+            if (_currentTransferMode == "Upload")
             {
-                MessageBox.Show("Please select a folder for timer upload using 'Browse Files' button.", "Validation Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                if (btnBrowseFilesForTimer != null) btnBrowseFilesForTimer.Focus();
-                return false;
+                if (string.IsNullOrEmpty(_selectedFolderForTimer))
+                {
+                    MessageBox.Show("Please select a local folder for timer upload using 'Browse Files' button.", "Validation Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    if (btnBrowseFilesForTimer != null) btnBrowseFilesForTimer.Focus();
+                    return false;
+                }
+            }
+            else if (_currentTransferMode == "Download")
+            {
+                if (string.IsNullOrEmpty(_selectedRemoteFolderForTimer))
+                {
+                    MessageBox.Show("Please select a remote folder for timer download using 'Browse Files' button.", "Validation Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    if (btnBrowseFilesForTimer != null) btnBrowseFilesForTimer.Focus();
+                    return false;
+                }
+                
+                if (string.IsNullOrEmpty(_timerDownloadDestination))
+                {
+                    MessageBox.Show("Please select a local destination folder for downloads.", "Validation Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return false;
+                }
             }
             
             return true;
@@ -1022,7 +1349,7 @@ namespace syncer.ui
         {
             try
             {
-                ServiceLocator.LogService.LogInfo("Timer elapsed - starting automatic upload");
+                ServiceLocator.LogService.LogInfo("Upload timer elapsed - starting automatic upload");
                 
                 // Run upload on UI thread
                 this.Invoke(new Action(() =>
@@ -1032,7 +1359,25 @@ namespace syncer.ui
             }
             catch (Exception ex)
             {
-                ServiceLocator.LogService.LogError("Timer elapsed error: " + ex.Message);
+                ServiceLocator.LogService.LogError("Upload timer elapsed error: " + ex.Message);
+            }
+        }
+
+        private void OnDownloadTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            try
+            {
+                ServiceLocator.LogService.LogInfo("Download timer elapsed - starting automatic download");
+                
+                // Run download on UI thread
+                this.Invoke(new Action(() =>
+                {
+                    PerformAutomaticDownload();
+                }));
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Download timer elapsed error: " + ex.Message);
             }
         }
 
@@ -1091,6 +1436,55 @@ namespace syncer.ui
             catch (Exception ex)
             {
                 ServiceLocator.LogService.LogError("Automatic upload error: " + ex.Message);
+            }
+        }
+
+        private void PerformAutomaticDownload()
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(_selectedRemoteFolderForTimer))
+                {
+                    ServiceLocator.LogService.LogWarning("No remote folder selected for automatic download");
+                    return;
+                }
+                
+                if (string.IsNullOrEmpty(_timerDownloadDestination))
+                {
+                    ServiceLocator.LogService.LogWarning("No local destination selected for automatic download");
+                    return;
+                }
+                
+                ServiceLocator.LogService.LogInfo($"Starting automatic download from remote folder '{_selectedRemoteFolderForTimer}' to local folder '{_timerDownloadDestination}'");
+                
+                // Get list of files from remote directory
+                List<string> remoteFiles;
+                string error;
+                bool success = _currentTransferClient.ListFiles(_coreConnectionSettings, _selectedRemoteFolderForTimer, out remoteFiles, out error);
+                
+                if (!success)
+                {
+                    ServiceLocator.LogService.LogError($"Failed to list remote files: {error}");
+                    return;
+                }
+                
+                if (remoteFiles == null || remoteFiles.Count == 0)
+                {
+                    ServiceLocator.LogService.LogInfo("No files found in remote folder for automatic download - will retry on next timer interval");
+                    return;
+                }
+                
+                ServiceLocator.LogService.LogInfo($"Found {remoteFiles.Count} files in remote folder for download");
+                
+                // Download all files
+                PerformFolderDownload(remoteFiles.ToArray(), _selectedRemoteFolderForTimer, _timerDownloadDestination);
+                
+                // Update last download time
+                _lastDownloadTime = DateTime.Now;
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Automatic download error: " + ex.Message);
             }
         }
 
@@ -1849,6 +2243,108 @@ namespace syncer.ui
                 else
                 {
                     MessageBox.Show("Folder uploaded successfully!", "Upload Complete", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            };
+            
+            worker.RunWorkerAsync();
+        }
+
+        private void PerformFolderDownload(string[] remoteFilePaths, string baseRemotePath, string localDestinationPath)
+        {
+            BackgroundWorker worker = new BackgroundWorker();
+            worker.WorkerReportsProgress = true;
+            worker.DoWork += (sender, e) =>
+            {
+                try
+                {
+                    ServiceLocator.LogService.LogInfo($"Starting download of {remoteFilePaths.Length} files from {baseRemotePath} to {localDestinationPath}");
+                    ServiceLocator.LogService.LogInfo($"Connection: {_coreConnectionSettings.Username}@{_coreConnectionSettings.Host}:{_coreConnectionSettings.Port}");
+                    
+                    // Ensure local destination directory exists
+                    if (!Directory.Exists(localDestinationPath))
+                    {
+                        Directory.CreateDirectory(localDestinationPath);
+                        ServiceLocator.LogService.LogInfo($"Created local destination directory: {localDestinationPath}");
+                    }
+                    
+                    int successCount = 0;
+                    int failureCount = 0;
+                    long totalBytes = 0;
+                    
+                    for (int i = 0; i < remoteFilePaths.Length; i++)
+                    {
+                        string remoteFile = remoteFilePaths[i];
+                        string fileName = Path.GetFileName(remoteFile);
+                        
+                        // Calculate local file path
+                        string localFile = Path.Combine(localDestinationPath, fileName);
+                        
+                        worker.ReportProgress((i * 100) / remoteFilePaths.Length, 
+                            $"Downloading {fileName}...");
+                        
+                        ServiceLocator.LogService.LogInfo($"Downloading: {remoteFile} -> {localFile}");
+                        
+                        try
+                        {
+                            string downloadError;
+                            bool success = _currentTransferClient.DownloadFile(_coreConnectionSettings, remoteFile, localFile, true, out downloadError);
+                            
+                            if (!success)
+                            {
+                                string errorMsg = $"Failed to download {fileName}: {downloadError ?? "Unknown error"}";
+                                ServiceLocator.LogService.LogError(errorMsg);
+                                failureCount++;
+                            }
+                            else
+                            {
+                                ServiceLocator.LogService.LogInfo($"Successfully downloaded: {fileName}");
+                                successCount++;
+                                
+                                // Get file size for statistics
+                                if (File.Exists(localFile))
+                                {
+                                    FileInfo fileInfo = new FileInfo(localFile);
+                                    totalBytes += fileInfo.Length;
+                                }
+                            }
+                        }
+                        catch (Exception fileEx)
+                        {
+                            ServiceLocator.LogService.LogError($"Error downloading {fileName}: {fileEx.Message}");
+                            failureCount++;
+                        }
+                    }
+                    
+                    worker.ReportProgress(100, "Download completed");
+                    ServiceLocator.LogService.LogInfo($"Folder download completed. Success: {successCount}, Failed: {failureCount}, Total bytes: {totalBytes}");
+                }
+                catch (Exception ex)
+                {
+                    ServiceLocator.LogService.LogError("Error during folder download: " + ex.Message);
+                    e.Result = ex;
+                }
+            };
+            
+            worker.ProgressChanged += (sender, e) =>
+            {
+                if (e.UserState != null)
+                {
+                    ServiceLocator.LogService.LogInfo(e.UserState.ToString());
+                }
+            };
+            
+            worker.RunWorkerCompleted += (sender, e) =>
+            {
+                if (e.Result is Exception)
+                {
+                    Exception ex = (Exception)e.Result;
+                    MessageBox.Show("Download failed: " + ex.Message, "Download Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else
+                {
+                    MessageBox.Show("Folder downloaded successfully!", "Download Complete", 
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             };

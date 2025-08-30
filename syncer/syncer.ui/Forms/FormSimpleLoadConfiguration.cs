@@ -39,10 +39,10 @@ namespace syncer.ui.Forms
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             
-            // Enable DPI awareness for better scaling
-            this.AutoScaleMode = AutoScaleMode.Dpi;
-            // Use default system font instead of custom font
-            // this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+            // Use Font mode for better compatibility with .NET Framework 3.5
+            this.AutoScaleMode = AutoScaleMode.Font;
+            // Set consistent font to match other forms
+            this.Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular);
             
             // Setup event handlers
             this.Load += FormSimpleLoadConfiguration_Load;
@@ -411,6 +411,11 @@ namespace syncer.ui.Forms
                 MessageBox.Show("Error loading configuration: " + ex.Message, "Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void lblTitle_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }

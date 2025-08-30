@@ -155,6 +155,9 @@
       <DependentUpon>FormSimpleLoadConfiguration.cs</DependentUpon>
     </Compile>
     <Compile Include="Examples\ConnectionFormUsageExample.cs" />
+    <EmbeddedResource Include="FormConnection.resx">
+      <DependentUpon>FormConnection.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="FormSchedule.resx">
       <DependentUpon>FormSchedule.cs</DependentUpon>
     </EmbeddedResource>

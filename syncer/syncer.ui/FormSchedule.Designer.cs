@@ -29,30 +29,34 @@ namespace syncer.ui
         private void InitializeComponent()
         {
             this.gbJobDetails = new System.Windows.Forms.GroupBox();
-            this.txtJobName = new System.Windows.Forms.TextBox();
-            this.lblJobName = new System.Windows.Forms.Label();
             this.chkEnableJob = new System.Windows.Forms.CheckBox();
+            this.lblJobName = new System.Windows.Forms.Label();
+            this.txtJobName = new System.Windows.Forms.TextBox();
+            this.gbTransfer = new System.Windows.Forms.GroupBox();
+            this.rbDownload = new System.Windows.Forms.RadioButton();
+            this.rbUpload = new System.Windows.Forms.RadioButton();
             this.gbTimerSettings = new System.Windows.Forms.GroupBox();
-            this.chkEnableTimer = new System.Windows.Forms.CheckBox();
-            this.lblUploadEvery = new System.Windows.Forms.Label();
-            this.numTimerInterval = new System.Windows.Forms.NumericUpDown();
-            this.cmbTimerUnit = new System.Windows.Forms.ComboBox();
-            this.btnStartTimer = new System.Windows.Forms.Button();
-            this.btnStopTimer = new System.Windows.Forms.Button();
-            this.lblTimerStatus = new System.Windows.Forms.Label();
             this.lblLastUpload = new System.Windows.Forms.Label();
+            this.lblTimerStatus = new System.Windows.Forms.Label();
+            this.btnStopTimer = new System.Windows.Forms.Button();
+            this.btnStartTimer = new System.Windows.Forms.Button();
+            this.cmbTimerUnit = new System.Windows.Forms.ComboBox();
+            this.numTimerInterval = new System.Windows.Forms.NumericUpDown();
+            this.lblUploadEvery = new System.Windows.Forms.Label();
+            this.chkEnableTimer = new System.Windows.Forms.CheckBox();
             this.gbFileManager = new System.Windows.Forms.GroupBox();
-            this.lblFileSelection = new System.Windows.Forms.Label();
-            this.btnBrowseFilesForTimer = new System.Windows.Forms.Button();
-            this.lblNoFilesSelected = new System.Windows.Forms.Label();
-            this.lblManualOperations = new System.Windows.Forms.Label();
-            this.btnUploadFiles = new System.Windows.Forms.Button();
             this.btnDownloadFile = new System.Windows.Forms.Button();
+            this.btnUploadFiles = new System.Windows.Forms.Button();
+            this.lblManualOperations = new System.Windows.Forms.Label();
+            this.lblNoFilesSelected = new System.Windows.Forms.Label();
+            this.btnBrowseFilesForTimer = new System.Windows.Forms.Button();
+            this.lblFileSelection = new System.Windows.Forms.Label();
             this.btnSaveTimerJob = new System.Windows.Forms.Button();
             this.btnLoadConfiguration = new System.Windows.Forms.Button();
             this.btnSave = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
             this.gbJobDetails.SuspendLayout();
+            this.gbTransfer.SuspendLayout();
             this.gbTimerSettings.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numTimerInterval)).BeginInit();
             this.gbFileManager.SuspendLayout();
@@ -63,40 +67,75 @@ namespace syncer.ui
             this.gbJobDetails.Controls.Add(this.chkEnableJob);
             this.gbJobDetails.Controls.Add(this.lblJobName);
             this.gbJobDetails.Controls.Add(this.txtJobName);
-            this.gbJobDetails.Location = new System.Drawing.Point(12, 12);
+            this.gbJobDetails.Location = new System.Drawing.Point(15, 15);
             this.gbJobDetails.Name = "gbJobDetails";
-            this.gbJobDetails.Size = new System.Drawing.Size(756, 60);
+            this.gbJobDetails.Padding = new System.Windows.Forms.Padding(15, 10, 15, 15);
+            this.gbJobDetails.Size = new System.Drawing.Size(760, 80);
             this.gbJobDetails.TabIndex = 0;
             this.gbJobDetails.TabStop = false;
             this.gbJobDetails.Text = "Job Details";
-            // 
-            // txtJobName
-            // 
-            this.txtJobName.Location = new System.Drawing.Point(80, 25);
-            this.txtJobName.Name = "txtJobName";
-            this.txtJobName.Size = new System.Drawing.Size(445, 20);
-            this.txtJobName.TabIndex = 0;
-            // 
-            // lblJobName
-            // 
-            this.lblJobName.AutoSize = true;
-            this.lblJobName.Location = new System.Drawing.Point(15, 28);
-            this.lblJobName.Name = "lblJobName";
-            this.lblJobName.Size = new System.Drawing.Size(59, 13);
-            this.lblJobName.TabIndex = 1;
-            this.lblJobName.Text = "Job Name:";
             // 
             // chkEnableJob
             // 
             this.chkEnableJob.AutoSize = true;
             this.chkEnableJob.Checked = true;
             this.chkEnableJob.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkEnableJob.Location = new System.Drawing.Point(540, 27);
+            this.chkEnableJob.Location = new System.Drawing.Point(690, 32);
             this.chkEnableJob.Name = "chkEnableJob";
             this.chkEnableJob.Size = new System.Drawing.Size(79, 17);
             this.chkEnableJob.TabIndex = 2;
             this.chkEnableJob.Text = "Enable Job";
             this.chkEnableJob.UseVisualStyleBackColor = true;
+            // 
+            // lblJobName
+            // 
+            this.lblJobName.AutoSize = true;
+            this.lblJobName.Location = new System.Drawing.Point(20, 33);
+            this.lblJobName.Name = "lblJobName";
+            this.lblJobName.Size = new System.Drawing.Size(62, 13);
+            this.lblJobName.TabIndex = 1;
+            this.lblJobName.Text = "Job Name *";
+            // 
+            // txtJobName
+            // 
+            this.txtJobName.Location = new System.Drawing.Point(100, 30);
+            this.txtJobName.Name = "txtJobName";
+            this.txtJobName.Size = new System.Drawing.Size(640, 20);
+            this.txtJobName.TabIndex = 0;
+            // 
+            // gbTransfer
+            // 
+            this.gbTransfer.Controls.Add(this.rbDownload);
+            this.gbTransfer.Controls.Add(this.rbUpload);
+            this.gbTransfer.Location = new System.Drawing.Point(15, 110);
+            this.gbTransfer.Name = "gbTransfer";
+            this.gbTransfer.Padding = new System.Windows.Forms.Padding(15, 10, 15, 15);
+            this.gbTransfer.Size = new System.Drawing.Size(760, 60);
+            this.gbTransfer.TabIndex = 1;
+            this.gbTransfer.TabStop = false;
+            this.gbTransfer.Text = "Transfer";
+            // 
+            // rbDownload
+            // 
+            this.rbDownload.AutoSize = true;
+            this.rbDownload.Location = new System.Drawing.Point(200, 25);
+            this.rbDownload.Name = "rbDownload";
+            this.rbDownload.Size = new System.Drawing.Size(133, 17);
+            this.rbDownload.TabIndex = 1;
+            this.rbDownload.Text = "Download (Remote →)";
+            this.rbDownload.UseVisualStyleBackColor = true;
+            // 
+            // rbUpload
+            // 
+            this.rbUpload.AutoSize = true;
+            this.rbUpload.Checked = true;
+            this.rbUpload.Location = new System.Drawing.Point(20, 25);
+            this.rbUpload.Name = "rbUpload";
+            this.rbUpload.Size = new System.Drawing.Size(108, 17);
+            this.rbUpload.TabIndex = 0;
+            this.rbUpload.TabStop = true;
+            this.rbUpload.Text = "Upload (Local →)";
+            this.rbUpload.UseVisualStyleBackColor = true;
             // 
             // gbTimerSettings
             // 
@@ -108,36 +147,76 @@ namespace syncer.ui
             this.gbTimerSettings.Controls.Add(this.numTimerInterval);
             this.gbTimerSettings.Controls.Add(this.lblUploadEvery);
             this.gbTimerSettings.Controls.Add(this.chkEnableTimer);
-            this.gbTimerSettings.Location = new System.Drawing.Point(12, 85);
+            this.gbTimerSettings.Location = new System.Drawing.Point(15, 185);
             this.gbTimerSettings.Name = "gbTimerSettings";
-            this.gbTimerSettings.Size = new System.Drawing.Size(370, 120);
-            this.gbTimerSettings.TabIndex = 1;
+            this.gbTimerSettings.Padding = new System.Windows.Forms.Padding(15, 10, 15, 15);
+            this.gbTimerSettings.Size = new System.Drawing.Size(360, 200);
+            this.gbTimerSettings.TabIndex = 2;
             this.gbTimerSettings.TabStop = false;
-            this.gbTimerSettings.Text = "Upload Timer Settings";
+            this.gbTimerSettings.Text = "Timer Settings";
             // 
-            // chkEnableTimer
+            // lblLastUpload
             // 
-            this.chkEnableTimer.AutoSize = true;
-            this.chkEnableTimer.Location = new System.Drawing.Point(15, 25);
-            this.chkEnableTimer.Name = "chkEnableTimer";
-            this.chkEnableTimer.Size = new System.Drawing.Size(86, 17);
-            this.chkEnableTimer.TabIndex = 0;
-            this.chkEnableTimer.Text = "Enable Timer";
-            this.chkEnableTimer.UseVisualStyleBackColor = true;
-            this.chkEnableTimer.CheckedChanged += new System.EventHandler(this.chkEnableTimer_CheckedChanged);
+            this.lblLastUpload.AutoSize = true;
+            this.lblLastUpload.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblLastUpload.ForeColor = System.Drawing.Color.DarkGreen;
+            this.lblLastUpload.Location = new System.Drawing.Point(260, 130);
+            this.lblLastUpload.Name = "lblLastUpload";
+            this.lblLastUpload.Size = new System.Drawing.Size(36, 13);
+            this.lblLastUpload.TabIndex = 7;
+            this.lblLastUpload.Text = "Never";
             // 
-            // lblUploadEvery
+            // lblTimerStatus
             // 
-            this.lblUploadEvery.AutoSize = true;
-            this.lblUploadEvery.Location = new System.Drawing.Point(15, 55);
-            this.lblUploadEvery.Name = "lblUploadEvery";
-            this.lblUploadEvery.Size = new System.Drawing.Size(75, 13);
-            this.lblUploadEvery.TabIndex = 1;
-            this.lblUploadEvery.Text = "Upload Every:";
+            this.lblTimerStatus.AutoSize = true;
+            this.lblTimerStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblTimerStatus.ForeColor = System.Drawing.Color.DarkRed;
+            this.lblTimerStatus.Location = new System.Drawing.Point(260, 110);
+            this.lblTimerStatus.Name = "lblTimerStatus";
+            this.lblTimerStatus.Size = new System.Drawing.Size(74, 13);
+            this.lblTimerStatus.TabIndex = 6;
+            this.lblTimerStatus.Text = "Timer stopped";
+            // 
+            // btnStopTimer
+            // 
+            this.btnStopTimer.Enabled = false;
+            this.btnStopTimer.Location = new System.Drawing.Point(110, 100);
+            this.btnStopTimer.Name = "btnStopTimer";
+            this.btnStopTimer.Size = new System.Drawing.Size(80, 30);
+            this.btnStopTimer.TabIndex = 5;
+            this.btnStopTimer.Text = "Stop Timer";
+            this.btnStopTimer.UseVisualStyleBackColor = true;
+            this.btnStopTimer.Click += new System.EventHandler(this.btnStopTimer_Click);
+            // 
+            // btnStartTimer
+            // 
+            this.btnStartTimer.Enabled = false;
+            this.btnStartTimer.Location = new System.Drawing.Point(20, 100);
+            this.btnStartTimer.Name = "btnStartTimer";
+            this.btnStartTimer.Size = new System.Drawing.Size(80, 30);
+            this.btnStartTimer.TabIndex = 4;
+            this.btnStartTimer.Text = "Start Timer";
+            this.btnStartTimer.UseVisualStyleBackColor = true;
+            this.btnStartTimer.Click += new System.EventHandler(this.btnStartTimer_Click);
+            // 
+            // cmbTimerUnit
+            // 
+            this.cmbTimerUnit.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbTimerUnit.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.cmbTimerUnit.FormattingEnabled = true;
+            this.cmbTimerUnit.Items.AddRange(new object[] {
+            "Seconds",
+            "Minutes",
+            "Hours"});
+            this.cmbTimerUnit.Location = new System.Drawing.Point(210, 63);
+            this.cmbTimerUnit.Name = "cmbTimerUnit";
+            this.cmbTimerUnit.Size = new System.Drawing.Size(90, 21);
+            this.cmbTimerUnit.TabIndex = 3;
             // 
             // numTimerInterval
             // 
-            this.numTimerInterval.Location = new System.Drawing.Point(96, 53);
+            this.numTimerInterval.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.numTimerInterval.Location = new System.Drawing.Point(140, 63);
             this.numTimerInterval.Maximum = new decimal(new int[] {
             9999,
             0,
@@ -157,60 +236,27 @@ namespace syncer.ui
             0,
             0});
             // 
-            // cmbTimerUnit
+            // lblUploadEvery
             // 
-            this.cmbTimerUnit.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbTimerUnit.FormattingEnabled = true;
-            this.cmbTimerUnit.Items.AddRange(new object[] {
-            "Seconds",
-            "Minutes",
-            "Hours"});
-            this.cmbTimerUnit.Location = new System.Drawing.Point(162, 53);
-            this.cmbTimerUnit.Name = "cmbTimerUnit";
-            this.cmbTimerUnit.Size = new System.Drawing.Size(80, 21);
-            this.cmbTimerUnit.TabIndex = 3;
+            this.lblUploadEvery.AutoSize = true;
+            this.lblUploadEvery.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblUploadEvery.Location = new System.Drawing.Point(20, 65);
+            this.lblUploadEvery.Name = "lblUploadEvery";
+            this.lblUploadEvery.Size = new System.Drawing.Size(71, 13);
+            this.lblUploadEvery.TabIndex = 1;
+            this.lblUploadEvery.Text = "Upload Every";
             // 
-            // btnStartTimer
+            // chkEnableTimer
             // 
-            this.btnStartTimer.BackColor = System.Drawing.Color.LightGreen;
-            this.btnStartTimer.Enabled = false;
-            this.btnStartTimer.Location = new System.Drawing.Point(15, 85);
-            this.btnStartTimer.Name = "btnStartTimer";
-            this.btnStartTimer.Size = new System.Drawing.Size(80, 25);
-            this.btnStartTimer.TabIndex = 4;
-            this.btnStartTimer.Text = "Start Timer";
-            this.btnStartTimer.UseVisualStyleBackColor = false;
-            this.btnStartTimer.Click += new System.EventHandler(this.btnStartTimer_Click);
-            // 
-            // btnStopTimer
-            // 
-            this.btnStopTimer.BackColor = System.Drawing.Color.LightCoral;
-            this.btnStopTimer.Enabled = false;
-            this.btnStopTimer.Location = new System.Drawing.Point(105, 85);
-            this.btnStopTimer.Name = "btnStopTimer";
-            this.btnStopTimer.Size = new System.Drawing.Size(80, 25);
-            this.btnStopTimer.TabIndex = 5;
-            this.btnStopTimer.Text = "Stop Timer";
-            this.btnStopTimer.UseVisualStyleBackColor = false;
-            this.btnStopTimer.Click += new System.EventHandler(this.btnStopTimer_Click);
-            // 
-            // lblTimerStatus
-            // 
-            this.lblTimerStatus.AutoSize = true;
-            this.lblTimerStatus.Location = new System.Drawing.Point(260, 28);
-            this.lblTimerStatus.Name = "lblTimerStatus";
-            this.lblTimerStatus.Size = new System.Drawing.Size(73, 13);
-            this.lblTimerStatus.TabIndex = 6;
-            this.lblTimerStatus.Text = "Timer stopped";
-            // 
-            // lblLastUpload
-            // 
-            this.lblLastUpload.AutoSize = true;
-            this.lblLastUpload.Location = new System.Drawing.Point(260, 55);
-            this.lblLastUpload.Name = "lblLastUpload";
-            this.lblLastUpload.Size = new System.Drawing.Size(36, 13);
-            this.lblLastUpload.TabIndex = 7;
-            this.lblLastUpload.Text = "Never";
+            this.chkEnableTimer.AutoSize = true;
+            this.chkEnableTimer.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.chkEnableTimer.Location = new System.Drawing.Point(20, 30);
+            this.chkEnableTimer.Name = "chkEnableTimer";
+            this.chkEnableTimer.Size = new System.Drawing.Size(88, 17);
+            this.chkEnableTimer.TabIndex = 0;
+            this.chkEnableTimer.Text = "Enable Timer";
+            this.chkEnableTimer.UseVisualStyleBackColor = true;
+            this.chkEnableTimer.CheckedChanged += new System.EventHandler(this.chkEnableTimer_CheckedChanged);
             // 
             // gbFileManager
             // 
@@ -220,133 +266,141 @@ namespace syncer.ui
             this.gbFileManager.Controls.Add(this.lblNoFilesSelected);
             this.gbFileManager.Controls.Add(this.btnBrowseFilesForTimer);
             this.gbFileManager.Controls.Add(this.lblFileSelection);
-            this.gbFileManager.Location = new System.Drawing.Point(398, 85);
+            this.gbFileManager.Location = new System.Drawing.Point(395, 185);
             this.gbFileManager.Name = "gbFileManager";
-            this.gbFileManager.Size = new System.Drawing.Size(370, 120);
-            this.gbFileManager.TabIndex = 2;
+            this.gbFileManager.Padding = new System.Windows.Forms.Padding(15, 10, 15, 15);
+            this.gbFileManager.Size = new System.Drawing.Size(380, 200);
+            this.gbFileManager.TabIndex = 3;
             this.gbFileManager.TabStop = false;
             this.gbFileManager.Text = "File Manager";
             // 
-            // lblFileSelection
+            // btnDownloadFile
             // 
-            this.lblFileSelection.Location = new System.Drawing.Point(15, 25);
-            this.lblFileSelection.Name = "lblFileSelection";
-            this.lblFileSelection.Size = new System.Drawing.Size(340, 13);
-            this.lblFileSelection.TabIndex = 0;
-            this.lblFileSelection.Text = "File Selection: All files in the selected folder will be uploaded automatically.";
+            this.btnDownloadFile.Location = new System.Drawing.Point(140, 120);
+            this.btnDownloadFile.Name = "btnDownloadFile";
+            this.btnDownloadFile.Size = new System.Drawing.Size(100, 30);
+            this.btnDownloadFile.TabIndex = 5;
+            this.btnDownloadFile.Text = "Download";
+            this.btnDownloadFile.UseVisualStyleBackColor = true;
+            this.btnDownloadFile.Click += new System.EventHandler(this.btnDirectDownload_Click);
             // 
-            // btnBrowseFilesForTimer
+            // btnUploadFiles
             // 
-            this.btnBrowseFilesForTimer.Location = new System.Drawing.Point(15, 45);
-            this.btnBrowseFilesForTimer.Name = "btnBrowseFilesForTimer";
-            this.btnBrowseFilesForTimer.Size = new System.Drawing.Size(75, 23);
-            this.btnBrowseFilesForTimer.TabIndex = 1;
-            this.btnBrowseFilesForTimer.Text = "Browse";
-            this.btnBrowseFilesForTimer.UseVisualStyleBackColor = true;
-            this.btnBrowseFilesForTimer.Click += new System.EventHandler(this.btnBrowseFilesForTimer_Click);
-            // 
-            // lblNoFilesSelected
-            // 
-            this.lblNoFilesSelected.AutoSize = true;
-            this.lblNoFilesSelected.ForeColor = System.Drawing.Color.Blue;
-            this.lblNoFilesSelected.Location = new System.Drawing.Point(100, 50);
-            this.lblNoFilesSelected.Name = "lblNoFilesSelected";
-            this.lblNoFilesSelected.Size = new System.Drawing.Size(83, 13);
-            this.lblNoFilesSelected.TabIndex = 2;
-            this.lblNoFilesSelected.Text = "No files selected";
+            this.btnUploadFiles.Location = new System.Drawing.Point(20, 120);
+            this.btnUploadFiles.Name = "btnUploadFiles";
+            this.btnUploadFiles.Size = new System.Drawing.Size(100, 30);
+            this.btnUploadFiles.TabIndex = 4;
+            this.btnUploadFiles.Text = "Upload File(s)";
+            this.btnUploadFiles.UseVisualStyleBackColor = true;
+            this.btnUploadFiles.Click += new System.EventHandler(this.btnDirectUpload_Click);
             // 
             // lblManualOperations
             // 
             this.lblManualOperations.AutoSize = true;
-            this.lblManualOperations.Location = new System.Drawing.Point(15, 75);
+            this.lblManualOperations.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblManualOperations.Location = new System.Drawing.Point(20, 100);
             this.lblManualOperations.Name = "lblManualOperations";
-            this.lblManualOperations.Size = new System.Drawing.Size(162, 13);
+            this.lblManualOperations.Size = new System.Drawing.Size(148, 13);
             this.lblManualOperations.TabIndex = 3;
-            this.lblManualOperations.Text = "Manual file transfer operations:";
+            this.lblManualOperations.Text = "Manual file transfer operations";
             // 
-            // btnUploadFiles
+            // lblNoFilesSelected
             // 
-            this.btnUploadFiles.BackColor = System.Drawing.Color.LightBlue;
-            this.btnUploadFiles.Location = new System.Drawing.Point(189, 70);
-            this.btnUploadFiles.Name = "btnUploadFiles";
-            this.btnUploadFiles.Size = new System.Drawing.Size(80, 23);
-            this.btnUploadFiles.TabIndex = 4;
-            this.btnUploadFiles.Text = "Upload File(s)";
-            this.btnUploadFiles.UseVisualStyleBackColor = false;
-            this.btnUploadFiles.Click += new System.EventHandler(this.btnDirectUpload_Click);
+            this.lblNoFilesSelected.AutoSize = true;
+            this.lblNoFilesSelected.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblNoFilesSelected.ForeColor = System.Drawing.Color.Blue;
+            this.lblNoFilesSelected.Location = new System.Drawing.Point(140, 77);
+            this.lblNoFilesSelected.Name = "lblNoFilesSelected";
+            this.lblNoFilesSelected.Size = new System.Drawing.Size(85, 13);
+            this.lblNoFilesSelected.TabIndex = 2;
+            this.lblNoFilesSelected.Text = "No files selected";
             // 
-            // btnDownloadFile
+            // btnBrowseFilesForTimer
             // 
-            this.btnDownloadFile.BackColor = System.Drawing.Color.LightGreen;
-            this.btnDownloadFile.Location = new System.Drawing.Point(275, 70);
-            this.btnDownloadFile.Name = "btnDownloadFile";
-            this.btnDownloadFile.Size = new System.Drawing.Size(80, 23);
-            this.btnDownloadFile.TabIndex = 5;
-            this.btnDownloadFile.Text = "Download";
-            this.btnDownloadFile.UseVisualStyleBackColor = false;
-            this.btnDownloadFile.Click += new System.EventHandler(this.btnDirectDownload_Click);
+            this.btnBrowseFilesForTimer.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnBrowseFilesForTimer.Location = new System.Drawing.Point(20, 70);
+            this.btnBrowseFilesForTimer.Name = "btnBrowseFilesForTimer";
+            this.btnBrowseFilesForTimer.Size = new System.Drawing.Size(110, 30);
+            this.btnBrowseFilesForTimer.TabIndex = 1;
+            this.btnBrowseFilesForTimer.Text = "Browse Folder";
+            this.btnBrowseFilesForTimer.UseVisualStyleBackColor = true;
+            this.btnBrowseFilesForTimer.Click += new System.EventHandler(this.btnBrowseFilesForTimer_Click);
+            // 
+            // lblFileSelection
+            // 
+            this.lblFileSelection.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblFileSelection.Location = new System.Drawing.Point(20, 25);
+            this.lblFileSelection.Name = "lblFileSelection";
+            this.lblFileSelection.Size = new System.Drawing.Size(320, 40);
+            this.lblFileSelection.TabIndex = 0;
+            this.lblFileSelection.Text = "File Selection: All files in the selected folder will be uploaded automatically.";
             // 
             // btnSaveTimerJob
             // 
-            this.btnSaveTimerJob.BackColor = System.Drawing.Color.LightBlue;
-            this.btnSaveTimerJob.Location = new System.Drawing.Point(317, 220);
+            this.btnSaveTimerJob.Location = new System.Drawing.Point(15, 400);
             this.btnSaveTimerJob.Name = "btnSaveTimerJob";
-            this.btnSaveTimerJob.Size = new System.Drawing.Size(140, 30);
-            this.btnSaveTimerJob.TabIndex = 3;
-            this.btnSaveTimerJob.Text = "Save Timer Job Configuration";
-            this.btnSaveTimerJob.UseVisualStyleBackColor = false;
+            this.btnSaveTimerJob.Size = new System.Drawing.Size(160, 40);
+            this.btnSaveTimerJob.TabIndex = 4;
+            this.btnSaveTimerJob.Text = "Save Timer Job";
+            this.btnSaveTimerJob.UseVisualStyleBackColor = true;
             this.btnSaveTimerJob.Click += new System.EventHandler(this.btnSaveTimerJob_Click);
             // 
             // btnLoadConfiguration
             // 
-            this.btnLoadConfiguration.BackColor = System.Drawing.Color.LightGreen;
-            this.btnLoadConfiguration.Location = new System.Drawing.Point(470, 220);
+            this.btnLoadConfiguration.Location = new System.Drawing.Point(185, 400);
             this.btnLoadConfiguration.Name = "btnLoadConfiguration";
-            this.btnLoadConfiguration.Size = new System.Drawing.Size(100, 30);
-            this.btnLoadConfiguration.TabIndex = 3;
-            this.btnLoadConfiguration.Text = "Load Configuration";
-            this.btnLoadConfiguration.UseVisualStyleBackColor = false;
+            this.btnLoadConfiguration.Size = new System.Drawing.Size(140, 40);
+            this.btnLoadConfiguration.TabIndex = 5;
+            this.btnLoadConfiguration.Text = "Load Config";
+            this.btnLoadConfiguration.UseVisualStyleBackColor = true;
             this.btnLoadConfiguration.Click += new System.EventHandler(this.btnLoadConfiguration_Click);
             // 
             // btnSave
             // 
-            this.btnSave.Location = new System.Drawing.Point(580, 220);
+            this.btnSave.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnSave.Location = new System.Drawing.Point(347, 402);
             this.btnSave.Name = "btnSave";
-            this.btnSave.Size = new System.Drawing.Size(75, 30);
-            this.btnSave.TabIndex = 4;
+            this.btnSave.Size = new System.Drawing.Size(90, 40);
+            this.btnSave.TabIndex = 6;
             this.btnSave.Text = "Save";
             this.btnSave.UseVisualStyleBackColor = true;
             this.btnSave.Click += new System.EventHandler(this.btnSave_Click);
             // 
             // btnCancel
             // 
-            this.btnCancel.Location = new System.Drawing.Point(670, 220);
+            this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnCancel.Location = new System.Drawing.Point(685, 402);
             this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(75, 30);
-            this.btnCancel.TabIndex = 5;
+            this.btnCancel.Size = new System.Drawing.Size(90, 40);
+            this.btnCancel.TabIndex = 7;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
             // 
             // FormSchedule
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 320);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
+            this.ClientSize = new System.Drawing.Size(820, 562);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnSave);
+            this.Controls.Add(this.btnLoadConfiguration);
             this.Controls.Add(this.btnSaveTimerJob);
             this.Controls.Add(this.gbFileManager);
             this.Controls.Add(this.gbTimerSettings);
+            this.Controls.Add(this.gbTransfer);
             this.Controls.Add(this.gbJobDetails);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            this.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "FormSchedule";
+            this.Padding = new System.Windows.Forms.Padding(12);
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Add Upload Timer Settings";
+            this.Text = "Add Timer Settings";
             this.gbJobDetails.ResumeLayout(false);
             this.gbJobDetails.PerformLayout();
+            this.gbTransfer.ResumeLayout(false);
+            this.gbTransfer.PerformLayout();
             this.gbTimerSettings.ResumeLayout(false);
             this.gbTimerSettings.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numTimerInterval)).EndInit();
@@ -362,6 +416,9 @@ namespace syncer.ui
         private System.Windows.Forms.TextBox txtJobName;
         private System.Windows.Forms.Label lblJobName;
         private System.Windows.Forms.CheckBox chkEnableJob;
+        private System.Windows.Forms.GroupBox gbTransfer;
+        private System.Windows.Forms.RadioButton rbUpload;
+        private System.Windows.Forms.RadioButton rbDownload;
         private System.Windows.Forms.GroupBox gbTimerSettings;
         private System.Windows.Forms.CheckBox chkEnableTimer;
         private System.Windows.Forms.Label lblUploadEvery;

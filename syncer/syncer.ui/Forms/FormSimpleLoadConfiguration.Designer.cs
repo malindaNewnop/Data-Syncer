@@ -50,7 +50,6 @@ namespace syncer.ui.Forms
             this.btnLoad = new System.Windows.Forms.Button();
             this.groupBoxDetails.SuspendLayout();
             this.SuspendLayout();
-
             // 
             // lblTitle
             // 
@@ -62,21 +61,20 @@ namespace syncer.ui.Forms
             this.lblTitle.Size = new System.Drawing.Size(200, 25);
             this.lblTitle.TabIndex = 0;
             this.lblTitle.Text = "Select Configuration:";
-
+            this.lblTitle.Click += new System.EventHandler(this.lblTitle_Click);
             // 
             // listBoxConfigurations
             // 
             this.listBoxConfigurations.DisplayMember = "Name";
             this.listBoxConfigurations.Font = new System.Drawing.Font("Segoe UI", 10F);
             this.listBoxConfigurations.FormattingEnabled = true;
-            this.listBoxConfigurations.ItemHeight = 20;
+            this.listBoxConfigurations.ItemHeight = 17;
             this.listBoxConfigurations.Location = new System.Drawing.Point(20, 50);
             this.listBoxConfigurations.Name = "listBoxConfigurations";
-            this.listBoxConfigurations.Size = new System.Drawing.Size(350, 420);
+            this.listBoxConfigurations.Size = new System.Drawing.Size(350, 412);
             this.listBoxConfigurations.TabIndex = 1;
             this.listBoxConfigurations.SelectedIndexChanged += new System.EventHandler(this.listBoxConfigurations_SelectedIndexChanged);
             this.listBoxConfigurations.DoubleClick += new System.EventHandler(this.listBoxConfigurations_DoubleClick);
-
             // 
             // groupBoxDetails
             // 
@@ -97,7 +95,6 @@ namespace syncer.ui.Forms
             this.groupBoxDetails.TabIndex = 2;
             this.groupBoxDetails.TabStop = false;
             this.groupBoxDetails.Text = "Configuration Details";
-
             // 
             // lblDestinationConnection
             // 
@@ -106,19 +103,16 @@ namespace syncer.ui.Forms
             this.lblDestinationConnection.Size = new System.Drawing.Size(390, 30);
             this.lblDestinationConnection.TabIndex = 9;
             this.lblDestinationConnection.Text = "Destination Connection: ";
-
             // 
             // lblSourceConnection
             // 
             this.lblSourceConnection.Font = new System.Drawing.Font("Segoe UI", 8.25F);
             this.lblSourceConnection.ForeColor = System.Drawing.Color.Black;
             this.lblSourceConnection.Location = new System.Drawing.Point(15, 345);
-            this.lblSourceConnection.Location = new System.Drawing.Point(15, 345);
             this.lblSourceConnection.Name = "lblSourceConnection";
             this.lblSourceConnection.Size = new System.Drawing.Size(390, 35);
             this.lblSourceConnection.TabIndex = 8;
             this.lblSourceConnection.Text = "Source Connection: ";
-
             // 
             // lblDestinationPath
             // 
@@ -127,7 +121,6 @@ namespace syncer.ui.Forms
             this.lblDestinationPath.Size = new System.Drawing.Size(390, 35);
             this.lblDestinationPath.TabIndex = 7;
             this.lblDestinationPath.Text = "Destination: ";
-
             // 
             // lblSourcePath
             // 
@@ -136,27 +129,24 @@ namespace syncer.ui.Forms
             this.lblSourcePath.Size = new System.Drawing.Size(390, 35);
             this.lblSourcePath.TabIndex = 6;
             this.lblSourcePath.Text = "Source: ";
-
             // 
             // lblTimesUsed
             // 
             this.lblTimesUsed.AutoSize = true;
             this.lblTimesUsed.Location = new System.Drawing.Point(15, 250);
             this.lblTimesUsed.Name = "lblTimesUsed";
-            this.lblTimesUsed.Size = new System.Drawing.Size(68, 13);
+            this.lblTimesUsed.Size = new System.Drawing.Size(69, 13);
             this.lblTimesUsed.TabIndex = 5;
             this.lblTimesUsed.Text = "Times Used: ";
-
             // 
             // lblLastUsed
             // 
             this.lblLastUsed.AutoSize = true;
             this.lblLastUsed.Location = new System.Drawing.Point(15, 225);
             this.lblLastUsed.Name = "lblLastUsed";
-            this.lblLastUsed.Size = new System.Drawing.Size(60, 13);
+            this.lblLastUsed.Size = new System.Drawing.Size(61, 13);
             this.lblLastUsed.TabIndex = 4;
             this.lblLastUsed.Text = "Last Used: ";
-
             // 
             // lblCreated
             // 
@@ -165,17 +155,9 @@ namespace syncer.ui.Forms
             this.lblCreated.ForeColor = System.Drawing.Color.Black;
             this.lblCreated.Location = new System.Drawing.Point(15, 200);
             this.lblCreated.Name = "lblCreated";
-            this.lblCreated.Size = new System.Drawing.Size(50, 13);
-            // 
-            // lblCreated
-            // 
-            this.lblCreated.AutoSize = true;
-            this.lblCreated.Location = new System.Drawing.Point(15, 200);
-            this.lblCreated.Name = "lblCreated";
-            this.lblCreated.Size = new System.Drawing.Size(47, 13);
+            this.lblCreated.Size = new System.Drawing.Size(53, 13);
             this.lblCreated.TabIndex = 3;
             this.lblCreated.Text = "Created: ";
-
             // 
             // lblCategory
             // 
@@ -185,7 +167,6 @@ namespace syncer.ui.Forms
             this.lblCategory.Size = new System.Drawing.Size(55, 13);
             this.lblCategory.TabIndex = 2;
             this.lblCategory.Text = "Category: ";
-
             // 
             // lblDescription
             // 
@@ -194,7 +175,6 @@ namespace syncer.ui.Forms
             this.lblDescription.Size = new System.Drawing.Size(390, 80);
             this.lblDescription.TabIndex = 1;
             this.lblDescription.Text = "Description: ";
-
             // 
             // lblConfigName
             // 
@@ -202,10 +182,9 @@ namespace syncer.ui.Forms
             this.lblConfigName.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
             this.lblConfigName.Location = new System.Drawing.Point(15, 40);
             this.lblConfigName.Name = "lblConfigName";
-            this.lblConfigName.Size = new System.Drawing.Size(43, 13);
+            this.lblConfigName.Size = new System.Drawing.Size(47, 13);
             this.lblConfigName.TabIndex = 0;
             this.lblConfigName.Text = "Name: ";
-
             // 
             // panelSeparator
             // 
@@ -214,80 +193,10 @@ namespace syncer.ui.Forms
             this.panelSeparator.Name = "panelSeparator";
             this.panelSeparator.Size = new System.Drawing.Size(770, 2);
             this.panelSeparator.TabIndex = 10;
-
-            // 
-            // btnLoad
-            // 
-            // 
-            // btnLoad
-            // 
-            this.btnLoad.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
-            this.btnLoad.Location = new System.Drawing.Point(24, 480);
-            this.btnLoad.Name = "btnLoad";
-            this.btnLoad.Size = new System.Drawing.Size(110, 35);
-            this.btnLoad.TabIndex = 3;
-            this.btnLoad.Text = "Load Only";
-            this.btnLoad.UseVisualStyleBackColor = true;
-            this.btnLoad.Click += new System.EventHandler(this.btnLoad_Click);
-
-            // 
-            // btnLoadAndStart
-            // 
-            // 
-            // btnLoadAndStart
-            // 
-            this.btnLoadAndStart.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
-            this.btnLoadAndStart.Location = new System.Drawing.Point(150, 480);
-            this.btnLoadAndStart.Name = "btnLoadAndStart";
-            this.btnLoadAndStart.Size = new System.Drawing.Size(120, 35);
-            this.btnLoadAndStart.TabIndex = 4;
-            this.btnLoadAndStart.Text = "Load && Start";
-            this.btnLoadAndStart.UseVisualStyleBackColor = true;
-            this.btnLoadAndStart.Click += new System.EventHandler(this.btnLoadAndStart_Click);
-
-            // 
-            // btnEdit
-            // 
-            // 
-            // btnEdit
-            // 
-            this.btnEdit.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
-            this.btnEdit.Location = new System.Drawing.Point(370, 480);
-            this.btnEdit.Name = "btnEdit";
-            this.btnEdit.Size = new System.Drawing.Size(90, 35);
-            this.btnEdit.TabIndex = 5;
-            this.btnEdit.Text = "Edit";
-            this.btnEdit.UseVisualStyleBackColor = true;
-            this.btnEdit.Click += new System.EventHandler(this.btnEdit_Click);
-
-            // 
-            // btnDelete
-            // 
-            this.btnDelete.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
-            this.btnDelete.Location = new System.Drawing.Point(480, 480);
-            this.btnDelete.Name = "btnDelete";
-            this.btnDelete.Size = new System.Drawing.Size(90, 35);
-            this.btnDelete.TabIndex = 6;
-            this.btnDelete.Text = "Delete";
-            this.btnDelete.UseVisualStyleBackColor = true;
-            this.btnDelete.Click += new System.EventHandler(this.btnDelete_Click);
-
-            // 
-            // btnExport
-            // 
-            this.btnExport.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
-            this.btnExport.Location = new System.Drawing.Point(590, 480);
-            this.btnExport.Name = "btnExport";
-            this.btnExport.Size = new System.Drawing.Size(90, 35);
-            this.btnExport.TabIndex = 7;
-            this.btnExport.Text = "Export";
-            this.btnExport.UseVisualStyleBackColor = true;
-            this.btnExport.Click += new System.EventHandler(this.btnExport_Click);
-
             // 
             // btnImport
             // 
-            this.btnImport.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
+            this.btnImport.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.btnImport.Location = new System.Drawing.Point(700, 480);
             this.btnImport.Name = "btnImport";
             this.btnImport.Size = new System.Drawing.Size(90, 35);
@@ -295,12 +204,66 @@ namespace syncer.ui.Forms
             this.btnImport.Text = "Import";
             this.btnImport.UseVisualStyleBackColor = true;
             this.btnImport.Click += new System.EventHandler(this.btnImport_Click);
-
+            // 
+            // btnExport
+            // 
+            this.btnExport.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnExport.Location = new System.Drawing.Point(590, 480);
+            this.btnExport.Name = "btnExport";
+            this.btnExport.Size = new System.Drawing.Size(90, 35);
+            this.btnExport.TabIndex = 7;
+            this.btnExport.Text = "Export";
+            this.btnExport.UseVisualStyleBackColor = true;
+            this.btnExport.Click += new System.EventHandler(this.btnExport_Click);
+            // 
+            // btnDelete
+            // 
+            this.btnDelete.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnDelete.Location = new System.Drawing.Point(480, 480);
+            this.btnDelete.Name = "btnDelete";
+            this.btnDelete.Size = new System.Drawing.Size(90, 35);
+            this.btnDelete.TabIndex = 6;
+            this.btnDelete.Text = "Delete";
+            this.btnDelete.UseVisualStyleBackColor = true;
+            this.btnDelete.Click += new System.EventHandler(this.btnDelete_Click);
+            // 
+            // btnEdit
+            // 
+            this.btnEdit.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnEdit.Location = new System.Drawing.Point(370, 480);
+            this.btnEdit.Name = "btnEdit";
+            this.btnEdit.Size = new System.Drawing.Size(90, 35);
+            this.btnEdit.TabIndex = 5;
+            this.btnEdit.Text = "Edit";
+            this.btnEdit.UseVisualStyleBackColor = true;
+            this.btnEdit.Click += new System.EventHandler(this.btnEdit_Click);
+            // 
+            // btnLoadAndStart
+            // 
+            this.btnLoadAndStart.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnLoadAndStart.Location = new System.Drawing.Point(150, 480);
+            this.btnLoadAndStart.Name = "btnLoadAndStart";
+            this.btnLoadAndStart.Size = new System.Drawing.Size(120, 35);
+            this.btnLoadAndStart.TabIndex = 4;
+            this.btnLoadAndStart.Text = "Load && Start";
+            this.btnLoadAndStart.UseVisualStyleBackColor = true;
+            this.btnLoadAndStart.Click += new System.EventHandler(this.btnLoadAndStart_Click);
+            // 
+            // btnLoad
+            // 
+            this.btnLoad.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnLoad.Location = new System.Drawing.Point(24, 480);
+            this.btnLoad.Name = "btnLoad";
+            this.btnLoad.Size = new System.Drawing.Size(110, 35);
+            this.btnLoad.TabIndex = 3;
+            this.btnLoad.Text = "Load Only";
+            this.btnLoad.UseVisualStyleBackColor = true;
+            this.btnLoad.Click += new System.EventHandler(this.btnLoad_Click);
             // 
             // FormSimpleLoadConfiguration
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(96F, 96F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.WhiteSmoke;
             this.ClientSize = new System.Drawing.Size(820, 560);
             this.Controls.Add(this.btnImport);
@@ -323,6 +286,7 @@ namespace syncer.ui.Forms
             this.groupBoxDetails.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
+
         }
 
         #endregion
