@@ -23,6 +23,13 @@ namespace syncer.ui
         private ITransferClient _currentTransferClient;
         private syncer.core.ConnectionSettings _coreConnectionSettings;
         
+        // Override to prevent unwanted resizing
+        protected override void SetBoundsCore(int x, int y, int width, int height, BoundsSpecified specified)
+        {
+            // Maintain the designed size
+            base.SetBoundsCore(x, y, 800, 470, specified);
+        }
+        
         // Timer-based upload functionality
         private System.Timers.Timer _uploadTimer;
         private bool _isTimerRunning = false;
@@ -163,14 +170,15 @@ namespace syncer.ui
         private void InitializeCustomComponents()
         {
             this.Text = _isEditMode ? "Edit Timer Job" : "Add Timer Settings";
-            this.Size = new Size(800, 400); // Increase height to accommodate download options
+            // Remove manual size setting - let the designer handle the size
+            // this.Size = new Size(800, 400); // This was causing the layout issue
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             
-            // Reorganize layout with better positioning
-            ReorganizeFormLayout();
+            // Don't reorganize layout - let the designer layout remain
+            // ReorganizeFormLayout();
             
             SetDefaultValues();
             if (_isEditMode) LoadJobSettings();

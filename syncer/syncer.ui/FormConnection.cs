@@ -12,6 +12,13 @@ namespace syncer.ui
         private IConnectionService _connectionService;
         private ConnectionSettings _currentSettings;
 
+        // Override to prevent unwanted resizing
+        protected override void SetBoundsCore(int x, int y, int width, int height, BoundsSpecified specified)
+        {
+            // Maintain the designed size
+            base.SetBoundsCore(x, y, 900, 580, specified);
+        }
+
         public FormConnection()
         {
             InitializeComponent();
@@ -28,7 +35,8 @@ namespace syncer.ui
         private void InitializeCustomComponents()
         {
             this.Text = "Connection Settings";
-            this.Size = new Size(490, 510);
+            // Remove manual size setting - let the designer handle the size
+            // this.Size = new Size(490, 510); // This was causing layout issues
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;

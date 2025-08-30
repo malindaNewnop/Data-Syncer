@@ -161,6 +161,9 @@
     <EmbeddedResource Include="FormSchedule.resx">
       <DependentUpon>FormSchedule.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FormConnectionManager.resx">
+      <DependentUpon>FormConnectionManager.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Forms\FormSimpleLoadConfiguration.resx">
       <DependentUpon>FormSimpleLoadConfiguration.cs</DependentUpon>
     </EmbeddedResource>

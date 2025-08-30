@@ -80,17 +80,17 @@ namespace syncer.ui
             this.chkEnableJob.AutoSize = true;
             this.chkEnableJob.Checked = true;
             this.chkEnableJob.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkEnableJob.Location = new System.Drawing.Point(690, 32);
+            this.chkEnableJob.Location = new System.Drawing.Point(670, 35);
             this.chkEnableJob.Name = "chkEnableJob";
             this.chkEnableJob.Size = new System.Drawing.Size(79, 17);
             this.chkEnableJob.TabIndex = 2;
-            this.chkEnableJob.Text = "Enable Job";
+            this.chkEnableJob.Text = "Enable";
             this.chkEnableJob.UseVisualStyleBackColor = true;
             // 
             // lblJobName
             // 
             this.lblJobName.AutoSize = true;
-            this.lblJobName.Location = new System.Drawing.Point(20, 33);
+            this.lblJobName.Location = new System.Drawing.Point(20, 35);
             this.lblJobName.Name = "lblJobName";
             this.lblJobName.Size = new System.Drawing.Size(62, 13);
             this.lblJobName.TabIndex = 1;
@@ -98,16 +98,16 @@ namespace syncer.ui
             // 
             // txtJobName
             // 
-            this.txtJobName.Location = new System.Drawing.Point(100, 30);
+            this.txtJobName.Location = new System.Drawing.Point(100, 32);
             this.txtJobName.Name = "txtJobName";
-            this.txtJobName.Size = new System.Drawing.Size(640, 20);
+            this.txtJobName.Size = new System.Drawing.Size(560, 20);
             this.txtJobName.TabIndex = 0;
             // 
             // gbTransfer
             // 
             this.gbTransfer.Controls.Add(this.rbDownload);
             this.gbTransfer.Controls.Add(this.rbUpload);
-            this.gbTransfer.Location = new System.Drawing.Point(15, 110);
+            this.gbTransfer.Location = new System.Drawing.Point(15, 105);
             this.gbTransfer.Name = "gbTransfer";
             this.gbTransfer.Padding = new System.Windows.Forms.Padding(15, 10, 15, 15);
             this.gbTransfer.Size = new System.Drawing.Size(760, 60);
@@ -147,7 +147,7 @@ namespace syncer.ui
             this.gbTimerSettings.Controls.Add(this.numTimerInterval);
             this.gbTimerSettings.Controls.Add(this.lblUploadEvery);
             this.gbTimerSettings.Controls.Add(this.chkEnableTimer);
-            this.gbTimerSettings.Location = new System.Drawing.Point(15, 185);
+            this.gbTimerSettings.Location = new System.Drawing.Point(15, 175);
             this.gbTimerSettings.Name = "gbTimerSettings";
             this.gbTimerSettings.Padding = new System.Windows.Forms.Padding(15, 10, 15, 15);
             this.gbTimerSettings.Size = new System.Drawing.Size(360, 200);
@@ -160,7 +160,7 @@ namespace syncer.ui
             this.lblLastUpload.AutoSize = true;
             this.lblLastUpload.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.lblLastUpload.ForeColor = System.Drawing.Color.DarkGreen;
-            this.lblLastUpload.Location = new System.Drawing.Point(260, 130);
+            this.lblLastUpload.Location = new System.Drawing.Point(210, 145);
             this.lblLastUpload.Name = "lblLastUpload";
             this.lblLastUpload.Size = new System.Drawing.Size(36, 13);
             this.lblLastUpload.TabIndex = 7;
@@ -171,7 +171,7 @@ namespace syncer.ui
             this.lblTimerStatus.AutoSize = true;
             this.lblTimerStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.lblTimerStatus.ForeColor = System.Drawing.Color.DarkRed;
-            this.lblTimerStatus.Location = new System.Drawing.Point(260, 110);
+            this.lblTimerStatus.Location = new System.Drawing.Point(210, 125);
             this.lblTimerStatus.Name = "lblTimerStatus";
             this.lblTimerStatus.Size = new System.Drawing.Size(74, 13);
             this.lblTimerStatus.TabIndex = 6;
@@ -180,22 +180,22 @@ namespace syncer.ui
             // btnStopTimer
             // 
             this.btnStopTimer.Enabled = false;
-            this.btnStopTimer.Location = new System.Drawing.Point(110, 100);
+            this.btnStopTimer.Location = new System.Drawing.Point(110, 150);
             this.btnStopTimer.Name = "btnStopTimer";
             this.btnStopTimer.Size = new System.Drawing.Size(80, 30);
             this.btnStopTimer.TabIndex = 5;
-            this.btnStopTimer.Text = "Stop Timer";
+            this.btnStopTimer.Text = "Stop";
             this.btnStopTimer.UseVisualStyleBackColor = true;
             this.btnStopTimer.Click += new System.EventHandler(this.btnStopTimer_Click);
             // 
             // btnStartTimer
             // 
             this.btnStartTimer.Enabled = false;
-            this.btnStartTimer.Location = new System.Drawing.Point(20, 100);
+            this.btnStartTimer.Location = new System.Drawing.Point(20, 150);
             this.btnStartTimer.Name = "btnStartTimer";
             this.btnStartTimer.Size = new System.Drawing.Size(80, 30);
             this.btnStartTimer.TabIndex = 4;
-            this.btnStartTimer.Text = "Start Timer";
+            this.btnStartTimer.Text = "Start";
             this.btnStartTimer.UseVisualStyleBackColor = true;
             this.btnStartTimer.Click += new System.EventHandler(this.btnStartTimer_Click);
             // 
@@ -208,15 +208,15 @@ namespace syncer.ui
             "Seconds",
             "Minutes",
             "Hours"});
-            this.cmbTimerUnit.Location = new System.Drawing.Point(210, 63);
+            this.cmbTimerUnit.Location = new System.Drawing.Point(165, 65);
             this.cmbTimerUnit.Name = "cmbTimerUnit";
-            this.cmbTimerUnit.Size = new System.Drawing.Size(90, 21);
+            this.cmbTimerUnit.Size = new System.Drawing.Size(80, 21);
             this.cmbTimerUnit.TabIndex = 3;
             // 
             // numTimerInterval
             // 
             this.numTimerInterval.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.numTimerInterval.Location = new System.Drawing.Point(140, 63);
+            this.numTimerInterval.Location = new System.Drawing.Point(95, 65);
             this.numTimerInterval.Maximum = new decimal(new int[] {
             9999,
             0,
@@ -240,11 +240,11 @@ namespace syncer.ui
             // 
             this.lblUploadEvery.AutoSize = true;
             this.lblUploadEvery.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblUploadEvery.Location = new System.Drawing.Point(20, 65);
+            this.lblUploadEvery.Location = new System.Drawing.Point(55, 67);
             this.lblUploadEvery.Name = "lblUploadEvery";
-            this.lblUploadEvery.Size = new System.Drawing.Size(71, 13);
+            this.lblUploadEvery.Size = new System.Drawing.Size(34, 13);
             this.lblUploadEvery.TabIndex = 1;
-            this.lblUploadEvery.Text = "Upload Every";
+            this.lblUploadEvery.Text = "Every";
             // 
             // chkEnableTimer
             // 
@@ -266,17 +266,17 @@ namespace syncer.ui
             this.gbFileManager.Controls.Add(this.lblNoFilesSelected);
             this.gbFileManager.Controls.Add(this.btnBrowseFilesForTimer);
             this.gbFileManager.Controls.Add(this.lblFileSelection);
-            this.gbFileManager.Location = new System.Drawing.Point(395, 185);
+            this.gbFileManager.Location = new System.Drawing.Point(385, 175);
             this.gbFileManager.Name = "gbFileManager";
             this.gbFileManager.Padding = new System.Windows.Forms.Padding(15, 10, 15, 15);
-            this.gbFileManager.Size = new System.Drawing.Size(380, 200);
+            this.gbFileManager.Size = new System.Drawing.Size(390, 200);
             this.gbFileManager.TabIndex = 3;
             this.gbFileManager.TabStop = false;
             this.gbFileManager.Text = "File Manager";
             // 
             // btnDownloadFile
             // 
-            this.btnDownloadFile.Location = new System.Drawing.Point(140, 120);
+            this.btnDownloadFile.Location = new System.Drawing.Point(140, 145);
             this.btnDownloadFile.Name = "btnDownloadFile";
             this.btnDownloadFile.Size = new System.Drawing.Size(100, 30);
             this.btnDownloadFile.TabIndex = 5;
@@ -286,11 +286,11 @@ namespace syncer.ui
             // 
             // btnUploadFiles
             // 
-            this.btnUploadFiles.Location = new System.Drawing.Point(20, 120);
+            this.btnUploadFiles.Location = new System.Drawing.Point(20, 145);
             this.btnUploadFiles.Name = "btnUploadFiles";
             this.btnUploadFiles.Size = new System.Drawing.Size(100, 30);
             this.btnUploadFiles.TabIndex = 4;
-            this.btnUploadFiles.Text = "Upload File(s)";
+            this.btnUploadFiles.Text = "Upload";
             this.btnUploadFiles.UseVisualStyleBackColor = true;
             this.btnUploadFiles.Click += new System.EventHandler(this.btnDirectUpload_Click);
             // 
@@ -298,7 +298,7 @@ namespace syncer.ui
             // 
             this.lblManualOperations.AutoSize = true;
             this.lblManualOperations.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblManualOperations.Location = new System.Drawing.Point(20, 100);
+            this.lblManualOperations.Location = new System.Drawing.Point(20, 125);
             this.lblManualOperations.Name = "lblManualOperations";
             this.lblManualOperations.Size = new System.Drawing.Size(148, 13);
             this.lblManualOperations.TabIndex = 3;
@@ -309,7 +309,7 @@ namespace syncer.ui
             this.lblNoFilesSelected.AutoSize = true;
             this.lblNoFilesSelected.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.lblNoFilesSelected.ForeColor = System.Drawing.Color.Blue;
-            this.lblNoFilesSelected.Location = new System.Drawing.Point(140, 77);
+            this.lblNoFilesSelected.Location = new System.Drawing.Point(140, 85);
             this.lblNoFilesSelected.Name = "lblNoFilesSelected";
             this.lblNoFilesSelected.Size = new System.Drawing.Size(85, 13);
             this.lblNoFilesSelected.TabIndex = 2;
@@ -318,9 +318,9 @@ namespace syncer.ui
             // btnBrowseFilesForTimer
             // 
             this.btnBrowseFilesForTimer.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnBrowseFilesForTimer.Location = new System.Drawing.Point(20, 70);
+            this.btnBrowseFilesForTimer.Location = new System.Drawing.Point(20, 80);
             this.btnBrowseFilesForTimer.Name = "btnBrowseFilesForTimer";
-            this.btnBrowseFilesForTimer.Size = new System.Drawing.Size(110, 30);
+            this.btnBrowseFilesForTimer.Size = new System.Drawing.Size(110, 25);
             this.btnBrowseFilesForTimer.TabIndex = 1;
             this.btnBrowseFilesForTimer.Text = "Browse Folder";
             this.btnBrowseFilesForTimer.UseVisualStyleBackColor = true;
@@ -331,13 +331,13 @@ namespace syncer.ui
             this.lblFileSelection.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.lblFileSelection.Location = new System.Drawing.Point(20, 25);
             this.lblFileSelection.Name = "lblFileSelection";
-            this.lblFileSelection.Size = new System.Drawing.Size(320, 40);
+            this.lblFileSelection.Size = new System.Drawing.Size(350, 40);
             this.lblFileSelection.TabIndex = 0;
             this.lblFileSelection.Text = "File Selection: All files in the selected folder will be uploaded automatically.";
             // 
             // btnSaveTimerJob
             // 
-            this.btnSaveTimerJob.Location = new System.Drawing.Point(15, 400);
+            this.btnSaveTimerJob.Location = new System.Drawing.Point(15, 395);
             this.btnSaveTimerJob.Name = "btnSaveTimerJob";
             this.btnSaveTimerJob.Size = new System.Drawing.Size(160, 40);
             this.btnSaveTimerJob.TabIndex = 4;
@@ -347,7 +347,7 @@ namespace syncer.ui
             // 
             // btnLoadConfiguration
             // 
-            this.btnLoadConfiguration.Location = new System.Drawing.Point(185, 400);
+            this.btnLoadConfiguration.Location = new System.Drawing.Point(185, 395);
             this.btnLoadConfiguration.Name = "btnLoadConfiguration";
             this.btnLoadConfiguration.Size = new System.Drawing.Size(140, 40);
             this.btnLoadConfiguration.TabIndex = 5;
@@ -358,7 +358,7 @@ namespace syncer.ui
             // btnSave
             // 
             this.btnSave.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnSave.Location = new System.Drawing.Point(347, 402);
+            this.btnSave.Location = new System.Drawing.Point(595, 395);
             this.btnSave.Name = "btnSave";
             this.btnSave.Size = new System.Drawing.Size(90, 40);
             this.btnSave.TabIndex = 6;
@@ -369,7 +369,7 @@ namespace syncer.ui
             // btnCancel
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnCancel.Location = new System.Drawing.Point(685, 402);
+            this.btnCancel.Location = new System.Drawing.Point(695, 395);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(90, 40);
             this.btnCancel.TabIndex = 7;
@@ -379,8 +379,8 @@ namespace syncer.ui
             // 
             // FormSchedule
             // 
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            this.ClientSize = new System.Drawing.Size(820, 562);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(800, 470);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnSave);
             this.Controls.Add(this.btnLoadConfiguration);
@@ -390,7 +390,7 @@ namespace syncer.ui
             this.Controls.Add(this.gbTransfer);
             this.Controls.Add(this.gbJobDetails);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "FormSchedule";

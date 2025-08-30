@@ -37,85 +37,101 @@ namespace syncer.ui
 
         private void InitializeComponent()
         {
-            this.lstConnections = new ListBox();
-            this.btnEdit = new Button();
-            this.btnDelete = new Button();
-            this.btnSetDefault = new Button();
-            this.btnTest = new Button();
-            this.btnClose = new Button();
-            this.lblConnectionInfo = new Label();
-            this.txtConnectionInfo = new TextBox();
+            this.lstConnections = new System.Windows.Forms.ListBox();
+            this.btnEdit = new System.Windows.Forms.Button();
+            this.btnDelete = new System.Windows.Forms.Button();
+            this.btnSetDefault = new System.Windows.Forms.Button();
+            this.btnTest = new System.Windows.Forms.Button();
+            this.btnClose = new System.Windows.Forms.Button();
+            this.lblConnectionInfo = new System.Windows.Forms.Label();
+            this.txtConnectionInfo = new System.Windows.Forms.TextBox();
             this.SuspendLayout();
-
-            // Form settings
-            this.Text = "Connection Manager";
-            this.Size = new Size(600, 400);
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.MinimizeBox = false;
-
+            // 
             // lstConnections
-            this.lstConnections.Location = new Point(12, 12);
-            this.lstConnections.Size = new Size(300, 250);
-            this.lstConnections.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom;
-            this.lstConnections.SelectedIndexChanged += this.lstConnections_SelectedIndexChanged;
-            this.lstConnections.DoubleClick += this.lstConnections_DoubleClick;
-
+            // 
+            this.lstConnections.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left)));
+            this.lstConnections.ItemHeight = 16;
+            this.lstConnections.Location = new System.Drawing.Point(12, 12);
+            this.lstConnections.Name = "lstConnections";
+            this.lstConnections.Size = new System.Drawing.Size(300, 276);
+            this.lstConnections.TabIndex = 0;
+            // 
             // btnEdit
-            this.btnEdit.Location = new Point(330, 12);
-            this.btnEdit.Size = new Size(75, 23);
+            // 
+            this.btnEdit.Enabled = false;
+            this.btnEdit.Location = new System.Drawing.Point(330, 12);
+            this.btnEdit.Name = "btnEdit";
+            this.btnEdit.Size = new System.Drawing.Size(75, 23);
+            this.btnEdit.TabIndex = 1;
             this.btnEdit.Text = "&Edit";
             this.btnEdit.UseVisualStyleBackColor = true;
-            this.btnEdit.Click += this.btnEdit_Click;
-            this.btnEdit.Enabled = false;
-
+            // 
             // btnDelete
-            this.btnDelete.Location = new Point(330, 41);
-            this.btnDelete.Size = new Size(75, 23);
+            // 
+            this.btnDelete.Enabled = false;
+            this.btnDelete.Location = new System.Drawing.Point(330, 41);
+            this.btnDelete.Name = "btnDelete";
+            this.btnDelete.Size = new System.Drawing.Size(75, 23);
+            this.btnDelete.TabIndex = 2;
             this.btnDelete.Text = "&Delete";
             this.btnDelete.UseVisualStyleBackColor = true;
-            this.btnDelete.Click += this.btnDelete_Click;
-            this.btnDelete.Enabled = false;
-
+            // 
             // btnSetDefault
-            this.btnSetDefault.Location = new Point(330, 70);
-            this.btnSetDefault.Size = new Size(75, 23);
+            // 
+            this.btnSetDefault.Enabled = false;
+            this.btnSetDefault.Location = new System.Drawing.Point(330, 70);
+            this.btnSetDefault.Name = "btnSetDefault";
+            this.btnSetDefault.Size = new System.Drawing.Size(75, 23);
+            this.btnSetDefault.TabIndex = 3;
             this.btnSetDefault.Text = "&Set Default";
             this.btnSetDefault.UseVisualStyleBackColor = true;
-            this.btnSetDefault.Click += this.btnSetDefault_Click;
-            this.btnSetDefault.Enabled = false;
-
+            // 
             // btnTest
-            this.btnTest.Location = new Point(330, 99);
-            this.btnTest.Size = new Size(75, 23);
+            // 
+            this.btnTest.Enabled = false;
+            this.btnTest.Location = new System.Drawing.Point(330, 99);
+            this.btnTest.Name = "btnTest";
+            this.btnTest.Size = new System.Drawing.Size(75, 23);
+            this.btnTest.TabIndex = 4;
             this.btnTest.Text = "&Test";
             this.btnTest.UseVisualStyleBackColor = true;
-            this.btnTest.Click += this.btnTest_Click;
-            this.btnTest.Enabled = false;
-
+            // 
             // btnClose
-            this.btnClose.Location = new Point(509, 339);
-            this.btnClose.Size = new Size(75, 23);
+            // 
+            this.btnClose.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnClose.Location = new System.Drawing.Point(507, 336);
+            this.btnClose.Name = "btnClose";
+            this.btnClose.Size = new System.Drawing.Size(75, 23);
+            this.btnClose.TabIndex = 5;
             this.btnClose.Text = "&Close";
             this.btnClose.UseVisualStyleBackColor = true;
-            this.btnClose.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            this.btnClose.Click += this.btnClose_Click;
-
+            this.btnClose.Click += new System.EventHandler(this.btnClose_Click_1);
+            // 
             // lblConnectionInfo
-            this.lblConnectionInfo.Location = new Point(330, 135);
-            this.lblConnectionInfo.Size = new Size(100, 13);
+            // 
+            this.lblConnectionInfo.Location = new System.Drawing.Point(330, 135);
+            this.lblConnectionInfo.Name = "lblConnectionInfo";
+            this.lblConnectionInfo.Size = new System.Drawing.Size(100, 13);
+            this.lblConnectionInfo.TabIndex = 6;
             this.lblConnectionInfo.Text = "Connection Details:";
-
+            // 
             // txtConnectionInfo
-            this.txtConnectionInfo.Location = new Point(330, 151);
-            this.txtConnectionInfo.Size = new Size(254, 111);
+            // 
+            this.txtConnectionInfo.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.txtConnectionInfo.Location = new System.Drawing.Point(330, 151);
             this.txtConnectionInfo.Multiline = true;
+            this.txtConnectionInfo.Name = "txtConnectionInfo";
             this.txtConnectionInfo.ReadOnly = true;
-            this.txtConnectionInfo.ScrollBars = ScrollBars.Vertical;
-            this.txtConnectionInfo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
-
-            // Add controls to form
+            this.txtConnectionInfo.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this.txtConnectionInfo.Size = new System.Drawing.Size(287, 144);
+            this.txtConnectionInfo.TabIndex = 7;
+            // 
+            // FormConnectionManager
+            // 
+            this.ClientSize = new System.Drawing.Size(615, 386);
             this.Controls.Add(this.lstConnections);
             this.Controls.Add(this.btnEdit);
             this.Controls.Add(this.btnDelete);
@@ -124,9 +140,15 @@ namespace syncer.ui
             this.Controls.Add(this.btnClose);
             this.Controls.Add(this.lblConnectionInfo);
             this.Controls.Add(this.txtConnectionInfo);
-
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.Name = "FormConnectionManager";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            this.Text = "Connection Manager";
             this.ResumeLayout(false);
             this.PerformLayout();
+
         }
 
         private void LoadConnections()
@@ -403,6 +425,11 @@ namespace syncer.ui
             }
 
             return null;
+        }
+
+        private void btnClose_Click_1(object sender, EventArgs e)
+        {
+
         }
     }
 }
