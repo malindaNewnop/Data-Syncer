@@ -212,24 +212,20 @@ namespace syncer.ui.Forms
             this.txtProfileDescription.Size = new System.Drawing.Size(200, 40);
             this.txtProfileDescription.TabIndex = 3;
             
-            // btnSaveProfile
-            this.btnSaveProfile.BackColor = System.Drawing.Color.LightGreen;
-            this.btnSaveProfile.Location = new System.Drawing.Point(80, 85);
+            // btnSaveProfile            this.btnSaveProfile.Location = new System.Drawing.Point(80, 85);
             this.btnSaveProfile.Name = "btnSaveProfile";
             this.btnSaveProfile.Size = new System.Drawing.Size(90, 25);
             this.btnSaveProfile.TabIndex = 4;
             this.btnSaveProfile.Text = "Save Profile";
-            this.btnSaveProfile.UseVisualStyleBackColor = false;
+            this.btnSaveProfile.UseVisualStyleBackColor = true;
             this.btnSaveProfile.Click += new System.EventHandler(this.btnSaveProfile_Click);
             
-            // btnDeleteProfile
-            this.btnDeleteProfile.BackColor = System.Drawing.Color.LightCoral;
-            this.btnDeleteProfile.Location = new System.Drawing.Point(180, 85);
+            // btnDeleteProfile            this.btnDeleteProfile.Location = new System.Drawing.Point(180, 85);
             this.btnDeleteProfile.Name = "btnDeleteProfile";
             this.btnDeleteProfile.Size = new System.Drawing.Size(90, 25);
             this.btnDeleteProfile.TabIndex = 5;
             this.btnDeleteProfile.Text = "Delete Profile";
-            this.btnDeleteProfile.UseVisualStyleBackColor = false;
+            this.btnDeleteProfile.UseVisualStyleBackColor = true;
             this.btnDeleteProfile.Click += new System.EventHandler(this.btnDeleteProfile_Click);
             
             // gbBasicConnection
@@ -549,26 +545,22 @@ namespace syncer.ui.Forms
             this.gbTesting.TabStop = false;
             this.gbTesting.Text = "Connection Testing";
             
-            // btnTestConnection
-            this.btnTestConnection.BackColor = System.Drawing.Color.LightBlue;
-            this.btnTestConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            // btnTestConnection            this.btnTestConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnTestConnection.Location = new System.Drawing.Point(15, 25);
             this.btnTestConnection.Name = "btnTestConnection";
             this.btnTestConnection.Size = new System.Drawing.Size(120, 30);
             this.btnTestConnection.TabIndex = 1;
             this.btnTestConnection.Text = "Test Connection";
-            this.btnTestConnection.UseVisualStyleBackColor = false;
+            this.btnTestConnection.UseVisualStyleBackColor = true;
             this.btnTestConnection.Click += new System.EventHandler(this.btnTestConnection_Click);
             
-            // btnTestAuthMethods
-            this.btnTestAuthMethods.BackColor = System.Drawing.Color.LightYellow;
-            this.btnTestAuthMethods.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            // btnTestAuthMethods            this.btnTestAuthMethods.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnTestAuthMethods.Location = new System.Drawing.Point(145, 25);
             this.btnTestAuthMethods.Name = "btnTestAuthMethods";
             this.btnTestAuthMethods.Size = new System.Drawing.Size(120, 30);
             this.btnTestAuthMethods.TabIndex = 2;
             this.btnTestAuthMethods.Text = "Test Auth Methods";
-            this.btnTestAuthMethods.UseVisualStyleBackColor = false;
+            this.btnTestAuthMethods.UseVisualStyleBackColor = true;
             this.btnTestAuthMethods.Click += new System.EventHandler(this.btnTestAuthMethods_Click);
             
             // progressBarTest
@@ -588,26 +580,22 @@ namespace syncer.ui.Forms
             this.txtTestResults.Size = new System.Drawing.Size(580, 45);
             this.txtTestResults.TabIndex = 4;
             
-            // btnOK
-            this.btnOK.BackColor = System.Drawing.Color.LightGreen;
-            this.btnOK.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            // btnOK            this.btnOK.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnOK.Location = new System.Drawing.Point(450, 620);
             this.btnOK.Name = "btnOK";
             this.btnOK.Size = new System.Drawing.Size(80, 35);
             this.btnOK.TabIndex = 5;
             this.btnOK.Text = "OK";
-            this.btnOK.UseVisualStyleBackColor = false;
+            this.btnOK.UseVisualStyleBackColor = true;
             this.btnOK.Click += new System.EventHandler(this.btnOK_Click);
             
-            // btnCancel
-            this.btnCancel.BackColor = System.Drawing.Color.LightCoral;
-            this.btnCancel.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            // btnCancel            this.btnCancel.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnCancel.Location = new System.Drawing.Point(540, 620);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(80, 35);
             this.btnCancel.TabIndex = 6;
             this.btnCancel.Text = "Cancel";
-            this.btnCancel.UseVisualStyleBackColor = false;
+            this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
             
             // FormEnhancedConnection

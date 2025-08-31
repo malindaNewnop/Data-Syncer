@@ -345,45 +345,37 @@ namespace syncer.ui
             this.gbActions.TabIndex = 4;
             this.gbActions.TabStop = false;
             this.gbActions.Text = "Actions";
-            // btnRefresh
-            this.btnRefresh.BackColor = System.Drawing.Color.LightBlue;
-            this.btnRefresh.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
+            // btnRefresh            this.btnRefresh.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
             this.btnRefresh.Location = new System.Drawing.Point(15, 20);
             this.btnRefresh.Name = "btnRefresh";
             this.btnRefresh.Size = new System.Drawing.Size(70, 25);
             this.btnRefresh.TabIndex = 0;
             this.btnRefresh.Text = "Refresh";
-            this.btnRefresh.UseVisualStyleBackColor = false;
+            this.btnRefresh.UseVisualStyleBackColor = true;
             this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
-            // btnClearLogs
-            this.btnClearLogs.BackColor = System.Drawing.Color.LightCoral;
-            this.btnClearLogs.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
+            // btnClearLogs            this.btnClearLogs.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
             this.btnClearLogs.Location = new System.Drawing.Point(95, 20);
             this.btnClearLogs.Name = "btnClearLogs";
             this.btnClearLogs.Size = new System.Drawing.Size(70, 25);
             this.btnClearLogs.TabIndex = 1;
             this.btnClearLogs.Text = "Clear Logs";
-            this.btnClearLogs.UseVisualStyleBackColor = false;
+            this.btnClearLogs.UseVisualStyleBackColor = true;
             this.btnClearLogs.Click += new System.EventHandler(this.btnClearLogs_Click);
-            // btnExport
-            this.btnExport.BackColor = System.Drawing.Color.LightGreen;
-            this.btnExport.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
+            // btnExport            this.btnExport.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
             this.btnExport.Location = new System.Drawing.Point(15, 50);
             this.btnExport.Name = "btnExport";
             this.btnExport.Size = new System.Drawing.Size(70, 25);
             this.btnExport.TabIndex = 2;
             this.btnExport.Text = "Export";
-            this.btnExport.UseVisualStyleBackColor = false;
+            this.btnExport.UseVisualStyleBackColor = true;
             this.btnExport.Click += new System.EventHandler(this.btnExport_Click);
-            // btnClose
-            this.btnClose.BackColor = System.Drawing.Color.LightGray;
-            this.btnClose.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
+            // btnClose            this.btnClose.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
             this.btnClose.Location = new System.Drawing.Point(95, 50);
             this.btnClose.Name = "btnClose";
             this.btnClose.Size = new System.Drawing.Size(70, 25);
             this.btnClose.TabIndex = 3;
             this.btnClose.Text = "Close";
-            this.btnClose.UseVisualStyleBackColor = false;
+            this.btnClose.UseVisualStyleBackColor = true;
             this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
             // statusStrip1
             this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {

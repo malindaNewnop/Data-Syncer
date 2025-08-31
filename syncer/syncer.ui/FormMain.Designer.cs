@@ -188,47 +188,43 @@ namespace syncer.ui
             this.aboutToolStripMenuItem.Text = "About";
             this.aboutToolStripMenuItem.Click += new System.EventHandler(this.aboutToolStripMenuItem_Click);
             // btnAddJob
-            this.btnAddJob.BackColor = System.Drawing.Color.LightBlue;
             this.btnAddJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnAddJob.Location = new System.Drawing.Point(15, 19);
             this.btnAddJob.Name = "btnAddJob";
             this.btnAddJob.Size = new System.Drawing.Size(120, 35);
             this.btnAddJob.TabIndex = 2;
             this.btnAddJob.Text = "Add Timer Job";
-            this.btnAddJob.UseVisualStyleBackColor = false;
+            this.btnAddJob.UseVisualStyleBackColor = true;
             this.btnAddJob.Click += new System.EventHandler(this.btnAddJob_Click);
             // btnStartStop - Hidden (service auto-starts with jobs)
-            this.btnStartStop.BackColor = System.Drawing.Color.LightGreen;
             this.btnStartStop.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnStartStop.Location = new System.Drawing.Point(150, 19);
             this.btnStartStop.Name = "btnStartStop";
             this.btnStartStop.Size = new System.Drawing.Size(120, 35);
             this.btnStartStop.TabIndex = 3;
             this.btnStartStop.Text = "Start Service";
-            this.btnStartStop.UseVisualStyleBackColor = false;
+            this.btnStartStop.UseVisualStyleBackColor = true;
             this.btnStartStop.Visible = false; // Hide the button
             this.btnStartStop.Click += new System.EventHandler(this.btnStartStop_Click);
             
             // btnSaveCurrentConfig - Adjusted position since btnStartStop is hidden
-            this.btnSaveCurrentConfig.BackColor = System.Drawing.Color.LightSalmon;
             this.btnSaveCurrentConfig.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnSaveCurrentConfig.Location = new System.Drawing.Point(150, 19);
             this.btnSaveCurrentConfig.Name = "btnSaveCurrentConfig";
             this.btnSaveCurrentConfig.Size = new System.Drawing.Size(150, 35);
             this.btnSaveCurrentConfig.TabIndex = 4;
             this.btnSaveCurrentConfig.Text = "Save Current Config";
-            this.btnSaveCurrentConfig.UseVisualStyleBackColor = false;
+            this.btnSaveCurrentConfig.UseVisualStyleBackColor = true;
             this.btnSaveCurrentConfig.Click += new System.EventHandler(this.btnSaveCurrentConfig_Click);
             
             // btnLoadConfiguration - Adjusted position
-            this.btnLoadConfiguration.BackColor = System.Drawing.Color.LightYellow;
             this.btnLoadConfiguration.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnLoadConfiguration.Location = new System.Drawing.Point(315, 19);
             this.btnLoadConfiguration.Name = "btnLoadConfiguration";
             this.btnLoadConfiguration.Size = new System.Drawing.Size(150, 35);
             this.btnLoadConfiguration.TabIndex = 5;
             this.btnLoadConfiguration.Text = "Load Configuration";
-            this.btnLoadConfiguration.UseVisualStyleBackColor = false;
+            this.btnLoadConfiguration.UseVisualStyleBackColor = true;
             this.btnLoadConfiguration.Click += new System.EventHandler(this.btnLoadConfiguration_Click);
             // statusStrip1
             this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -306,25 +302,23 @@ namespace syncer.ui
             this.btnRefreshTimerJobs.Click += new System.EventHandler(this.btnRefreshTimerJobs_Click);
 
             // btnStopTimerJob
-            this.btnStopTimerJob.BackColor = System.Drawing.Color.LightCoral;
             this.btnStopTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.btnStopTimerJob.Location = new System.Drawing.Point(346, 22);
             this.btnStopTimerJob.Name = "btnStopTimerJob";
             this.btnStopTimerJob.Size = new System.Drawing.Size(120, 35);
             this.btnStopTimerJob.TabIndex = 2;
             this.btnStopTimerJob.Text = "Stop Selected Job";
-            this.btnStopTimerJob.UseVisualStyleBackColor = false;
+            this.btnStopTimerJob.UseVisualStyleBackColor = true;
             this.btnStopTimerJob.Click += new System.EventHandler(this.btnStopTimerJob_Click);
 
             // btnEditTimerJob
-            this.btnEditTimerJob.BackColor = System.Drawing.Color.LightBlue;
             this.btnEditTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.btnEditTimerJob.Location = new System.Drawing.Point(472, 22);
             this.btnEditTimerJob.Name = "btnEditTimerJob";
             this.btnEditTimerJob.Size = new System.Drawing.Size(120, 35);
             this.btnEditTimerJob.TabIndex = 3;
             this.btnEditTimerJob.Text = "Edit Selected Job";
-            this.btnEditTimerJob.UseVisualStyleBackColor = false;
+            this.btnEditTimerJob.UseVisualStyleBackColor = true;
             this.btnEditTimerJob.Click += new System.EventHandler(this.btnEditTimerJob_Click);
 
             

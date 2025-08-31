@@ -44,6 +44,8 @@ namespace syncer.ui
             this.numTimerInterval = new System.Windows.Forms.NumericUpDown();
             this.lblUploadEvery = new System.Windows.Forms.Label();
             this.chkEnableTimer = new System.Windows.Forms.CheckBox();
+            this.chkIncludeSubfolders = new System.Windows.Forms.CheckBox();
+            this.chkIncludeSubfolders = new System.Windows.Forms.CheckBox();
             this.gbFileManager = new System.Windows.Forms.GroupBox();
             this.btnDownloadFile = new System.Windows.Forms.Button();
             this.btnUploadFiles = new System.Windows.Forms.Button();
@@ -147,6 +149,7 @@ namespace syncer.ui
             this.gbTimerSettings.Controls.Add(this.numTimerInterval);
             this.gbTimerSettings.Controls.Add(this.lblUploadEvery);
             this.gbTimerSettings.Controls.Add(this.chkEnableTimer);
+            this.gbTimerSettings.Controls.Add(this.chkIncludeSubfolders);
             this.gbTimerSettings.Location = new System.Drawing.Point(15, 175);
             this.gbTimerSettings.Name = "gbTimerSettings";
             this.gbTimerSettings.Padding = new System.Windows.Forms.Padding(15, 10, 15, 15);
@@ -257,6 +260,18 @@ namespace syncer.ui
             this.chkEnableTimer.Text = "Enable Timer";
             this.chkEnableTimer.UseVisualStyleBackColor = true;
             this.chkEnableTimer.CheckedChanged += new System.EventHandler(this.chkEnableTimer_CheckedChanged);
+            // 
+            // chkIncludeSubfolders
+            // 
+            this.chkIncludeSubfolders.AutoSize = true;
+            this.chkIncludeSubfolders.Checked = true;
+            this.chkIncludeSubfolders.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkIncludeSubfolders.Location = new System.Drawing.Point(20, 105);
+            this.chkIncludeSubfolders.Name = "chkIncludeSubfolders";
+            this.chkIncludeSubfolders.Size = new System.Drawing.Size(117, 17);
+            this.chkIncludeSubfolders.TabIndex = 1;
+            this.chkIncludeSubfolders.Text = "Include Subfolders";
+            this.chkIncludeSubfolders.UseVisualStyleBackColor = true;
             // 
             // gbFileManager
             // 
@@ -428,6 +443,7 @@ namespace syncer.ui
         private System.Windows.Forms.Button btnStopTimer;
         private System.Windows.Forms.Label lblTimerStatus;
         private System.Windows.Forms.Label lblLastUpload;
+        private System.Windows.Forms.CheckBox chkIncludeSubfolders;
         private System.Windows.Forms.GroupBox gbFileManager;
         private System.Windows.Forms.Label lblFileSelection;
         private System.Windows.Forms.Button btnBrowseFilesForTimer;

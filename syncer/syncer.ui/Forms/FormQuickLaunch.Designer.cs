@@ -48,26 +48,24 @@ namespace syncer.ui.Forms
             // 
             // btnLoadAndStartJob
             // 
-            this.btnLoadAndStartJob.BackColor = System.Drawing.Color.LightGreen;
             this.btnLoadAndStartJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.btnLoadAndStartJob.Location = new System.Drawing.Point(12, 250);
             this.btnLoadAndStartJob.Name = "btnLoadAndStartJob";
             this.btnLoadAndStartJob.Size = new System.Drawing.Size(120, 30);
             this.btnLoadAndStartJob.TabIndex = 1;
             this.btnLoadAndStartJob.Text = "Load & Start Job";
-            this.btnLoadAndStartJob.UseVisualStyleBackColor = false;
+            this.btnLoadAndStartJob.UseVisualStyleBackColor = true;
             this.btnLoadAndStartJob.Click += new System.EventHandler(this.btnLoadAndStartJob_Click);
             // 
             // btnEditSelectedJob
             // 
-            this.btnEditSelectedJob.BackColor = System.Drawing.Color.LightSteelBlue;
             this.btnEditSelectedJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.btnEditSelectedJob.Location = new System.Drawing.Point(142, 250);
             this.btnEditSelectedJob.Name = "btnEditSelectedJob";
             this.btnEditSelectedJob.Size = new System.Drawing.Size(120, 30);
             this.btnEditSelectedJob.TabIndex = 2;
             this.btnEditSelectedJob.Text = "Edit Selected Job";
-            this.btnEditSelectedJob.UseVisualStyleBackColor = false;
+            this.btnEditSelectedJob.UseVisualStyleBackColor = true;
             this.btnEditSelectedJob.Click += new System.EventHandler(this.btnEditSelectedJob_Click);
             // 
             // btnManageConfigurations

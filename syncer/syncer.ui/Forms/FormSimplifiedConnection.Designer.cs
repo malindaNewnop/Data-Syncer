@@ -203,13 +203,12 @@ namespace syncer.ui.Forms
             this.btnBrowseKey.Click += new System.EventHandler(this.btnBrowseKey_Click);
             
             // btnGenerateKey
-            this.btnGenerateKey.BackColor = System.Drawing.Color.LightBlue;
             this.btnGenerateKey.Location = new System.Drawing.Point(100, 80);
             this.btnGenerateKey.Name = "btnGenerateKey";
             this.btnGenerateKey.Size = new System.Drawing.Size(100, 25);
             this.btnGenerateKey.TabIndex = 4;
             this.btnGenerateKey.Text = "Generate Key";
-            this.btnGenerateKey.UseVisualStyleBackColor = false;
+            this.btnGenerateKey.UseVisualStyleBackColor = true;
             this.btnGenerateKey.Click += new System.EventHandler(this.btnGenerateKey_Click);
             
             // lblTimeout
@@ -229,36 +228,33 @@ namespace syncer.ui.Forms
             this.numTimeout.Value = new decimal(new int[] { 30, 0, 0, 0 });
             
             // btnTestConnection
-            this.btnTestConnection.BackColor = System.Drawing.Color.LightYellow;
             this.btnTestConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnTestConnection.Location = new System.Drawing.Point(12, 310);
             this.btnTestConnection.Name = "btnTestConnection";
             this.btnTestConnection.Size = new System.Drawing.Size(120, 30);
             this.btnTestConnection.TabIndex = 2;
             this.btnTestConnection.Text = "Test Connection";
-            this.btnTestConnection.UseVisualStyleBackColor = false;
+            this.btnTestConnection.UseVisualStyleBackColor = true;
             this.btnTestConnection.Click += new System.EventHandler(this.btnTestConnection_Click);
             
             // btnOK
-            this.btnOK.BackColor = System.Drawing.Color.LightGreen;
             this.btnOK.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnOK.Location = new System.Drawing.Point(300, 310);
             this.btnOK.Name = "btnOK";
             this.btnOK.Size = new System.Drawing.Size(80, 30);
             this.btnOK.TabIndex = 3;
             this.btnOK.Text = "OK";
-            this.btnOK.UseVisualStyleBackColor = false;
+            this.btnOK.UseVisualStyleBackColor = true;
             this.btnOK.Click += new System.EventHandler(this.btnOK_Click);
             
             // btnCancel
-            this.btnCancel.BackColor = System.Drawing.Color.LightCoral;
             this.btnCancel.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnCancel.Location = new System.Drawing.Point(390, 310);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(80, 30);
             this.btnCancel.TabIndex = 4;
             this.btnCancel.Text = "Cancel";
-            this.btnCancel.UseVisualStyleBackColor = false;
+            this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
             
             // FormSimplifiedConnection

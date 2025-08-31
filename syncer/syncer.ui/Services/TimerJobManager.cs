@@ -34,6 +34,8 @@ namespace syncer.ui.Services
             public DateTime? LastUploadTime { get; set; }
             public ITransferClient TransferClient { get; set; }
             public syncer.core.ConnectionSettings ConnectionSettings { get; set; }
+            public bool IsUploadInProgress { get; set; } // Prevent overlapping uploads
+            public DateTime? UploadStartTime { get; set; } // Track upload duration
         }
         
         public TimerJobManager()
@@ -61,6 +63,10 @@ namespace syncer.ui.Services
                     job.FolderPath = folderPath;
                     job.RemotePath = remotePath;
                     job.IntervalMs = intervalMs;
+                    
+                    // Initialize new properties if they don't exist
+                    if (!job.IsUploadInProgress) job.IsUploadInProgress = false;
+                    if (job.UploadStartTime == null) job.UploadStartTime = null;
                     
                     // Update timer interval if running
                     if (job.Timer != null && job.IsRunning)
@@ -111,7 +117,9 @@ namespace syncer.ui.Services
                     IsRunning = false,
                     LastUploadTime = null,
                     TransferClient = transferClient,
-                    ConnectionSettings = coreSettings
+                    ConnectionSettings = coreSettings,
+                    IsUploadInProgress = false,
+                    UploadStartTime = null
                 };
                 
                 _timerJobs.Add(jobId, newJob);
@@ -286,6 +294,36 @@ namespace syncer.ui.Services
             return _timerJobs[jobId].JobName ?? ("Timer Job " + jobId);
         }
         
+        /// <summary>
+        /// Checks if a timer job is currently performing an upload
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>True if the job is currently uploading</returns>
+        public bool IsTimerJobUploading(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return false;
+            }
+            
+            return _timerJobs[jobId].IsUploadInProgress;
+        }
+        
+        /// <summary>
+        /// Gets the upload start time for a timer job
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>DateTime when the current upload started, or null if not uploading</returns>
+        public DateTime? GetTimerJobUploadStartTime(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return null;
+            }
+            
+            return _timerJobs[jobId].UploadStartTime;
+        }
+        
         public bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs)
         {
             try
@@ -346,6 +384,15 @@ namespace syncer.ui.Services
                 
                 TimerJobInfo job = _timerJobs[jobId];
                 
+                // Prevent overlapping uploads
+                if (job.IsUploadInProgress)
+                {
+                    TimeSpan uploadDuration = DateTime.Now - (job.UploadStartTime ?? DateTime.Now);
+                    _logService.LogWarning(string.Format("Skipping timer cycle for job {0} - previous upload still in progress (running for {1:mm\\:ss})", 
+                        jobId, uploadDuration));
+                    return;
+                }
+                
                 _logService.LogInfo(string.Format("Timer elapsed for job {0} - starting folder upload", jobId));
                 
                 // Get all files in the directory, including any newly added files
@@ -402,15 +449,46 @@ namespace syncer.ui.Services
                     return;
                 }
                 
-                // Perform the upload
-                PerformFolderUpload(job, currentFiles);
+                // Mark upload as in progress and start background upload
+                job.IsUploadInProgress = true;
+                job.UploadStartTime = DateTime.Now;
                 
-                // Update last upload time
-                job.LastUploadTime = DateTime.Now;
+                // Perform the upload asynchronously to prevent blocking the timer
+                System.Threading.ThreadPool.QueueUserWorkItem(state =>
+                {
+                    try
+                    {
+                        PerformFolderUpload(job, currentFiles);
+                        
+                        // Update last upload time
+                        job.LastUploadTime = DateTime.Now;
+                        
+                        TimeSpan totalDuration = DateTime.Now - job.UploadStartTime.Value;
+                        _logService.LogInfo(string.Format("Upload cycle completed for job {0} in {1:mm\\:ss}", 
+                            jobId, totalDuration));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(string.Format("Error in background upload for job {0}: {1}", jobId, ex.Message));
+                    }
+                    finally
+                    {
+                        // Always reset the upload in progress flag
+                        job.IsUploadInProgress = false;
+                        job.UploadStartTime = null;
+                    }
+                });
             }
             catch (Exception ex)
             {
                 _logService.LogError(string.Format("Error in timer job {0}: {1}", jobId, ex.Message));
+                
+                // Ensure we reset the flag even if there's an error
+                if (_timerJobs.ContainsKey(jobId))
+                {
+                    _timerJobs[jobId].IsUploadInProgress = false;
+                    _timerJobs[jobId].UploadStartTime = null;
+                }
             }
         }
         
@@ -432,135 +510,157 @@ namespace syncer.ui.Services
                 // Dictionary to track created remote folders
                 Dictionary<string, bool> createdRemoteFolders = new Dictionary<string, bool>();
                 
-                foreach (string localFile in localFilePaths)
+                // Process files in smaller batches to improve responsiveness
+                const int batchSize = 5; // Process 5 files at a time
+                int totalBatches = (int)Math.Ceiling((double)localFilePaths.Length / batchSize);
+                
+                for (int batchIndex = 0; batchIndex < totalBatches; batchIndex++)
                 {
-                    try
+                    int startIndex = batchIndex * batchSize;
+                    int endIndex = Math.Min(startIndex + batchSize, localFilePaths.Length);
+                    
+                    _logService.LogInfo(string.Format("Processing batch {0}/{1} (files {2}-{3})", 
+                        batchIndex + 1, totalBatches, startIndex + 1, endIndex));
+                    
+                    // Process files in current batch
+                    for (int i = startIndex; i < endIndex; i++)
                     {
-                        // Skip if the file doesn't exist
-                        if (!File.Exists(localFile))
-                        {
-                            _logService.LogWarning(string.Format("File does not exist: {0}", localFile));
-                            skippedFiles++;
-                            continue;
-                        }
+                        string localFile = localFilePaths[i];
                         
-                        // Skip files that are currently being written to or locked
                         try
                         {
-                            using (FileStream stream = File.Open(localFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+                            // Skip if the file doesn't exist
+                            if (!File.Exists(localFile))
                             {
-                                // File is accessible
+                                _logService.LogWarning(string.Format("File does not exist: {0}", localFile));
+                                skippedFiles++;
+                                continue;
                             }
-                        }
-                        catch (IOException)
-                        {
-                            _logService.LogWarning(string.Format("File is locked or being used: {0}", localFile));
-                            skippedFiles++;
-                            continue;
-                        }
-                        
-                        // Calculate relative path from base folder
-                        string relativePath = localFile.Substring(job.FolderPath.Length);
-                        if (relativePath.StartsWith("\\") || relativePath.StartsWith("/"))
-                        {
-                            relativePath = relativePath.Substring(1);
-                        }
-                        
-                        // Fix path separator - ensure remote path uses forward slashes
-                        string normalizedRemotePath = job.RemotePath.Replace('\\', '/');
-                        if (!normalizedRemotePath.EndsWith("/")) normalizedRemotePath += "/";
-                        
-                        // Get the directory structure of the file
-                        string remoteDirectory = Path.GetDirectoryName(relativePath);
-                        
-                        if (!string.IsNullOrEmpty(remoteDirectory))
-                        {
-                            // Replace backslashes with forward slashes
-                            remoteDirectory = remoteDirectory.Replace('\\', '/');
                             
-                            // Create the remote directory structure
-                            string[] pathParts = remoteDirectory.Split('/');
-                            string currentPath = normalizedRemotePath;
-                            
-                            foreach (string part in pathParts)
-                            {
-                                currentPath += part + "/";
-                                
-                                // Check if we've already created this directory
-                                if (!createdRemoteFolders.ContainsKey(currentPath))
-                                {
-                                    // Ensure directory exists (creates it if it doesn't exist)
-                                    string dirError = null;
-                                    if (job.TransferClient.EnsureDirectory(job.ConnectionSettings, currentPath, out dirError))
-                                    {
-                                        _logService.LogInfo(string.Format("Ensured remote directory exists: {0}", currentPath));
-                                        createdRemoteFolders.Add(currentPath, true);
-                                    }
-                                    else
-                                    {
-                                        _logService.LogError(string.Format("Failed to create directory {0}: {1}", 
-                                            currentPath, dirError ?? "Unknown error"));
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Calculate the remote file path
-                        string remoteFile = normalizedRemotePath + relativePath.Replace('\\', '/');
-                        
-                        // Upload the file
-                        string fileName = Path.GetFileName(localFile);
-                        _logService.LogInfo(string.Format("Uploading: {0} -> {1}", localFile, remoteFile));
-                        
-                        FileInfo fileInfo = new FileInfo(localFile);
-                        _logService.LogInfo(string.Format("Local file size: {0} bytes", fileInfo.Length));
-                        
-                        string error = null;
-                        bool success = job.TransferClient.UploadFile(job.ConnectionSettings, localFile, remoteFile, true, out error);
-                        
-                        if (!success)
-                        {
-                            string errorMsg = string.Format("Failed to upload {0}: {1}", 
-                                fileName, error == null ? "Unknown error" : error);
-                            _logService.LogError(errorMsg);
-                            failedUploads++;
-                            
-                            // Don't break here - continue trying to upload other files
-                            // This ensures all files get an attempt even if some fail
-                        }
-                        else
-                        {
-                            _logService.LogInfo(string.Format("Successfully uploaded: {0} ({1} bytes)", fileName, fileInfo.Length));
-                            successfulUploads++;
-                            
-                            // Verify upload by checking if file exists remotely (optional)
+                            // Skip files that are currently being written to or locked
                             try
                             {
-                                bool remoteFileExists = false;
-                                string verifyError = null;
-                                if (job.TransferClient.FileExists(job.ConnectionSettings, remoteFile, out remoteFileExists, out verifyError))
+                                using (FileStream stream = File.Open(localFile, FileMode.Open, FileAccess.Read, FileShare.Read))
                                 {
-                                    if (remoteFileExists)
+                                    // File is accessible
+                                }
+                            }
+                            catch (IOException)
+                            {
+                                _logService.LogWarning(string.Format("File is locked or being used: {0}", localFile));
+                                skippedFiles++;
+                                continue;
+                            }
+                            
+                            // Calculate relative path from base folder
+                            string relativePath = localFile.Substring(job.FolderPath.Length);
+                            if (relativePath.StartsWith("\\") || relativePath.StartsWith("/"))
+                            {
+                                relativePath = relativePath.Substring(1);
+                            }
+                            
+                            // Fix path separator - ensure remote path uses forward slashes
+                            string normalizedRemotePath = job.RemotePath.Replace('\\', '/');
+                            if (!normalizedRemotePath.EndsWith("/")) normalizedRemotePath += "/";
+                            
+                            // Get the directory structure of the file
+                            string remoteDirectory = Path.GetDirectoryName(relativePath);
+                            
+                            if (!string.IsNullOrEmpty(remoteDirectory))
+                            {
+                                // Replace backslashes with forward slashes
+                                remoteDirectory = remoteDirectory.Replace('\\', '/');
+                                
+                                // Create the remote directory structure
+                                string[] pathParts = remoteDirectory.Split('/');
+                                string currentPath = normalizedRemotePath;
+                                
+                                foreach (string part in pathParts)
+                                {
+                                    currentPath += part + "/";
+                                    
+                                    // Check if we've already created this directory
+                                    if (!createdRemoteFolders.ContainsKey(currentPath))
                                     {
-                                        _logService.LogInfo(string.Format("Upload verified: {0} exists on remote server", fileName));
-                                    }
-                                    else
-                                    {
-                                        _logService.LogWarning(string.Format("Upload completed but file not found on remote: {0}", fileName));
+                                        // Ensure directory exists (creates it if it doesn't exist)
+                                        string dirError = null;
+                                        if (job.TransferClient.EnsureDirectory(job.ConnectionSettings, currentPath, out dirError))
+                                        {
+                                            _logService.LogInfo(string.Format("Ensured remote directory exists: {0}", currentPath));
+                                            createdRemoteFolders.Add(currentPath, true);
+                                        }
+                                        else
+                                        {
+                                            _logService.LogError(string.Format("Failed to create directory {0}: {1}", 
+                                                currentPath, dirError ?? "Unknown error"));
+                                            continue;
+                                        }
                                     }
                                 }
                             }
-                            catch (Exception verifyEx)
+                            
+                            // Calculate the remote file path
+                            string remoteFile = normalizedRemotePath + relativePath.Replace('\\', '/');
+                            
+                            // Upload the file
+                            string fileName = Path.GetFileName(localFile);
+                            _logService.LogInfo(string.Format("Uploading: {0} -> {1}", localFile, remoteFile));
+                            
+                            FileInfo fileInfo = new FileInfo(localFile);
+                            _logService.LogInfo(string.Format("Local file size: {0} bytes", fileInfo.Length));
+                            
+                            string error = null;
+                            bool success = job.TransferClient.UploadFile(job.ConnectionSettings, localFile, remoteFile, true, out error);
+                            
+                            if (!success)
                             {
-                                _logService.LogWarning(string.Format("Could not verify upload of {0}: {1}", fileName, verifyEx.Message));
+                                string errorMsg = string.Format("Failed to upload {0}: {1}", 
+                                    fileName, error == null ? "Unknown error" : error);
+                                _logService.LogError(errorMsg);
+                                failedUploads++;
+                                
+                                // Don't break here - continue trying to upload other files
+                                // This ensures all files get an attempt even if some fail
+                            }
+                            else
+                            {
+                                _logService.LogInfo(string.Format("Successfully uploaded: {0} ({1} bytes)", fileName, fileInfo.Length));
+                                successfulUploads++;
+                                
+                                // Verify upload by checking if file exists remotely (optional)
+                                try
+                                {
+                                    bool remoteFileExists = false;
+                                    string verifyError = null;
+                                    if (job.TransferClient.FileExists(job.ConnectionSettings, remoteFile, out remoteFileExists, out verifyError))
+                                    {
+                                        if (remoteFileExists)
+                                        {
+                                            _logService.LogInfo(string.Format("Upload verified: {0} exists on remote server", fileName));
+                                        }
+                                        else
+                                        {
+                                            _logService.LogWarning(string.Format("Upload completed but file not found on remote: {0}", fileName));
+                                        }
+                                    }
+                                }
+                                catch (Exception verifyEx)
+                                {
+                                    _logService.LogWarning(string.Format("Could not verify upload of {0}: {1}", fileName, verifyEx.Message));
+                                }
                             }
                         }
+                        catch (Exception fileEx)
+                        {
+                            _logService.LogError(string.Format("Error uploading file: {0}", fileEx.Message));
+                            failedUploads++;
+                        }
                     }
-                    catch (Exception fileEx)
+                    
+                    // Small delay between batches to prevent overwhelming the server
+                    if (batchIndex < totalBatches - 1) // Don't delay after the last batch
                     {
-                        _logService.LogError(string.Format("Error uploading file: {0}", fileEx.Message));
-                        failedUploads++;
+                        System.Threading.Thread.Sleep(100); // 100ms delay between batches
                     }
                 }
                 

@@ -37,6 +37,9 @@ namespace syncer.ui
         private string[] _selectedFilesForTimer; // Store files selected for timer upload
         private string _selectedFolderForTimer; // Base folder path for relative path calculation
         private string _timerUploadDestination = "/"; // Default destination path
+        private bool _isUploadInProgress = false; // Prevent overlapping uploads
+        private DateTime? _uploadStartTime = null; // Track upload duration
+        private bool _includeSubfoldersForTimer = true; // Include subfolders in timer uploads (default: true)
 
         // Timer-based download functionality
         private System.Timers.Timer _downloadTimer;
@@ -46,6 +49,8 @@ namespace syncer.ui
         private string _selectedRemoteFileForTimer; // Specific remote file for download (if any)
         private string _timerDownloadDestination; // Local destination path for downloads
         private string _currentTransferMode = "Upload"; // "Upload" or "Download"
+        private bool _isDownloadInProgress = false; // Prevent overlapping downloads
+        private DateTime? _downloadStartTime = null; // Track download duration
 
         // Filter controls - simplified filtering (most advanced filtering features removed)
         // private GroupBox gbFilters; // Unused - filtering simplified
@@ -479,6 +484,13 @@ namespace syncer.ui
             // Filtering simplified - advanced filter controls removed
             // All files will be uploaded automatically
             return;
+        }
+
+        private SearchOption GetSearchOption()
+        {
+            // Return search option based on subfolder inclusion checkbox
+            return chkIncludeSubfolders != null && chkIncludeSubfolders.Checked ? 
+                SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
         }
 
         private FilterSettings GetCurrentFilterSettings()
@@ -959,15 +971,15 @@ namespace syncer.ui
         {
             using (FolderBrowserDialog dialog = new FolderBrowserDialog())
             {
-                dialog.Description = "Select local folder for timed uploads (all files will be monitored)";
+                dialog.Description = "Select local folder for timed uploads (subfolder inclusion controlled by checkbox)";
                 dialog.ShowNewFolderButton = true;
                 
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
                     string folderPath = dialog.SelectedPath;
                     
-                    // Get all files in the selected folder (including subfolders)
-                    string[] allFiles = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories);
+                    // Get files based on subfolder inclusion checkbox
+                    string[] allFiles = Directory.GetFiles(folderPath, "*", GetSearchOption());
                     
                     // Apply filters to get realistic count
                     List<string> filteredFiles = new List<string>();
@@ -997,18 +1009,19 @@ namespace syncer.ui
                     if (lblNoFilesSelected != null)
                     {
                         string filterInfo = (currentFilters != null && currentFilters.FiltersEnabled) ? " (filtered)" : "";
+                        string subfolderInfo = chkIncludeSubfolders.Checked ? " + subfolders" : " (top level only)";
                         
                         if (filteredFiles.Count == 0)
                         {
-                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (empty/no matching files - will monitor for new files)" + filterInfo;
+                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (empty/no matching files - will monitor for new files)" + subfolderInfo + filterInfo;
                         }
                         else if (filteredFiles.Count == 1)
                         {
-                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (1 file, including new files added later)" + filterInfo;
+                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (1 file, including new files added later)" + subfolderInfo + filterInfo;
                         }
                         else
                         {
-                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (" + filteredFiles.Count + " files, including new files added later)" + filterInfo;
+                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (" + filteredFiles.Count + " files, including new files added later)" + subfolderInfo + filterInfo;
                         }
                     }
                     
@@ -1545,17 +1558,48 @@ namespace syncer.ui
         {
             try
             {
+                // Prevent overlapping uploads
+                if (_isUploadInProgress)
+                {
+                    TimeSpan uploadDuration = DateTime.Now - (_uploadStartTime ?? DateTime.Now);
+                    ServiceLocator.LogService.LogWarning(string.Format("Skipping upload timer cycle - previous upload still in progress (running for {0:mm\\:ss})", uploadDuration));
+                    return;
+                }
+                
                 ServiceLocator.LogService.LogInfo("Upload timer elapsed - starting automatic upload");
+                
+                // Mark upload as in progress
+                _isUploadInProgress = true;
+                _uploadStartTime = DateTime.Now;
                 
                 // Run upload on UI thread
                 this.Invoke(new Action(() =>
                 {
-                    PerformAutomaticUpload();
+                    try
+                    {
+                        PerformAutomaticUpload();
+                        
+                        TimeSpan totalDuration = DateTime.Now - _uploadStartTime.Value;
+                        ServiceLocator.LogService.LogInfo(string.Format("Upload cycle completed in {0:mm\\:ss}", totalDuration));
+                    }
+                    catch (Exception ex)
+                    {
+                        ServiceLocator.LogService.LogError("Automatic upload error: " + ex.Message);
+                    }
+                    finally
+                    {
+                        // Always reset the upload in progress flag
+                        _isUploadInProgress = false;
+                        _uploadStartTime = null;
+                    }
                 }));
             }
             catch (Exception ex)
             {
                 ServiceLocator.LogService.LogError("Upload timer elapsed error: " + ex.Message);
+                // Ensure we reset the flag even if there's an error
+                _isUploadInProgress = false;
+                _uploadStartTime = null;
             }
         }
 
@@ -1563,17 +1607,48 @@ namespace syncer.ui
         {
             try
             {
+                // Prevent overlapping downloads
+                if (_isDownloadInProgress)
+                {
+                    TimeSpan downloadDuration = DateTime.Now - (_downloadStartTime ?? DateTime.Now);
+                    ServiceLocator.LogService.LogWarning(string.Format("Skipping download timer cycle - previous download still in progress (running for {0:mm\\:ss})", downloadDuration));
+                    return;
+                }
+                
                 ServiceLocator.LogService.LogInfo("Download timer elapsed - starting automatic download");
+                
+                // Mark download as in progress
+                _isDownloadInProgress = true;
+                _downloadStartTime = DateTime.Now;
                 
                 // Run download on UI thread
                 this.Invoke(new Action(() =>
                 {
-                    PerformAutomaticDownload();
+                    try
+                    {
+                        PerformAutomaticDownload();
+                        
+                        TimeSpan totalDuration = DateTime.Now - _downloadStartTime.Value;
+                        ServiceLocator.LogService.LogInfo(string.Format("Download cycle completed in {0:mm\\:ss}", totalDuration));
+                    }
+                    catch (Exception ex)
+                    {
+                        ServiceLocator.LogService.LogError("Automatic download error: " + ex.Message);
+                    }
+                    finally
+                    {
+                        // Always reset the download in progress flag
+                        _isDownloadInProgress = false;
+                        _downloadStartTime = null;
+                    }
                 }));
             }
             catch (Exception ex)
             {
                 ServiceLocator.LogService.LogError("Download timer elapsed error: " + ex.Message);
+                // Ensure we reset the flag even if there's an error
+                _isDownloadInProgress = false;
+                _downloadStartTime = null;
             }
         }
 
@@ -1587,8 +1662,8 @@ namespace syncer.ui
                     return;
                 }
                 
-                // Get all files in the directory, including any newly added files
-                string[] allFiles = Directory.GetFiles(_selectedFolderForTimer, "*", SearchOption.AllDirectories);
+                // Get files based on subfolder inclusion checkbox setting
+                string[] allFiles = Directory.GetFiles(_selectedFolderForTimer, "*", GetSearchOption());
                 
                 // Apply filters if they are configured
                 List<string> filteredFiles = new List<string>();

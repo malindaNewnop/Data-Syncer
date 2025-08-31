@@ -121,5 +121,19 @@ namespace syncer.ui.Interfaces
         /// </summary>
         /// <returns>Dictionary with job IDs as keys and job info as values</returns>
         Dictionary<long, object> GetAllJobs();
+        
+        /// <summary>
+        /// Checks if a timer job is currently performing an upload
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>True if the job is currently uploading</returns>
+        bool IsTimerJobUploading(long jobId);
+        
+        /// <summary>
+        /// Gets the upload start time for a timer job
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>DateTime when the current upload started, or null if not uploading</returns>
+        DateTime? GetTimerJobUploadStartTime(long jobId);
     }
 }

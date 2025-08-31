@@ -197,15 +197,13 @@ namespace syncer.ui.Forms
             this.gbGeneration.TabStop = false;
             this.gbGeneration.Text = "Key Generation";
             
-            // btnGenerate
-            this.btnGenerate.BackColor = System.Drawing.Color.LightGreen;
-            this.btnGenerate.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            // btnGenerate            this.btnGenerate.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnGenerate.Location = new System.Drawing.Point(15, 25);
             this.btnGenerate.Name = "btnGenerate";
             this.btnGenerate.Size = new System.Drawing.Size(120, 30);
             this.btnGenerate.TabIndex = 1;
             this.btnGenerate.Text = "Generate Key Pair";
-            this.btnGenerate.UseVisualStyleBackColor = false;
+            this.btnGenerate.UseVisualStyleBackColor = true;
             this.btnGenerate.Click += new System.EventHandler(this.btnGenerate_Click);
             
             // progressBar
@@ -216,14 +214,12 @@ namespace syncer.ui.Forms
             this.progressBar.TabIndex = 2;
             this.progressBar.Visible = false;
             
-            // btnCopyPublicKey
-            this.btnCopyPublicKey.BackColor = System.Drawing.Color.LightBlue;
-            this.btnCopyPublicKey.Location = new System.Drawing.Point(355, 25);
+            // btnCopyPublicKey            this.btnCopyPublicKey.Location = new System.Drawing.Point(355, 25);
             this.btnCopyPublicKey.Name = "btnCopyPublicKey";
             this.btnCopyPublicKey.Size = new System.Drawing.Size(95, 30);
             this.btnCopyPublicKey.TabIndex = 3;
             this.btnCopyPublicKey.Text = "Copy Public Key";
-            this.btnCopyPublicKey.UseVisualStyleBackColor = false;
+            this.btnCopyPublicKey.UseVisualStyleBackColor = true;
             this.btnCopyPublicKey.Click += new System.EventHandler(this.btnCopyPublicKey_Click);
             
             // txtOutput
@@ -235,27 +231,23 @@ namespace syncer.ui.Forms
             this.txtOutput.Size = new System.Drawing.Size(435, 105);
             this.txtOutput.TabIndex = 4;
             
-            // btnOK
-            this.btnOK.BackColor = System.Drawing.Color.LightGreen;
-            this.btnOK.Enabled = false;
+            // btnOK            this.btnOK.Enabled = false;
             this.btnOK.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnOK.Location = new System.Drawing.Point(300, 420);
             this.btnOK.Name = "btnOK";
             this.btnOK.Size = new System.Drawing.Size(80, 30);
             this.btnOK.TabIndex = 3;
             this.btnOK.Text = "OK";
-            this.btnOK.UseVisualStyleBackColor = false;
+            this.btnOK.UseVisualStyleBackColor = true;
             this.btnOK.Click += new System.EventHandler(this.btnOK_Click);
             
-            // btnCancel
-            this.btnCancel.BackColor = System.Drawing.Color.LightCoral;
-            this.btnCancel.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            // btnCancel            this.btnCancel.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnCancel.Location = new System.Drawing.Point(390, 420);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(80, 30);
             this.btnCancel.TabIndex = 4;
             this.btnCancel.Text = "Cancel";
-            this.btnCancel.UseVisualStyleBackColor = false;
+            this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
             
             // FormKeyGeneration

@@ -698,10 +698,36 @@ namespace syncer.ui
                     row.Cells["RemotePath"].Value = remotePath;
                     row.Cells["Interval"].Value = interval;
                     row.Cells["LastUpload"].Value = lastUpload.HasValue ? lastUpload.Value.ToString("yyyy-MM-dd HH:mm:ss") : "Never";
-                    row.Cells["Status"].Value = isRunning ? "Running" : "Stopped";
+                    
+                    // Check if currently uploading
+                    bool isUploading = timerJobManager.IsTimerJobUploading(jobId);
+                    DateTime? uploadStartTime = timerJobManager.GetTimerJobUploadStartTime(jobId);
+                    
+                    string status = "Stopped";
+                    if (isRunning)
+                    {
+                        if (isUploading && uploadStartTime.HasValue)
+                        {
+                            TimeSpan uploadDuration = DateTime.Now - uploadStartTime.Value;
+                            status = string.Format("Uploading ({0:mm\\:ss})", uploadDuration);
+                        }
+                        else
+                        {
+                            status = "Running";
+                        }
+                    }
+                    
+                    row.Cells["Status"].Value = status;
                     
                     // Set row color based on status
-                    row.DefaultCellStyle.BackColor = isRunning ? Color.LightGreen : Color.LightGray;
+                    if (isUploading)
+                    {
+                        row.DefaultCellStyle.BackColor = Color.LightBlue; // Blue for uploading
+                    }
+                    else
+                    {
+                        row.DefaultCellStyle.BackColor = isRunning ? Color.LightGreen : Color.LightGray;
+                    }
                 }
             }
             catch (Exception ex)

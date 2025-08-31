@@ -303,39 +303,33 @@ namespace syncer.ui
             this.btnBrowseSSHKey.Click += new System.EventHandler(this.btnBrowseSSHKey_Click);
             // 
             // btnTestConnection
-            // 
-            this.btnTestConnection.BackColor = System.Drawing.Color.LightBlue;
-            this.btnTestConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            //            this.btnTestConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnTestConnection.Location = new System.Drawing.Point(30, 330);
             this.btnTestConnection.Name = "btnTestConnection";
             this.btnTestConnection.Size = new System.Drawing.Size(100, 35);
             this.btnTestConnection.TabIndex = 17;
             this.btnTestConnection.Text = "Test";
-            this.btnTestConnection.UseVisualStyleBackColor = false;
+            this.btnTestConnection.UseVisualStyleBackColor = true;
             this.btnTestConnection.Click += new System.EventHandler(this.btnTestConnection_Click);
             // 
             // btnSaveConnection
-            // 
-            this.btnSaveConnection.BackColor = System.Drawing.Color.LightGreen;
-            this.btnSaveConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            //            this.btnSaveConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnSaveConnection.Location = new System.Drawing.Point(150, 330);
             this.btnSaveConnection.Name = "btnSaveConnection";
             this.btnSaveConnection.Size = new System.Drawing.Size(100, 35);
             this.btnSaveConnection.TabIndex = 18;
             this.btnSaveConnection.Text = "Save";
-            this.btnSaveConnection.UseVisualStyleBackColor = false;
+            this.btnSaveConnection.UseVisualStyleBackColor = true;
             this.btnSaveConnection.Click += new System.EventHandler(this.btnSaveConnection_Click);
             // 
             // btnLoadConnection
-            // 
-            this.btnLoadConnection.BackColor = System.Drawing.Color.LightYellow;
-            this.btnLoadConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            //            this.btnLoadConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnLoadConnection.Location = new System.Drawing.Point(270, 330);
             this.btnLoadConnection.Name = "btnLoadConnection";
             this.btnLoadConnection.Size = new System.Drawing.Size(100, 35);
             this.btnLoadConnection.TabIndex = 20;
             this.btnLoadConnection.Text = "Load Config";
-            this.btnLoadConnection.UseVisualStyleBackColor = false;
+            this.btnLoadConnection.UseVisualStyleBackColor = true;
             this.btnLoadConnection.Click += new System.EventHandler(this.btnLoadConnection_Click);
             // 
             // btnManageConnections
@@ -427,27 +421,23 @@ namespace syncer.ui
             0});
             // 
             // btnSave
-            // 
-            this.btnSave.BackColor = System.Drawing.Color.LightGreen;
-            this.btnSave.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold);
+            //            this.btnSave.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold);
             this.btnSave.Location = new System.Drawing.Point(616, 391);
             this.btnSave.Name = "btnSave";
             this.btnSave.Size = new System.Drawing.Size(90, 35);
             this.btnSave.TabIndex = 12;
             this.btnSave.Text = "Save";
-            this.btnSave.UseVisualStyleBackColor = false;
+            this.btnSave.UseVisualStyleBackColor = true;
             this.btnSave.Click += new System.EventHandler(this.btnSave_Click);
             // 
             // btnCancel
-            // 
-            this.btnCancel.BackColor = System.Drawing.Color.LightCoral;
-            this.btnCancel.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold);
+            //            this.btnCancel.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold);
             this.btnCancel.Location = new System.Drawing.Point(739, 391);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(90, 35);
             this.btnCancel.TabIndex = 13;
             this.btnCancel.Text = "Cancel";
-            this.btnCancel.UseVisualStyleBackColor = false;
+            this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
             // 
             // FormConnection
