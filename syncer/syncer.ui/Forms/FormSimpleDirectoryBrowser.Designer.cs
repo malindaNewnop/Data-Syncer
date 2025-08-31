@@ -1,6 +1,6 @@
 namespace syncer.ui.Forms
 {
-    partial class FormRemoteDirectoryBrowser
+    partial class FormSimpleDirectoryBrowser
     {
         /// <summary>
         /// Required designer variable.
@@ -30,13 +30,13 @@ namespace syncer.ui.Forms
         {
             this.SuspendLayout();
             // 
-            // FormRemoteDirectoryBrowser
+            // FormSimpleDirectoryBrowser
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1000, 700);
-            this.Name = "FormRemoteDirectoryBrowser";
-            this.Text = "File Manager";
+            this.ClientSize = new System.Drawing.Size(800, 600);
+            this.Name = "FormSimpleDirectoryBrowser";
+            this.Text = "Directory Browser";
             this.ResumeLayout(false);
         }
 

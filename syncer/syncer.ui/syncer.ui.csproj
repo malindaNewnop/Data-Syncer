@@ -116,12 +116,12 @@
     <Compile Include="Forms\FormComprehensiveConnection.Designer.cs">
       <DependentUpon>FormComprehensiveConnection.cs</DependentUpon>
     </Compile>
-    <!-- FileZilla-like File Manager -->
-    <Compile Include="Forms\FormRemoteDirectoryBrowser.cs">
+    <!-- Simple Directory Browser -->
+    <Compile Include="Forms\FormSimpleDirectoryBrowser.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Forms\FormRemoteDirectoryBrowser.Designer.cs">
-      <DependentUpon>FormRemoteDirectoryBrowser.cs</DependentUpon>
+    <Compile Include="Forms\FormSimpleDirectoryBrowser.Designer.cs">
+      <DependentUpon>FormSimpleDirectoryBrowser.cs</DependentUpon>
     </Compile>
     <!-- Job Configuration Forms -->
     <Compile Include="Forms\FormSaveJobConfiguration.cs">

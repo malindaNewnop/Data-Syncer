@@ -572,5 +572,42 @@ namespace syncer.ui.Services
                 _logService.LogError(string.Format("Error in folder upload for job {0}: {1}", job.JobId, ex.Message));
             }
         }
+        
+        public Dictionary<long, object> GetRunningJobs()
+        {
+            var runningJobs = new Dictionary<long, object>();
+            try
+            {
+                foreach (var kvp in _timerJobs)
+                {
+                    if (kvp.Value.IsRunning)
+                    {
+                        runningJobs.Add(kvp.Key, kvp.Value);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(string.Format("Error getting running jobs: {0}", ex.Message));
+            }
+            return runningJobs;
+        }
+        
+        public Dictionary<long, object> GetAllJobs()
+        {
+            var allJobs = new Dictionary<long, object>();
+            try
+            {
+                foreach (var kvp in _timerJobs)
+                {
+                    allJobs.Add(kvp.Key, kvp.Value);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(string.Format("Error getting all jobs: {0}", ex.Message));
+            }
+            return allJobs;
+        }
     }
 }

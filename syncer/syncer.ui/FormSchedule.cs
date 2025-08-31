@@ -43,6 +43,7 @@ namespace syncer.ui
         private bool _isDownloadTimerRunning = false;
         private DateTime _lastDownloadTime;
         private string _selectedRemoteFolderForTimer; // Remote folder path for download monitoring
+        private string _selectedRemoteFileForTimer; // Specific remote file for download (if any)
         private string _timerDownloadDestination; // Local destination path for downloads
         private string _currentTransferMode = "Upload"; // "Upload" or "Download"
 
@@ -936,13 +937,21 @@ namespace syncer.ui
 
         private void btnBrowseFilesForTimer_Click(object sender, EventArgs e)
         {
+            ServiceLocator.LogService.LogInfo($"Browse button clicked - Current transfer mode: {_currentTransferMode}");
+            
             if (_currentTransferMode == "Upload")
             {
+                ServiceLocator.LogService.LogInfo("Routing to local folder browser for upload mode");
                 BrowseLocalFolderForUpload();
             }
             else if (_currentTransferMode == "Download")
             {
-                BrowseRemoteFolderForDownload();
+                ServiceLocator.LogService.LogInfo("Routing to remote file browser for download mode");
+                BrowseRemoteFolderForDownloadImproved();
+            }
+            else
+            {
+                ServiceLocator.LogService.LogWarning($"Unknown transfer mode: {_currentTransferMode}");
             }
         }
 
@@ -1017,29 +1026,81 @@ namespace syncer.ui
 
         private void BrowseRemoteFolderForDownload()
         {
-            if (!ValidateConnection()) return;
+            ServiceLocator.LogService.LogInfo("BrowseRemoteFolderForDownload method called");
+            
+            // Debug connection settings
+            ServiceLocator.LogService.LogInfo($"Connection settings null? {_coreConnectionSettings == null}");
+            if (_coreConnectionSettings != null)
+            {
+                ServiceLocator.LogService.LogInfo($"Protocol: {_coreConnectionSettings.Protocol}");
+            }
+            
+            // Debug connection service
+            ServiceLocator.LogService.LogInfo($"Connection service null? {_connectionService == null}");
+            if (_connectionService != null)
+            {
+                ServiceLocator.LogService.LogInfo($"Is connected: {_connectionService.IsConnected()}");
+            }
+            
+            // Debug transfer client
+            ServiceLocator.LogService.LogInfo($"Transfer client null? {_currentTransferClient == null}");
+            
+            if (!ValidateConnection()) 
+            {
+                ServiceLocator.LogService.LogWarning("Connection validation failed in BrowseRemoteFolderForDownload");
+                return;
+            }
 
             try
             {
-                using (FormRemoteDirectoryBrowser remoteBrowser = new FormRemoteDirectoryBrowser(_coreConnectionSettings))
+                ServiceLocator.LogService.LogInfo("Creating FormSimpleDirectoryBrowser for remote browsing");
+                using (FormSimpleDirectoryBrowser remoteBrowser = new FormSimpleDirectoryBrowser(_coreConnectionSettings))
                 {
-                    remoteBrowser.Text = "Select Remote Folder for Download Timer";
-                    remoteBrowser.IsUploadMode = false;
+                    remoteBrowser.Text = "Select Remote Files/Folder for Download Timer";
+                    remoteBrowser.IsRemoteMode = true;
+                    remoteBrowser.IsDownloadMode = true; // Enable file selection for download mode
+                    remoteBrowser.AllowFileSelection = true; // Allow file selection
+                    
+                    ServiceLocator.LogService.LogInfo($"Remote browser configured - IsRemoteMode: {remoteBrowser.IsRemoteMode}, IsDownloadMode: {remoteBrowser.IsDownloadMode}, AllowFileSelection: {remoteBrowser.AllowFileSelection}");
                     
                     if (remoteBrowser.ShowDialog() == DialogResult.OK)
                     {
-                        if (!string.IsNullOrEmpty(remoteBrowser.SelectedRemotePath))
+                        if (!string.IsNullOrEmpty(remoteBrowser.SelectedPath))
                         {
-                            // Store the selected remote folder
-                            _selectedRemoteFolderForTimer = remoteBrowser.SelectedRemotePath;
-                            
-                            // Update the label to show selected remote folder
-                            if (lblNoFilesSelected != null)
+                            // Check if a specific file was selected
+                            if (remoteBrowser.IsFileSelected && !string.IsNullOrEmpty(remoteBrowser.SelectedFileName))
                             {
-                                lblNoFilesSelected.Text = "Remote: " + Path.GetFileName(_selectedRemoteFolderForTimer) + " (will monitor for new files)";
+                                // Store the selected remote file information
+                                _selectedRemoteFolderForTimer = remoteBrowser.SelectedPath;
+                                _selectedRemoteFileForTimer = remoteBrowser.SelectedFileName;
+                                string selectedFilePath = _selectedRemoteFolderForTimer.EndsWith("/") ? 
+                                    _selectedRemoteFolderForTimer + remoteBrowser.SelectedFileName : 
+                                    _selectedRemoteFolderForTimer + "/" + remoteBrowser.SelectedFileName;
+                                
+                                // Update the label to show selected remote file
+                                if (lblNoFilesSelected != null)
+                                {
+                                    lblNoFilesSelected.Text = "Remote File: " + remoteBrowser.SelectedFileName + 
+                                        " (will download periodically)";
+                                }
+                                
+                                ServiceLocator.LogService.LogInfo($"Selected remote file '{selectedFilePath}' for timer download");
                             }
-                            
-                            ServiceLocator.LogService.LogInfo($"Selected remote folder '{_selectedRemoteFolderForTimer}' for timer download");
+                            else
+                            {
+                                // Store the selected remote folder (existing behavior)
+                                _selectedRemoteFolderForTimer = remoteBrowser.SelectedPath;
+                                _selectedRemoteFileForTimer = null; // Clear any previously selected file
+                                
+                                // Update the label to show selected remote folder
+                                if (lblNoFilesSelected != null)
+                                {
+                                    lblNoFilesSelected.Text = "Remote Folder: " + System.IO.Path.GetFileName(_selectedRemoteFolderForTimer) + 
+                                        " (will monitor for new files)";
+                                }
+                                
+                                ServiceLocator.LogService.LogInfo($"Selected remote folder '{_selectedRemoteFolderForTimer}' for timer download");
+                            }
                             
                             // Ask for local download destination
                             AskForTimerDownloadDestination();
@@ -1049,9 +1110,136 @@ namespace syncer.ui
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error opening remote folder browser: " + ex.Message, "Error",
+                MessageBox.Show("Error opening remote file browser: " + ex.Message, "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService.LogError("Error browsing remote folder: " + ex.Message);
+                ServiceLocator.LogService.LogError("Error browsing remote files: " + ex.Message);
+            }
+        }
+
+        private void BrowseRemoteFolderForDownloadImproved()
+        {
+            ServiceLocator.LogService.LogInfo("BrowseRemoteFolderForDownloadImproved started");
+            
+            // Check if connection settings exist
+            if (_coreConnectionSettings == null)
+            {
+                MessageBox.Show("No connection settings available. Please configure connection settings first.", 
+                    "Connection Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // For local protocol, redirect to local browser
+            if (_coreConnectionSettings.Protocol == syncer.core.ProtocolType.Local)
+            {
+                ServiceLocator.LogService.LogInfo("Local protocol detected, using local folder browser");
+                BrowseLocalFolderForUpload(); // Use same logic but for download destination
+                return;
+            }
+
+            // Attempt to connect if not already connected
+            if (!_connectionService.IsConnected())
+            {
+                ServiceLocator.LogService.LogInfo("Not connected, attempting to test connection");
+                try
+                {
+                    // Try to test connection using the current connection settings
+                    // Get UI connection settings since TestConnection expects UI ConnectionSettings
+                    var uiConnectionSettings = _connectionService.GetConnectionSettings();
+                    if (_connectionService.TestConnection(uiConnectionSettings))
+                    {
+                        ServiceLocator.LogService.LogInfo("Connection test successful");
+                        
+                        // Initialize transfer client after successful connection test
+                        UpdateTransferClient();
+                        
+                        if (_currentTransferClient == null)
+                        {
+                            ServiceLocator.LogService.LogError("Failed to initialize transfer client after connection test");
+                            MessageBox.Show("Failed to initialize transfer client.", "Error", 
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        ServiceLocator.LogService.LogError("Connection test failed");
+                        MessageBox.Show("Could not connect to remote server. Please check your connection settings.", 
+                            "Connection Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ServiceLocator.LogService.LogError($"Exception during connection test: {ex.Message}");
+                    MessageBox.Show($"Error testing connection: {ex.Message}", "Connection Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+            }
+
+            // Now proceed with remote browsing
+            try
+            {
+                ServiceLocator.LogService.LogInfo("Opening remote file browser");
+                using (FormSimpleDirectoryBrowser remoteBrowser = new FormSimpleDirectoryBrowser(_coreConnectionSettings))
+                {
+                    remoteBrowser.Text = "Select Remote Files/Folder for Download Timer";
+                    remoteBrowser.IsRemoteMode = true;
+                    remoteBrowser.IsDownloadMode = true; // Enable file selection for download mode
+                    remoteBrowser.AllowFileSelection = true; // Allow file selection
+                    
+                    ServiceLocator.LogService.LogInfo($"Remote browser configured - IsRemoteMode: {remoteBrowser.IsRemoteMode}, IsDownloadMode: {remoteBrowser.IsDownloadMode}, AllowFileSelection: {remoteBrowser.AllowFileSelection}");
+                    
+                    if (remoteBrowser.ShowDialog() == DialogResult.OK)
+                    {
+                        if (!string.IsNullOrEmpty(remoteBrowser.SelectedPath))
+                        {
+                            // Check if a specific file was selected
+                            if (remoteBrowser.IsFileSelected && !string.IsNullOrEmpty(remoteBrowser.SelectedFileName))
+                            {
+                                // Store the selected remote file information
+                                _selectedRemoteFolderForTimer = remoteBrowser.SelectedPath;
+                                _selectedRemoteFileForTimer = remoteBrowser.SelectedFileName;
+                                string selectedFilePath = _selectedRemoteFolderForTimer.EndsWith("/") ? 
+                                    _selectedRemoteFolderForTimer + remoteBrowser.SelectedFileName : 
+                                    _selectedRemoteFolderForTimer + "/" + remoteBrowser.SelectedFileName;
+                                
+                                // Update the label to show selected remote file
+                                if (lblNoFilesSelected != null)
+                                {
+                                    lblNoFilesSelected.Text = "Remote File: " + remoteBrowser.SelectedFileName + 
+                                        " (will download periodically)";
+                                }
+                                
+                                ServiceLocator.LogService.LogInfo($"Selected remote file '{selectedFilePath}' for timer download");
+                            }
+                            else
+                            {
+                                // Store the selected remote folder (existing behavior)
+                                _selectedRemoteFolderForTimer = remoteBrowser.SelectedPath;
+                                _selectedRemoteFileForTimer = null; // Clear any previously selected file
+                                
+                                // Update the label to show selected remote folder
+                                if (lblNoFilesSelected != null)
+                                {
+                                    lblNoFilesSelected.Text = "Remote Folder: " + System.IO.Path.GetFileName(_selectedRemoteFolderForTimer) + 
+                                        " (will monitor for new files)";
+                                }
+                                
+                                ServiceLocator.LogService.LogInfo($"Selected remote folder '{_selectedRemoteFolderForTimer}' for timer download");
+                            }
+                            
+                            // Ask for local download destination
+                            AskForTimerDownloadDestination();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening remote file browser: " + ex.Message, "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error browsing remote files: " + ex.Message);
             }
         }
 
@@ -1463,8 +1651,90 @@ namespace syncer.ui
                     return;
                 }
                 
-                ServiceLocator.LogService.LogInfo($"Starting automatic download from remote folder '{_selectedRemoteFolderForTimer}' to local folder '{_timerDownloadDestination}'");
+                ServiceLocator.LogService.LogInfo($"Starting automatic download from remote location '{_selectedRemoteFolderForTimer}' to local folder '{_timerDownloadDestination}'");
                 
+                // Check if we're monitoring a specific file
+                bool isSpecificFile = !string.IsNullOrEmpty(_selectedRemoteFileForTimer) ||
+                    (lblNoFilesSelected != null && lblNoFilesSelected.Text.StartsWith("Remote File:"));
+                
+                if (isSpecificFile)
+                {
+                    // Download specific file
+                    PerformSpecificFileDownload();
+                }
+                else
+                {
+                    // Monitor and download from folder
+                    PerformFolderMonitoringDownload();
+                }
+                
+                // Update last download time
+                _lastDownloadTime = DateTime.Now;
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Automatic download error: " + ex.Message);
+            }
+        }
+        
+        private void PerformSpecificFileDownload()
+        {
+            try
+            {
+                // Use stored filename if available, otherwise extract from label
+                string fileName = _selectedRemoteFileForTimer;
+                
+                if (string.IsNullOrEmpty(fileName) && lblNoFilesSelected != null && lblNoFilesSelected.Text.StartsWith("Remote File:"))
+                {
+                    // Extract filename from label: "Remote File: filename.ext (will download periodically)"
+                    string labelText = lblNoFilesSelected.Text;
+                    int start = labelText.IndexOf(": ") + 2;
+                    int end = labelText.IndexOf(" (will download");
+                    if (start > 1 && end > start)
+                    {
+                        fileName = labelText.Substring(start, end - start);
+                    }
+                }
+                
+                if (string.IsNullOrEmpty(fileName))
+                {
+                    ServiceLocator.LogService.LogError("Could not determine specific file name for download");
+                    return;
+                }
+                
+                // Construct full remote file path
+                string remoteFilePath = _selectedRemoteFolderForTimer.EndsWith("/") ? 
+                    _selectedRemoteFolderForTimer + fileName : 
+                    _selectedRemoteFolderForTimer + "/" + fileName;
+                
+                // Construct local file path
+                string localFilePath = Path.Combine(_timerDownloadDestination, fileName);
+                
+                ServiceLocator.LogService.LogInfo($"Downloading specific file '{remoteFilePath}' to '{localFilePath}'");
+                
+                // Download the specific file
+                string error;
+                bool success = _currentTransferClient.DownloadFile(_coreConnectionSettings, remoteFilePath, localFilePath, false, out error);
+                
+                if (success)
+                {
+                    ServiceLocator.LogService.LogInfo($"Successfully downloaded file '{fileName}'");
+                }
+                else
+                {
+                    ServiceLocator.LogService.LogError($"Failed to download file '{fileName}': {error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError($"Error downloading specific file: {ex.Message}");
+            }
+        }
+        
+        private void PerformFolderMonitoringDownload()
+        {
+            try
+            {
                 // Get list of files from remote directory
                 List<string> remoteFiles;
                 string error;
@@ -1486,13 +1756,10 @@ namespace syncer.ui
                 
                 // Download all files
                 PerformFolderDownload(remoteFiles.ToArray(), _selectedRemoteFolderForTimer, _timerDownloadDestination);
-                
-                // Update last download time
-                _lastDownloadTime = DateTime.Now;
             }
             catch (Exception ex)
             {
-                ServiceLocator.LogService.LogError("Automatic download error: " + ex.Message);
+                ServiceLocator.LogService.LogError($"Error in folder monitoring download: {ex.Message}");
             }
         }
 
@@ -2004,7 +2271,7 @@ namespace syncer.ui
             // Open file manager in download mode
             try
             {
-                using (FormRemoteDirectoryBrowser fileManager = new FormRemoteDirectoryBrowser(_coreConnectionSettings))
+                using (FormSimpleDirectoryBrowser fileManager = new FormSimpleDirectoryBrowser(_coreConnectionSettings))
                 {
                     fileManager.IsUploadMode = false;
                     fileManager.Text = "Download Files from Remote Server";
@@ -2041,7 +2308,7 @@ namespace syncer.ui
 
             try
             {
-                using (FormRemoteDirectoryBrowser fileManager = new FormRemoteDirectoryBrowser(_coreConnectionSettings))
+                using (FormSimpleDirectoryBrowser fileManager = new FormSimpleDirectoryBrowser(_coreConnectionSettings))
                 {
                     fileManager.Text = "FileZilla-like File Manager";
                     fileManager.ShowDialog();

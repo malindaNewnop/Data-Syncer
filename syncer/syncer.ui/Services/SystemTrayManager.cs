@@ -307,6 +307,15 @@ namespace syncer.ui.Services
             
             _contextMenu.MenuItems.Add(new MenuItem("-")); // Separator
             
+            // Job control (new functionality)
+            MenuItem jobControlItem = new MenuItem("Job Control");
+            jobControlItem.MenuItems.Add(new MenuItem("Stop All Running Jobs", OnStopAllJobsClicked));
+            jobControlItem.MenuItems.Add(new MenuItem("Resume All Jobs", OnResumeAllJobsClicked));
+            jobControlItem.MenuItems.Add(new MenuItem("Show Running Jobs", OnShowRunningJobsClicked));
+            _contextMenu.MenuItems.Add(jobControlItem);
+            
+            _contextMenu.MenuItems.Add(new MenuItem("-")); // Separator
+            
             // Quick actions
             MenuItem actionsItem = new MenuItem("Quick Actions");
             actionsItem.MenuItems.Add(new MenuItem("View Logs", OnViewLogsClicked));
@@ -763,6 +772,127 @@ namespace syncer.ui.Services
                 ShowNotification("Service Error", "Error restarting service: " + ex.Message, ToolTipIcon.Error);
                 if (_logService != null)
                     _logService.LogError("Failed to restart service from tray: " + ex.Message, "UI");
+            }
+        }
+
+        #endregion
+
+        #region Job Control Event Handlers
+
+        private void OnStopAllJobsClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager != null)
+                {
+                    int stoppedCount = 0;
+                    var runningJobs = timerJobManager.GetRunningJobs();
+                    
+                    foreach (var jobId in runningJobs.Keys)
+                    {
+                        if (timerJobManager.StopTimerJob(jobId))
+                        {
+                            stoppedCount++;
+                        }
+                    }
+                    
+                    if (stoppedCount > 0)
+                    {
+                        ShowNotification("Jobs Stopped", 
+                            $"{stoppedCount} running job(s) have been stopped", ToolTipIcon.Warning);
+                        if (_logService != null)
+                            _logService.LogInfo($"Stopped {stoppedCount} jobs from system tray", "UI");
+                    }
+                    else
+                    {
+                        ShowNotification("No Jobs Running", "No running jobs to stop", ToolTipIcon.Info);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowNotification("Job Control Error", "Error stopping jobs: " + ex.Message, ToolTipIcon.Error);
+                if (_logService != null)
+                    _logService.LogError("Failed to stop jobs from tray: " + ex.Message, "UI");
+            }
+        }
+
+        private void OnResumeAllJobsClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager != null)
+                {
+                    int resumedCount = 0;
+                    var allJobs = timerJobManager.GetAllJobs();
+                    
+                    foreach (var jobId in allJobs.Keys)
+                    {
+                        if (!timerJobManager.IsTimerJobRunning(jobId))
+                        {
+                            if (timerJobManager.StartTimerJob(jobId))
+                            {
+                                resumedCount++;
+                            }
+                        }
+                    }
+                    
+                    if (resumedCount > 0)
+                    {
+                        ShowNotification("Jobs Resumed", 
+                            $"{resumedCount} job(s) have been resumed", ToolTipIcon.Info);
+                        if (_logService != null)
+                            _logService.LogInfo($"Resumed {resumedCount} jobs from system tray", "UI");
+                    }
+                    else
+                    {
+                        ShowNotification("All Jobs Running", "All jobs are already running", ToolTipIcon.Info);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowNotification("Job Control Error", "Error resuming jobs: " + ex.Message, ToolTipIcon.Error);
+                if (_logService != null)
+                    _logService.LogError("Failed to resume jobs from tray: " + ex.Message, "UI");
+            }
+        }
+
+        private void OnShowRunningJobsClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager != null)
+                {
+                    var runningJobs = timerJobManager.GetRunningJobs();
+                    
+                    if (runningJobs.Count > 0)
+                    {
+                        string jobList = "";
+                        foreach (var job in runningJobs)
+                        {
+                            string jobName = timerJobManager.GetTimerJobName(job.Key);
+                            jobList += "• " + (jobName ?? "Job " + job.Key) + "\n";
+                        }
+                        
+                        MessageBox.Show($"Currently Running Jobs ({runningJobs.Count}):\n\n{jobList}", 
+                            "Running Jobs", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("No jobs are currently running.", 
+                            "Running Jobs", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowNotification("Job Control Error", "Error retrieving running jobs: " + ex.Message, ToolTipIcon.Error);
+                if (_logService != null)
+                    _logService.LogError("Failed to show running jobs from tray: " + ex.Message, "UI");
             }
         }
 

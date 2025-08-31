@@ -197,7 +197,7 @@ namespace syncer.ui
             this.btnAddJob.Text = "Add Timer Job";
             this.btnAddJob.UseVisualStyleBackColor = false;
             this.btnAddJob.Click += new System.EventHandler(this.btnAddJob_Click);
-            // btnStartStop
+            // btnStartStop - Hidden (service auto-starts with jobs)
             this.btnStartStop.BackColor = System.Drawing.Color.LightGreen;
             this.btnStartStop.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.btnStartStop.Location = new System.Drawing.Point(150, 19);
@@ -206,12 +206,13 @@ namespace syncer.ui
             this.btnStartStop.TabIndex = 3;
             this.btnStartStop.Text = "Start Service";
             this.btnStartStop.UseVisualStyleBackColor = false;
+            this.btnStartStop.Visible = false; // Hide the button
             this.btnStartStop.Click += new System.EventHandler(this.btnStartStop_Click);
             
-            // btnSaveCurrentConfig
+            // btnSaveCurrentConfig - Adjusted position since btnStartStop is hidden
             this.btnSaveCurrentConfig.BackColor = System.Drawing.Color.LightSalmon;
             this.btnSaveCurrentConfig.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.btnSaveCurrentConfig.Location = new System.Drawing.Point(285, 19);
+            this.btnSaveCurrentConfig.Location = new System.Drawing.Point(150, 19);
             this.btnSaveCurrentConfig.Name = "btnSaveCurrentConfig";
             this.btnSaveCurrentConfig.Size = new System.Drawing.Size(150, 35);
             this.btnSaveCurrentConfig.TabIndex = 4;
@@ -219,10 +220,10 @@ namespace syncer.ui
             this.btnSaveCurrentConfig.UseVisualStyleBackColor = false;
             this.btnSaveCurrentConfig.Click += new System.EventHandler(this.btnSaveCurrentConfig_Click);
             
-            // btnLoadConfiguration
+            // btnLoadConfiguration - Adjusted position
             this.btnLoadConfiguration.BackColor = System.Drawing.Color.LightYellow;
             this.btnLoadConfiguration.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.btnLoadConfiguration.Location = new System.Drawing.Point(450, 19);
+            this.btnLoadConfiguration.Location = new System.Drawing.Point(315, 19);
             this.btnLoadConfiguration.Name = "btnLoadConfiguration";
             this.btnLoadConfiguration.Size = new System.Drawing.Size(150, 35);
             this.btnLoadConfiguration.TabIndex = 5;
@@ -250,7 +251,6 @@ namespace syncer.ui
             this.gbControls.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
             | System.Windows.Forms.AnchorStyles.Right)));
             this.gbControls.Controls.Add(this.btnAddJob);
-            this.gbControls.Controls.Add(this.btnStartStop);
             this.gbControls.Controls.Add(this.btnSaveCurrentConfig);
             this.gbControls.Controls.Add(this.btnLoadConfiguration);
             this.gbControls.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);

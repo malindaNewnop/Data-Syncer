@@ -90,12 +90,13 @@ namespace syncer.ui.Forms
                     
                     if (configuration != null)
                     {
+                        // Hide the Quick Launch form before starting the job
+                        this.Hide();
+                        
                         // Load the configuration in the parent form and start the job
                         _parentForm?.LoadConfigurationAndStart(configuration);
                         
-                        // Show notification
-                        MessageBox.Show($"Configuration '{configuration.Name}' loaded and job started successfully!", 
-                            "Job Started", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        // Don't show message here as LoadConfigurationAndStart will show it
                     }
                     else
                     {

@@ -109,5 +109,17 @@ namespace syncer.ui.Interfaces
         /// <param name="intervalMs">The new timer interval in milliseconds</param>
         /// <returns>True if the job was updated successfully</returns>
         bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs);
+        
+        /// <summary>
+        /// Gets all running timer jobs
+        /// </summary>
+        /// <returns>Dictionary with job IDs as keys and job info as values</returns>
+        Dictionary<long, object> GetRunningJobs();
+        
+        /// <summary>
+        /// Gets all timer jobs (running and stopped)
+        /// </summary>
+        /// <returns>Dictionary with job IDs as keys and job info as values</returns>
+        Dictionary<long, object> GetAllJobs();
     }
 }

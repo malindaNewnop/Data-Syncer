@@ -161,16 +161,9 @@ namespace syncer.ui
                 string status = _serviceManager != null ? _serviceManager.GetServiceStatus() : "Unknown";
                 lblServiceStatus.Text = "Service: " + status;
                 lblServiceStatus.ForeColor = status == "Running" ? Color.Green : Color.Red;
-                if (status == "Running")
-                {
-                    btnStartStop.Text = "Stop Service";
-                    btnStartStop.BackColor = Color.LightCoral;
-                }
-                else
-                {
-                    btnStartStop.Text = "Start Service";
-                    btnStartStop.BackColor = Color.LightGreen;
-                }
+                
+                // Note: btnStartStop is hidden since service auto-starts with jobs
+                // No need to update the button since it's not visible to users
                 
                 // Update the tray icon tooltip
                 if (_trayManager != null)
@@ -178,13 +171,9 @@ namespace syncer.ui
                     _trayManager.UpdateToolTip($"Data Syncer - Service: {status}");
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                lblServiceStatus.Text = "Service: Unknown";
-                lblServiceStatus.ForeColor = Color.Gray;
-                btnStartStop.Text = "Start Service";
-                btnStartStop.BackColor = Color.LightGray;
-                btnStartStop.Enabled = false;
+                ServiceLocator.LogService.LogError($"Error updating service status: {ex.Message}", "UI");
             }
         }
 
@@ -192,20 +181,50 @@ namespace syncer.ui
         {
             try
             {
-                bool isConnected = _connectionService != null && _connectionService.IsConnected();
-                ConnectionSettings connectionSettings = _connectionService != null ? _connectionService.GetConnectionSettings() : null;
-                string status = isConnected ? "Connected (" + (connectionSettings != null ? connectionSettings.ConnectionTypeDisplay : "Unknown") + ")" : "Disconnected";
-                if (!isConnected && connectionSettings != null)
+                if (_connectionService != null)
                 {
-                    status += " (" + connectionSettings.ConnectionTypeDisplay + ")";
+                    var connectionSettings = _connectionService.GetConnectionSettings();
+                    if (connectionSettings != null && connectionSettings.IsRemoteConnection)
+                    {
+                        // Test the connection
+                        bool isConnected = false;
+                        try
+                        {
+                            isConnected = _connectionService.TestConnection(connectionSettings);
+                        }
+                        catch
+                        {
+                            isConnected = false;
+                        }
+                        
+                        if (isConnected)
+                        {
+                            lblConnectionStatus.Text = $"Connected to {connectionSettings.Host}:{connectionSettings.Port}";
+                            lblConnectionStatus.ForeColor = Color.Green;
+                        }
+                        else
+                        {
+                            lblConnectionStatus.Text = $"Connection failed to {connectionSettings.Host}:{connectionSettings.Port}";
+                            lblConnectionStatus.ForeColor = Color.Red;
+                        }
+                    }
+                    else
+                    {
+                        lblConnectionStatus.Text = "No remote connection configured";
+                        lblConnectionStatus.ForeColor = Color.Orange;
+                    }
                 }
-                lblConnectionStatus.Text = "Connection: " + status;
-                lblConnectionStatus.ForeColor = isConnected ? Color.Green : Color.Red;
+                else
+                {
+                    lblConnectionStatus.Text = "Connection service unavailable";
+                    lblConnectionStatus.ForeColor = Color.Red;
+                }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                lblConnectionStatus.Text = "Connection: Unknown";
-                lblConnectionStatus.ForeColor = Color.Gray;
+                lblConnectionStatus.Text = "Connection status check failed";
+                lblConnectionStatus.ForeColor = Color.Red;
+                ServiceLocator.LogService.LogError($"Error updating connection status: {ex.Message}", "UI");
             }
         }
 
@@ -295,6 +314,9 @@ namespace syncer.ui
             {
                 if (scheduleForm.ShowDialog() == DialogResult.OK)
                 {
+                    // Auto-start service when job is created
+                    AutoStartServiceIfNeeded();
+                    
                     // Refresh timer jobs grid to show the newly added job
                     RefreshTimerJobsGrid();
                     
@@ -303,10 +325,49 @@ namespace syncer.ui
                     {
                         _notificationService.ShowNotification(
                             "Job Added",
-                            "New synchronization job has been added successfully.",
+                            "New synchronization job added and service started automatically.",
                             ToolTipIcon.Info);
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Automatically starts the service if it's not running and there are jobs to run
+        /// </summary>
+        private void AutoStartServiceIfNeeded()
+        {
+            try
+            {
+                if (_serviceManager != null)
+                {
+                    if (!_serviceManager.IsServiceRunning())
+                    {
+                        ServiceLocator.LogService.LogInfo("Auto-starting service because job was created", "UI");
+                        
+                        if (_serviceManager.StartService())
+                        {
+                            ServiceLocator.LogService.LogInfo("Service auto-started successfully", "UI");
+                            UpdateServiceStatus();
+                            
+                            if (_notificationService != null)
+                            {
+                                _notificationService.ShowNotification(
+                                    "Service Auto-Started",
+                                    "Data Syncer service started automatically for new job.",
+                                    ToolTipIcon.Info);
+                            }
+                        }
+                        else
+                        {
+                            ServiceLocator.LogService.LogWarning("Failed to auto-start service", "UI");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError($"Error auto-starting service: {ex.Message}", "UI");
             }
         }
 
@@ -851,6 +912,12 @@ namespace syncer.ui
                 var connectionService = ServiceLocator.ConnectionService;
                 var timerJobManager = ServiceLocator.TimerJobManager;
                 
+                // Auto-start service when loading configuration with jobs
+                if (startAfterLoad && config.JobSettings != null)
+                {
+                    AutoStartServiceIfNeeded();
+                }
+                
                 // Apply connection settings
                 if (config.SourceConnection?.Settings != null)
                 {
@@ -1026,26 +1093,34 @@ namespace syncer.ui
                 // Load the job configuration and start it
                 if (configuration?.JobSettings != null)
                 {
-                    // This method would typically load the configuration and start the sync job
-                    // For now, show a message indicating the job would be started
-                    string message = $"Loading and starting job configuration: {configuration.Name}\n" +
+                    ServiceLocator.LogService.LogInfo($"Quick Launch: Loading configuration '{configuration.Name}'", "QuickLaunch");
+                    
+                    // Apply the loaded configuration
+                    ApplyLoadedConfiguration(configuration, true);
+                    
+                    // Show success message
+                    string message = $"Job '{configuration.Name}' started successfully!\n" +
                                    $"Source: {configuration.JobSettings.SourcePath}\n" +
                                    $"Destination: {configuration.JobSettings.DestinationPath}\n" +
                                    $"Interval: {configuration.JobSettings.IntervalValue} {configuration.JobSettings.IntervalType}";
                     
-                    // Here you would implement the actual job loading and starting logic
-                    // For example:
-                    // - Load connection settings
-                    // - Configure the sync job
-                    // - Start the timer/scheduler
+                    MessageBox.Show(message, "Job Started Successfully", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
                     
-                    ServiceLocator.LogService.LogInfo($"Quick Launch: {message}", "QuickLaunch");
+                    ServiceLocator.LogService.LogInfo($"Quick Launch: Job '{configuration.Name}' started successfully", "QuickLaunch");
+                }
+                else
+                {
+                    MessageBox.Show("Invalid configuration: Missing job settings.", "Configuration Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
             catch (Exception ex)
             {
-                ServiceLocator.LogService.LogError($"Error loading job configuration: {ex.Message}", "QuickLaunch");
-                throw;
+                string errorMsg = $"Error loading and starting job configuration: {ex.Message}";
+                ServiceLocator.LogService.LogError(errorMsg, "QuickLaunch");
+                MessageBox.Show(errorMsg, "Quick Launch Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
