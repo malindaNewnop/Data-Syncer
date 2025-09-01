@@ -36,6 +36,7 @@ namespace syncer.ui.Services
             public syncer.core.ConnectionSettings ConnectionSettings { get; set; }
             public bool IsUploadInProgress { get; set; } // Prevent overlapping uploads
             public DateTime? UploadStartTime { get; set; } // Track upload duration
+            public bool IncludeSubfolders { get; set; } // Whether to include subfolders in file enumeration
         }
         
         public TimerJobManager()
@@ -47,10 +48,15 @@ namespace syncer.ui.Services
         
         public bool RegisterTimerJob(long jobId, string folderPath, string remotePath, double intervalMs)
         {
-            return RegisterTimerJob(jobId, "Timer Job " + jobId, folderPath, remotePath, intervalMs);
+            return RegisterTimerJob(jobId, "Timer Job " + jobId, folderPath, remotePath, intervalMs, true); // Default to include subfolders
         }
         
         public bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs)
+        {
+            return RegisterTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, true); // Default to include subfolders
+        }
+        
+        public bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders)
         {
             try
             {
@@ -63,6 +69,7 @@ namespace syncer.ui.Services
                     job.FolderPath = folderPath;
                     job.RemotePath = remotePath;
                     job.IntervalMs = intervalMs;
+                    job.IncludeSubfolders = includeSubfolders; // Update subfolder setting
                     
                     // Initialize new properties if they don't exist
                     if (!job.IsUploadInProgress) job.IsUploadInProgress = false;
@@ -119,7 +126,8 @@ namespace syncer.ui.Services
                     TransferClient = transferClient,
                     ConnectionSettings = coreSettings,
                     IsUploadInProgress = false,
-                    UploadStartTime = null
+                    UploadStartTime = null,
+                    IncludeSubfolders = includeSubfolders
                 };
                 
                 _timerJobs.Add(jobId, newJob);
@@ -326,6 +334,11 @@ namespace syncer.ui.Services
         
         public bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs)
         {
+            return UpdateTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, true); // Default to include subfolders for backward compatibility
+        }
+        
+        public bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders)
+        {
             try
             {
                 if (!_timerJobs.ContainsKey(jobId))
@@ -348,6 +361,7 @@ namespace syncer.ui.Services
                 job.FolderPath = folderPath;
                 job.RemotePath = remotePath;
                 job.IntervalMs = intervalMs;
+                job.IncludeSubfolders = includeSubfolders;
                 
                 // Update timer interval if the timer exists
                 if (job.Timer != null)
@@ -395,14 +409,17 @@ namespace syncer.ui.Services
                 
                 _logService.LogInfo(string.Format("Timer elapsed for job {0} - starting folder upload", jobId));
                 
-                // Get all files in the directory, including any newly added files
-                string[] currentFiles = Directory.GetFiles(job.FolderPath, "*", SearchOption.AllDirectories);
+                // Get files based on subfolder inclusion setting
+                SearchOption searchOption = job.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+                string[] currentFiles = Directory.GetFiles(job.FolderPath, "*", searchOption);
                 
-                // Also ensure empty directories are created on remote
-                string[] allDirectories = Directory.GetDirectories(job.FolderPath, "*", SearchOption.AllDirectories);
+                // Also ensure empty directories are created on remote (only if including subfolders)
+                string[] allDirectories = job.IncludeSubfolders ? 
+                    Directory.GetDirectories(job.FolderPath, "*", SearchOption.AllDirectories) : 
+                    new string[0]; // No subdirectories if not including subfolders
                 
-                _logService.LogInfo(string.Format("Found {0} files and {1} directories in folder {2}", 
-                    currentFiles.Length, allDirectories.Length, job.FolderPath));
+                _logService.LogInfo(string.Format("Found {0} files and {1} directories in folder {2} (subfolders: {3})", 
+                    currentFiles.Length, allDirectories.Length, job.FolderPath, job.IncludeSubfolders ? "included" : "excluded"));
                 
                 // Create empty directories first
                 foreach (string directory in allDirectories)

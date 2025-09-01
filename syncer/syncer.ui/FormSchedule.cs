@@ -191,6 +191,9 @@ namespace syncer.ui
             InitializeTransferClient();
             InitializeTimerControls();
             InitializeFilterControls();
+            
+            // Initialize UI based on current transfer mode
+            UpdateUIForTransferMode();
         }
 
         private void ReorganizeFormLayout()
@@ -577,6 +580,12 @@ namespace syncer.ui
             return true;
         }
 
+        private bool ShouldIncludeSubfolders()
+        {
+            // Return the checkbox state, default to true if checkbox doesn't exist or isn't checked
+            return chkIncludeSubfolders != null && chkIncludeSubfolders.Checked;
+        }
+
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             // Clean up timers when form is closed
@@ -607,7 +616,22 @@ namespace syncer.ui
             if (rb != null && rb.Checked)
             {
                 _currentTransferMode = "Upload";
+                
+                // Clear download-specific selections when switching to upload mode
+                _selectedRemoteFolderForTimer = null;
+                _selectedRemoteFileForTimer = null;
+                _timerDownloadDestination = null;
+                
                 UpdateUIForTransferMode();
+                
+                ServiceLocator.LogService.LogInfo("Switched to Upload mode - cleared download settings");
+                
+                // Show helpful message to user about what to do next
+                if (lblNoFilesSelected != null)
+                {
+                    lblNoFilesSelected.Text = "Click 'Browse Local Folder' to select files to upload";
+                    lblNoFilesSelected.ForeColor = System.Drawing.Color.Blue;
+                }
             }
         }
 
@@ -617,7 +641,22 @@ namespace syncer.ui
             if (rb != null && rb.Checked)
             {
                 _currentTransferMode = "Download";
+                
+                // Clear upload-specific selections when switching to download mode
+                _selectedFilesForTimer = null;
+                _selectedFolderForTimer = null;
+                _timerUploadDestination = "/";
+                
                 UpdateUIForTransferMode();
+                
+                ServiceLocator.LogService.LogInfo("Switched to Download mode - cleared upload settings");
+                
+                // Show helpful message to user about what to do next
+                if (lblNoFilesSelected != null)
+                {
+                    lblNoFilesSelected.Text = "Click 'Browse Remote Folder' to select files from server";
+                    lblNoFilesSelected.ForeColor = System.Drawing.Color.Blue;
+                }
             }
         }
 
@@ -629,17 +668,59 @@ namespace syncer.ui
                 gbTimerSettings.Text = _currentTransferMode + " Timer Settings";
             }
 
-            // Update button text in File Manager
+            // Update browse button text directly since we have a reference to it
+            if (btnBrowseFilesForTimer != null)
+            {
+                string buttonText = _currentTransferMode == "Upload" ? "Browse Local Folder" : "Browse Remote Folder";
+                btnBrowseFilesForTimer.Text = buttonText;
+                ServiceLocator.LogService.LogInfo($"Updated browse button text to: {buttonText}");
+            }
+
+            // Update file manager groupbox title to be more descriptive
+            if (gbFileManager != null)
+            {
+                if (_currentTransferMode == "Upload")
+                {
+                    gbFileManager.Text = "File Manager (Local → Remote)";
+                }
+                else if (_currentTransferMode == "Download")
+                {
+                    gbFileManager.Text = "File Manager (Remote → Local)";
+                }
+                else
+                {
+                    gbFileManager.Text = "File Manager";
+                }
+            }
+
+            // Update file selection label to provide guidance
+            if (lblNoFilesSelected != null)
+            {
+                if (_currentTransferMode == "Upload")
+                {
+                    lblNoFilesSelected.Text = "No local folder selected for upload";
+                }
+                else if (_currentTransferMode == "Download")
+                {
+                    lblNoFilesSelected.Text = "No remote folder selected for download";
+                }
+                else
+                {
+                    lblNoFilesSelected.Text = "No files selected";
+                }
+            }
+
+            // Also update via groupbox search as backup (for any dynamically created buttons)
             foreach (Control control in this.Controls)
             {
-                if (control is GroupBox && ((GroupBox)control).Text == "File Manager")
+                if (control is GroupBox && ((GroupBox)control).Text.Contains("File Manager"))
                 {
                     foreach (Control innerControl in control.Controls)
                     {
                         if (innerControl is Button)
                         {
                             Button btn = innerControl as Button;
-                            if (btn.Text.Contains("Browse"))
+                            if (btn.Text.Contains("Browse") && btn != btnBrowseFilesForTimer) // Don't double-update
                             {
                                 btn.Text = _currentTransferMode == "Upload" ? "Browse Local Folder" : "Browse Remote Folder";
                             }
@@ -887,7 +968,7 @@ namespace syncer.ui
                         {
                             // Update existing timer job
                             bool updated = timerJobManager.UpdateTimerJob(_currentJob.Id, _currentJob.Name,
-                                sourcePath, destPath, intervalMs);
+                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders());
                             
                             if (updated)
                             {
@@ -899,7 +980,7 @@ namespace syncer.ui
                         {
                             // Register new timer job
                             bool registered = timerJobManager.RegisterTimerJob(_currentJob.Id, _currentJob.Name,
-                                sourcePath, destPath, intervalMs);
+                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders());
                             
                             bool isTimerCurrentlyRunning = (_currentTransferMode == "Upload" && _isTimerRunning) ||
                                                          (_currentTransferMode == "Download" && _isDownloadTimerRunning);
@@ -951,19 +1032,53 @@ namespace syncer.ui
         {
             ServiceLocator.LogService.LogInfo($"Browse button clicked - Current transfer mode: {_currentTransferMode}");
             
-            if (_currentTransferMode == "Upload")
+            // Disable the button during browsing to prevent multiple clicks
+            if (btnBrowseFilesForTimer != null)
             {
-                ServiceLocator.LogService.LogInfo("Routing to local folder browser for upload mode");
-                BrowseLocalFolderForUpload();
+                btnBrowseFilesForTimer.Enabled = false;
             }
-            else if (_currentTransferMode == "Download")
+            
+            try
             {
-                ServiceLocator.LogService.LogInfo("Routing to remote file browser for download mode");
-                BrowseRemoteFolderForDownloadImproved();
+                if (_currentTransferMode == "Upload")
+                {
+                    ServiceLocator.LogService.LogInfo("Routing to local folder browser for upload mode");
+                    BrowseLocalFolderForUpload();
+                }
+                else if (_currentTransferMode == "Download")
+                {
+                    ServiceLocator.LogService.LogInfo("Routing to remote file browser for download mode");
+                    
+                    // Verify connection before attempting to browse remote files
+                    if (_coreConnectionSettings == null)
+                    {
+                        MessageBox.Show("No connection settings available. Please configure connection settings first.", 
+                            "Connection Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    
+                    BrowseRemoteFolderForDownloadImproved();
+                }
+                else
+                {
+                    ServiceLocator.LogService.LogWarning($"Unknown transfer mode: {_currentTransferMode}");
+                    MessageBox.Show($"Unknown transfer mode: {_currentTransferMode}. Please select Upload or Download mode.", 
+                        "Invalid Mode", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                ServiceLocator.LogService.LogWarning($"Unknown transfer mode: {_currentTransferMode}");
+                ServiceLocator.LogService.LogError($"Error during browse operation: {ex.Message}");
+                MessageBox.Show($"Error during browse operation: {ex.Message}", "Browse Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                // Re-enable the button
+                if (btnBrowseFilesForTimer != null)
+                {
+                    btnBrowseFilesForTimer.Enabled = true;
+                }
             }
         }
 
@@ -1314,7 +1429,17 @@ namespace syncer.ui
         {
             using (FolderBrowserDialog dialog = new FolderBrowserDialog())
             {
-                dialog.Description = "Select local folder for timer downloads";
+                string remoteInfo = "";
+                if (!string.IsNullOrEmpty(_selectedRemoteFileForTimer))
+                {
+                    remoteInfo = $" for remote file: {_selectedRemoteFileForTimer}";
+                }
+                else if (!string.IsNullOrEmpty(_selectedRemoteFolderForTimer))
+                {
+                    remoteInfo = $" for remote folder: {System.IO.Path.GetFileName(_selectedRemoteFolderForTimer)}";
+                }
+                
+                dialog.Description = $"Select local folder to download files{remoteInfo}";
                 dialog.ShowNewFolderButton = true;
                 
                 if (!string.IsNullOrEmpty(_timerDownloadDestination))
@@ -1325,7 +1450,21 @@ namespace syncer.ui
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
                     _timerDownloadDestination = dialog.SelectedPath;
-                    ServiceLocator.LogService.LogInfo("Timer download destination set to: " + _timerDownloadDestination);
+                    ServiceLocator.LogService.LogInfo($"Timer download destination set to: {_timerDownloadDestination}");
+                    
+                    // Update UI to show the complete configuration
+                    if (lblNoFilesSelected != null && !string.IsNullOrEmpty(_selectedRemoteFolderForTimer))
+                    {
+                        string sourceInfo = !string.IsNullOrEmpty(_selectedRemoteFileForTimer) 
+                            ? $"Remote File: {_selectedRemoteFileForTimer}" 
+                            : $"Remote Folder: {System.IO.Path.GetFileName(_selectedRemoteFolderForTimer)}";
+                        
+                        lblNoFilesSelected.Text = $"{sourceInfo} → {System.IO.Path.GetFileName(_timerDownloadDestination)}";
+                    }
+                }
+                else
+                {
+                    ServiceLocator.LogService.LogInfo("Download destination selection cancelled by user");
                 }
             }
         }
@@ -1506,7 +1645,7 @@ namespace syncer.ui
             {
                 if (string.IsNullOrEmpty(_selectedFolderForTimer))
                 {
-                    MessageBox.Show("Please select a local folder for timer upload using 'Browse Files' button.", "Validation Error", 
+                    MessageBox.Show("Please select a local folder for timer upload using the 'Browse Local Folder' button.", "Validation Error", 
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     if (btnBrowseFilesForTimer != null) btnBrowseFilesForTimer.Focus();
                     return false;
@@ -1516,7 +1655,7 @@ namespace syncer.ui
             {
                 if (string.IsNullOrEmpty(_selectedRemoteFolderForTimer))
                 {
-                    MessageBox.Show("Please select a remote folder for timer download using 'Browse Files' button.", "Validation Error", 
+                    MessageBox.Show("Please select a remote folder or file for timer download using the 'Browse Remote Folder' button.", "Validation Error", 
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     if (btnBrowseFilesForTimer != null) btnBrowseFilesForTimer.Focus();
                     return false;
@@ -1524,7 +1663,7 @@ namespace syncer.ui
                 
                 if (string.IsNullOrEmpty(_timerDownloadDestination))
                 {
-                    MessageBox.Show("Please select a local destination folder for downloads.", "Validation Error", 
+                    MessageBox.Show("Please select a local destination folder for downloads. This will be prompted after selecting remote files.", "Validation Error", 
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;
                 }
