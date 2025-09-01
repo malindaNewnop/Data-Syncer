@@ -510,5 +510,45 @@ namespace syncer.core
             result.Add(current.ToString());
             return result.ToArray();
         }
+
+        #region Real-time Logging Interface Implementation (No-op for FileLogService)
+        
+        public event EventHandler<LogEntryEventArgs> RealTimeLogEntry;
+
+        /// <summary>
+        /// Enable real-time logging (no-op implementation for FileLogService)
+        /// </summary>
+        public void EnableRealTimeLogging(string customFilePath)
+        {
+            // FileLogService doesn't support real-time logging to custom directories
+            // This is a no-op implementation
+        }
+
+        /// <summary>
+        /// Disable real-time logging (no-op implementation for FileLogService)
+        /// </summary>
+        public void DisableRealTimeLogging()
+        {
+            // FileLogService doesn't support real-time logging to custom directories
+            // This is a no-op implementation
+        }
+
+        /// <summary>
+        /// Check if real-time logging is enabled (always false for FileLogService)
+        /// </summary>
+        public bool IsRealTimeLoggingEnabled()
+        {
+            return false; // FileLogService doesn't support real-time logging
+        }
+
+        /// <summary>
+        /// Get real-time log path (always null for FileLogService)
+        /// </summary>
+        public string GetRealTimeLogPath()
+        {
+            return null; // FileLogService doesn't support real-time logging
+        }
+
+        #endregion
     }
 }

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using syncer.core;
 
 namespace syncer.core.Services
 {
@@ -339,9 +340,205 @@ namespace syncer.core.Services
             }
         }
         
+        /// <summary>
+        /// Log transfer event
+        /// </summary>
+        public void LogTransfer(string jobName, string fileName, long fileSize, bool success, string error)
+        {
+            string level = success ? "INFO" : "ERROR";
+            string message = success 
+                ? string.Format("Transfer completed: {0} ({1} bytes)", fileName, fileSize)
+                : string.Format("Transfer failed: {0} - {1}", fileName, error);
+            
+            if (success)
+                LogInfo(message, jobName);
+            else
+                LogError(message, jobName);
+        }
+
+        #region Real-Time Logging Support
+        
+        private bool _realTimeLoggingEnabled = false;
+        private string _realTimeLogPath = null;
+        private StreamWriter _realTimeCsvWriter = null;
+        private readonly object _realTimeLock = new object();
+        
+        public event EventHandler<LogEntryEventArgs> RealTimeLogEntry;
+
+        /// <summary>
+        /// Enable real-time logging to custom directory/file
+        /// </summary>
+        public void EnableRealTimeLogging(string customFilePath)
+        {
+            lock (_realTimeLock)
+            {
+                try
+                {
+                    // Disable current logging if active
+                    DisableRealTimeLogging();
+
+                    if (string.IsNullOrEmpty(customFilePath))
+                        throw new ArgumentException("Custom file path cannot be null or empty");
+
+                    // Ensure directory exists
+                    string directory = Path.GetDirectoryName(customFilePath);
+                    if (!Directory.Exists(directory))
+                        Directory.CreateDirectory(directory);
+
+                    _realTimeLogPath = customFilePath;
+                    
+                    // Initialize CSV writer
+                    _realTimeCsvWriter = new StreamWriter(_realTimeLogPath, true, Encoding.UTF8);
+                    
+                    // Write CSV header if file is new/empty
+                    if (new FileInfo(_realTimeLogPath).Length == 0)
+                    {
+                        _realTimeCsvWriter.WriteLine("Timestamp,Level,Source,Message,Exception");
+                        _realTimeCsvWriter.Flush();
+                    }
+                    
+                    _realTimeLoggingEnabled = true;
+                    
+                    LogInfo("Real-time logging enabled to: " + _realTimeLogPath, "EnhancedLogService");
+                }
+                catch (Exception ex)
+                {
+                    _realTimeLoggingEnabled = false;
+                    if (_realTimeCsvWriter != null)
+                    {
+                        try { _realTimeCsvWriter.Close(); } catch { }
+                        _realTimeCsvWriter = null;
+                    }
+                    throw new InvalidOperationException("Failed to enable real-time logging: " + ex.Message, ex);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Disable real-time logging
+        /// </summary>
+        public void DisableRealTimeLogging()
+        {
+            lock (_realTimeLock)
+            {
+                if (_realTimeLoggingEnabled)
+                {
+                    LogInfo("Real-time logging disabled", "EnhancedLogService");
+                    _realTimeLoggingEnabled = false;
+                }
+
+                if (_realTimeCsvWriter != null)
+                {
+                    try
+                    {
+                        _realTimeCsvWriter.Flush();
+                        _realTimeCsvWriter.Close();
+                    }
+                    catch
+                    {
+                        // Ignore errors during cleanup
+                    }
+                    finally
+                    {
+                        _realTimeCsvWriter = null;
+                    }
+                }
+
+                _realTimeLogPath = null;
+            }
+        }
+
+        /// <summary>
+        /// Check if real-time logging is enabled
+        /// </summary>
+        public bool IsRealTimeLoggingEnabled()
+        {
+            lock (_realTimeLock)
+            {
+                return _realTimeLoggingEnabled;
+            }
+        }
+
+        /// <summary>
+        /// Get current real-time log path
+        /// </summary>
+        public string GetRealTimeLogPath()
+        {
+            lock (_realTimeLock)
+            {
+                return _realTimeLogPath;
+            }
+        }
+
+        #endregion
+        
         protected virtual void OnLogEntryAdded(LogEntryEventArgs e)
         {
             LogEntryAdded?.Invoke(this, e);
+            
+            // Also trigger real-time logging if enabled
+            if (_realTimeLoggingEnabled)
+            {
+                WriteToRealTimeLog(e.LogEntry);
+                OnRealTimeLogEntry(e);
+            }
+        }
+        
+        private void WriteToRealTimeLog(LogEntry logEntry)
+        {
+            if (!_realTimeLoggingEnabled || _realTimeCsvWriter == null)
+                return;
+
+            lock (_realTimeLock)
+            {
+                try
+                {
+                    string csvLine = string.Format("{0},{1},{2},{3},{4}",
+                        EscapeCSVField(logEntry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")),
+                        EscapeCSVField(logEntry.Level.ToString()),
+                        EscapeCSVField(logEntry.Source ?? ""),
+                        EscapeCSVField(logEntry.Message ?? ""),
+                        EscapeCSVField(logEntry.Exception != null ? logEntry.Exception.ToString() : "")
+                    );
+
+                    _realTimeCsvWriter.WriteLine(csvLine);
+                    _realTimeCsvWriter.Flush(); // Ensure immediate write for real-time
+                }
+                catch
+                {
+                    // Silently fail - don't break main logging
+                }
+            }
+        }
+        
+        protected virtual void OnRealTimeLogEntry(LogEntryEventArgs e)
+        {
+            EventHandler<LogEntryEventArgs> handler = RealTimeLogEntry;
+            if (handler != null)
+            {
+                try
+                {
+                    handler(this, e);
+                }
+                catch
+                {
+                    // Don't let event handler exceptions break logging
+                }
+            }
+        }
+        
+        private string EscapeCSVField(string field)
+        {
+            if (string.IsNullOrEmpty(field))
+                return "";
+
+            // Escape quotes and handle special characters
+            if (field.Contains("\"") || field.Contains(",") || field.Contains("\n") || field.Contains("\r"))
+            {
+                return "\"" + field.Replace("\"", "\"\"") + "\"";
+            }
+
+            return field;
         }
     }
 
@@ -356,14 +553,6 @@ namespace syncer.core.Services
         public string Source { get; set; }
         public string ThreadId { get; set; }
         public Exception Exception { get; set; }
-    }
-
-    /// <summary>
-    /// Event arguments for log entry events
-    /// </summary>
-    public class LogEntryEventArgs : EventArgs
-    {
-        public LogEntry LogEntry { get; set; }
     }
 
     /// <summary>

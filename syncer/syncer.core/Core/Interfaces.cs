@@ -70,6 +70,24 @@ namespace syncer.core
         void LogJobSuccess(SyncJob job, string message);
         void LogJobError(SyncJob job, string message, Exception ex = null);
         void LogTransfer(string jobName, string fileName, long fileSize, bool success, string error);
+        
+        // Real-time Custom Directory Logging
+        void EnableRealTimeLogging(string customFilePath);
+        void DisableRealTimeLogging();
+        bool IsRealTimeLoggingEnabled();
+        string GetRealTimeLogPath();
+        event EventHandler<LogEntryEventArgs> RealTimeLogEntry;
+    }
+    
+    // Event arguments for real-time logging
+    public class LogEntryEventArgs : EventArgs
+    {
+        public DateTime Timestamp { get; set; }
+        public string Level { get; set; }
+        public string Source { get; set; }
+        public string Message { get; set; }
+        public string JobName { get; set; }
+        public Exception Exception { get; set; }
     }
 
     // Transfer Client Interface

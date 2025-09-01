@@ -1325,6 +1325,46 @@ namespace syncer.ui.Services
         {
             _logsTable.Rows.Add(DateTime.Now, level, jobName, string.Empty, string.Empty, message);
         }
+
+        #region Real-time Logging Interface Implementation (No-op for UI LogService)
+        
+        public event EventHandler<syncer.core.LogEntryEventArgs> RealTimeLogEntry;
+
+        /// <summary>
+        /// Enable real-time logging (no-op implementation for UI LogService)
+        /// </summary>
+        public void EnableRealTimeLogging(string customFilePath)
+        {
+            // UI LogService doesn't support real-time logging to custom directories
+            // This is a no-op implementation
+        }
+
+        /// <summary>
+        /// Disable real-time logging (no-op implementation for UI LogService)
+        /// </summary>
+        public void DisableRealTimeLogging()
+        {
+            // UI LogService doesn't support real-time logging to custom directories
+            // This is a no-op implementation
+        }
+
+        /// <summary>
+        /// Check if real-time logging is enabled (always false for UI LogService)
+        /// </summary>
+        public bool IsRealTimeLoggingEnabled()
+        {
+            return false; // UI LogService doesn't support real-time logging
+        }
+
+        /// <summary>
+        /// Get real-time log path (always null for UI LogService)
+        /// </summary>
+        public string GetRealTimeLogPath()
+        {
+            return null; // UI LogService doesn't support real-time logging
+        }
+
+        #endregion
     }
 
     // Full implementation of service manager that properly manages job scheduling

@@ -38,6 +38,14 @@ namespace syncer.ui
         private System.Windows.Forms.Button btnExport;
         private System.Windows.Forms.Button btnClose;
         
+        // Real-time Logging section
+        private System.Windows.Forms.GroupBox gbRealTimeLogging;
+        private System.Windows.Forms.CheckBox chkEnableRealTimeLogging;
+        private System.Windows.Forms.Label lblRealTimeLogPath;
+        private System.Windows.Forms.TextBox txtRealTimeLogPath;
+        private System.Windows.Forms.Button btnBrowseRealTimeLogPath;
+        private System.Windows.Forms.Label lblRealTimeStatus;
+        
         // Status section
         private System.Windows.Forms.StatusStrip statusStrip1;
         private System.Windows.Forms.ToolStripStatusLabel lblLogCount;
@@ -89,6 +97,14 @@ namespace syncer.ui
             this.btnExport = new System.Windows.Forms.Button();
             this.btnClose = new System.Windows.Forms.Button();
             
+            // Real-time Logging
+            this.gbRealTimeLogging = new System.Windows.Forms.GroupBox();
+            this.chkEnableRealTimeLogging = new System.Windows.Forms.CheckBox();
+            this.lblRealTimeLogPath = new System.Windows.Forms.Label();
+            this.txtRealTimeLogPath = new System.Windows.Forms.TextBox();
+            this.btnBrowseRealTimeLogPath = new System.Windows.Forms.Button();
+            this.lblRealTimeStatus = new System.Windows.Forms.Label();
+            
             // Status
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.lblLogCount = new System.Windows.Forms.ToolStripStatusLabel();
@@ -99,6 +115,7 @@ namespace syncer.ui
             this.gbTimeFilter.SuspendLayout();
             this.gbJobFilter.SuspendLayout();
             this.gbActions.SuspendLayout();
+            this.gbRealTimeLogging.SuspendLayout();
             this.statusStrip1.SuspendLayout();
             this.SuspendLayout();
             // dgvLogs
@@ -116,7 +133,7 @@ namespace syncer.ui
             this.dgvLogs.ReadOnly = true;
             this.dgvLogs.RowHeadersWidth = 25;
             this.dgvLogs.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dgvLogs.Size = new System.Drawing.Size(860, 335);
+            this.dgvLogs.Size = new System.Drawing.Size(860, 305);
             this.dgvLogs.TabIndex = 5;
             this.dgvLogs.CellFormatting += new System.Windows.Forms.DataGridViewCellFormattingEventHandler(this.dgvLogs_CellFormatting);
             
@@ -377,6 +394,70 @@ namespace syncer.ui
             this.btnClose.Text = "Close";
             this.btnClose.UseVisualStyleBackColor = true;
             this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
+            
+            // Real-time Logging GroupBox
+            this.gbRealTimeLogging.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.gbRealTimeLogging.Controls.Add(this.chkEnableRealTimeLogging);
+            this.gbRealTimeLogging.Controls.Add(this.lblRealTimeLogPath);
+            this.gbRealTimeLogging.Controls.Add(this.txtRealTimeLogPath);
+            this.gbRealTimeLogging.Controls.Add(this.btnBrowseRealTimeLogPath);
+            this.gbRealTimeLogging.Controls.Add(this.lblRealTimeStatus);
+            this.gbRealTimeLogging.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            this.gbRealTimeLogging.Location = new System.Drawing.Point(380, 125);
+            this.gbRealTimeLogging.Name = "gbRealTimeLogging";
+            this.gbRealTimeLogging.Size = new System.Drawing.Size(492, 60);
+            this.gbRealTimeLogging.TabIndex = 5;
+            this.gbRealTimeLogging.TabStop = false;
+            this.gbRealTimeLogging.Text = "Real-time CSV Logging";
+            
+            // chkEnableRealTimeLogging
+            this.chkEnableRealTimeLogging.AutoSize = true;
+            this.chkEnableRealTimeLogging.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.chkEnableRealTimeLogging.Location = new System.Drawing.Point(15, 25);
+            this.chkEnableRealTimeLogging.Name = "chkEnableRealTimeLogging";
+            this.chkEnableRealTimeLogging.Size = new System.Drawing.Size(59, 19);
+            this.chkEnableRealTimeLogging.TabIndex = 0;
+            this.chkEnableRealTimeLogging.Text = "Enable";
+            this.chkEnableRealTimeLogging.UseVisualStyleBackColor = true;
+            this.chkEnableRealTimeLogging.CheckedChanged += new System.EventHandler(this.chkEnableRealTimeLogging_CheckedChanged);
+            
+            // lblRealTimeLogPath
+            this.lblRealTimeLogPath.AutoSize = true;
+            this.lblRealTimeLogPath.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblRealTimeLogPath.Location = new System.Drawing.Point(85, 27);
+            this.lblRealTimeLogPath.Name = "lblRealTimeLogPath";
+            this.lblRealTimeLogPath.Size = new System.Drawing.Size(32, 15);
+            this.lblRealTimeLogPath.TabIndex = 1;
+            this.lblRealTimeLogPath.Text = "File:";
+            
+            // txtRealTimeLogPath
+            this.txtRealTimeLogPath.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.txtRealTimeLogPath.Location = new System.Drawing.Point(125, 24);
+            this.txtRealTimeLogPath.Name = "txtRealTimeLogPath";
+            this.txtRealTimeLogPath.Size = new System.Drawing.Size(280, 21);
+            this.txtRealTimeLogPath.TabIndex = 2;
+            
+            // btnBrowseRealTimeLogPath
+            this.btnBrowseRealTimeLogPath.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
+            this.btnBrowseRealTimeLogPath.Location = new System.Drawing.Point(415, 23);
+            this.btnBrowseRealTimeLogPath.Name = "btnBrowseRealTimeLogPath";
+            this.btnBrowseRealTimeLogPath.Size = new System.Drawing.Size(65, 23);
+            this.btnBrowseRealTimeLogPath.TabIndex = 3;
+            this.btnBrowseRealTimeLogPath.Text = "Browse...";
+            this.btnBrowseRealTimeLogPath.UseVisualStyleBackColor = true;
+            this.btnBrowseRealTimeLogPath.Click += new System.EventHandler(this.btnBrowseRealTimeLogPath_Click);
+            
+            // lblRealTimeStatus
+            this.lblRealTimeStatus.AutoSize = true;
+            this.lblRealTimeStatus.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
+            this.lblRealTimeStatus.ForeColor = System.Drawing.Color.Gray;
+            this.lblRealTimeStatus.Location = new System.Drawing.Point(125, 45);
+            this.lblRealTimeStatus.Name = "lblRealTimeStatus";
+            this.lblRealTimeStatus.Size = new System.Drawing.Size(130, 13);
+            this.lblRealTimeStatus.TabIndex = 4;
+            this.lblRealTimeStatus.Text = "Real-time logging disabled";
+            
             // statusStrip1
             this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.lblLogCount,
@@ -405,6 +486,7 @@ namespace syncer.ui
             this.Controls.Add(this.gbSearchFilter);
             this.Controls.Add(this.gbTimeFilter);
             this.Controls.Add(this.gbJobFilter);
+            this.Controls.Add(this.gbRealTimeLogging);
             this.Controls.Add(this.dgvLogs);
             this.MinimumSize = new System.Drawing.Size(900, 600);
             this.Name = "FormLogs";
@@ -419,6 +501,8 @@ namespace syncer.ui
             this.gbJobFilter.ResumeLayout(false);
             this.gbJobFilter.PerformLayout();
             this.gbActions.ResumeLayout(false);
+            this.gbRealTimeLogging.ResumeLayout(false);
+            this.gbRealTimeLogging.PerformLayout();
             this.statusStrip1.ResumeLayout(false);
             this.statusStrip1.PerformLayout();
             this.ResumeLayout(false);

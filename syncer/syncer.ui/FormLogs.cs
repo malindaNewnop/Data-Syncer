@@ -2,6 +2,9 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Data;
+using System.Reflection;
+using syncer.core;
+using syncer.core.Services;
 
 namespace syncer.ui
 {
@@ -57,6 +60,9 @@ namespace syncer.ui
             dtpToTime.Value = DateTime.Today.AddDays(1).AddSeconds(-1); // Default to 23:59:59
             
             chkEnableTimeFilter.Checked = true; // Default to enabled time filtering
+
+            // Initialize real-time logging controls
+            InitializeRealTimeLogging();
 
             // Initialize log data
             InitializeLogData();
@@ -1022,6 +1028,255 @@ namespace syncer.ui
                 ApplyFilters();
             }
         }
+
+        #region Real-Time Logging Implementation
+
+        /// <summary>
+        /// Initialize real-time logging controls
+        /// </summary>
+        private void InitializeRealTimeLogging()
+        {
+            chkEnableRealTimeLogging.Checked = false;
+            txtRealTimeLogPath.Text = "";
+            lblRealTimeLogPath.Enabled = false;
+            txtRealTimeLogPath.Enabled = false;
+            btnBrowseRealTimeLogPath.Enabled = false;
+            lblRealTimeStatus.Text = "Real-time logging disabled";
+            lblRealTimeStatus.ForeColor = Color.Gray;
+            
+            // Set default file path suggestion
+            string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            string dataFolderPath = System.IO.Path.Combine(documentsPath, "DataSyncerLogs");
+            string defaultPath = System.IO.Path.Combine(dataFolderPath, 
+                string.Format("syncer_realtime_{0:yyyyMMdd}.csv", DateTime.Now));
+            txtRealTimeLogPath.Text = defaultPath;
+        }
+
+        /// <summary>
+        /// Event handler for Enable Real-Time Logging checkbox
+        /// </summary>
+        private void chkEnableRealTimeLogging_CheckedChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                bool enabled = chkEnableRealTimeLogging.Checked;
+                
+                // Enable/disable related controls
+                lblRealTimeLogPath.Enabled = enabled;
+                txtRealTimeLogPath.Enabled = enabled;
+                btnBrowseRealTimeLogPath.Enabled = enabled;
+
+                if (enabled)
+                {
+                    // Try to enable real-time logging
+                    string logPath = txtRealTimeLogPath.Text.Trim();
+                    if (string.IsNullOrEmpty(logPath))
+                    {
+                        MessageBox.Show("Please select a CSV file path first.", "Real-Time Logging",
+                                      MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        chkEnableRealTimeLogging.Checked = false;
+                        return;
+                    }
+
+                    try
+                    {
+                        // Check if service supports real-time logging using reflection
+                        var enableMethod = _logService.GetType().GetMethod("EnableRealTimeLogging");
+                        var eventInfo = _logService.GetType().GetEvent("RealTimeLogEntry");
+                        
+                        if (enableMethod != null)
+                        {
+                            enableMethod.Invoke(_logService, new object[] { logPath });
+                            
+                            // Subscribe to the event if available
+                            if (eventInfo != null)
+                            {
+                                var handler = new EventHandler<LogEntryEventArgs>(OnRealTimeLogEntry);
+                                eventInfo.AddEventHandler(_logService, handler);
+                            }
+                        }
+                        else
+                        {
+                            throw new NotSupportedException("Current log service does not support real-time logging");
+                        }
+                        
+                        lblRealTimeStatus.Text = "Real-time logging enabled";
+                        lblRealTimeStatus.ForeColor = Color.Green;
+
+                        MessageBox.Show(string.Format("Real-time logging enabled to:\r\n{0}", logPath),
+                                      "Real-Time Logging", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        chkEnableRealTimeLogging.Checked = false;
+                        lblRealTimeStatus.Text = "Failed to enable real-time logging";
+                        lblRealTimeStatus.ForeColor = Color.Red;
+                        
+                        MessageBox.Show(string.Format("Failed to enable real-time logging:\r\n{0}", ex.Message),
+                                      "Real-Time Logging Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+                else
+                {
+                    // Disable real-time logging
+                    try
+                    {
+                        // Unsubscribe from events using reflection
+                        var eventInfo = _logService.GetType().GetEvent("RealTimeLogEntry");
+                        if (eventInfo != null)
+                        {
+                            var handler = new EventHandler<LogEntryEventArgs>(OnRealTimeLogEntry);
+                            eventInfo.RemoveEventHandler(_logService, handler);
+                        }
+
+                        // Disable real-time logging using reflection
+                        var disableMethod = _logService.GetType().GetMethod("DisableRealTimeLogging");
+                        if (disableMethod != null)
+                        {
+                            disableMethod.Invoke(_logService, new object[0]);
+                        }
+
+                        lblRealTimeStatus.Text = "Real-time logging disabled";
+                        lblRealTimeStatus.ForeColor = Color.Gray;
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(string.Format("Error disabling real-time logging:\r\n{0}", ex.Message),
+                                      "Real-Time Logging Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error in real-time logging toggle: " + ex.Message, "Error",
+                              MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Event handler for Browse Real-Time Log Path button
+        /// </summary>
+        private void btnBrowseRealTimeLogPath_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (SaveFileDialog saveDialog = new SaveFileDialog())
+                {
+                    saveDialog.Title = "Select Real-Time Log File";
+                    saveDialog.Filter = "CSV Files (*.csv)|*.csv|Text Files (*.txt)|*.txt|All Files (*.*)|*.*";
+                    saveDialog.FilterIndex = 1;
+                    saveDialog.DefaultExt = "csv";
+                    
+                    // Set initial directory and filename
+                    if (!string.IsNullOrEmpty(txtRealTimeLogPath.Text))
+                    {
+                        string currentPath = txtRealTimeLogPath.Text;
+                        try
+                        {
+                            saveDialog.InitialDirectory = System.IO.Path.GetDirectoryName(currentPath);
+                            saveDialog.FileName = System.IO.Path.GetFileName(currentPath);
+                        }
+                        catch
+                        {
+                            // Use default if current path is invalid
+                            string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                            saveDialog.InitialDirectory = documentsPath;
+                            saveDialog.FileName = string.Format("syncer_realtime_{0:yyyyMMdd}.csv", DateTime.Now);
+                        }
+                    }
+                    else
+                    {
+                        string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                        saveDialog.InitialDirectory = documentsPath;
+                        saveDialog.FileName = string.Format("syncer_realtime_{0:yyyyMMdd}.csv", DateTime.Now);
+                    }
+
+                    if (saveDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        txtRealTimeLogPath.Text = saveDialog.FileName;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error selecting file: " + ex.Message, "Error",
+                              MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Event handler for real-time log entries (for UI updates if needed)
+        /// </summary>
+        private void OnRealTimeLogEntry(object sender, LogEntryEventArgs e)
+        {
+            // This method can be used to update UI in real-time if needed
+            // For now, we'll just ensure the main log view gets refreshed
+            try
+            {
+                if (InvokeRequired)
+                {
+                    Invoke(new Action<object, LogEntryEventArgs>(OnRealTimeLogEntry), sender, e);
+                    return;
+                }
+
+                // Optionally refresh the main log view to show new entries
+                // RefreshLogData();
+                
+                // Update last updated time
+                UpdateLastUpdatedLabel();
+            }
+            catch
+            {
+                // Silently handle any UI update errors
+            }
+        }
+
+        /// <summary>
+        /// Clean up real-time logging when form closes
+        /// </summary>
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            try
+            {
+                if (_logService != null)
+                {
+                    // Check if real-time logging is enabled using reflection
+                    var isEnabledMethod = _logService.GetType().GetMethod("IsRealTimeLoggingEnabled");
+                    bool isEnabled = false;
+                    
+                    if (isEnabledMethod != null)
+                    {
+                        isEnabled = (bool)isEnabledMethod.Invoke(_logService, new object[0]);
+                    }
+
+                    if (isEnabled)
+                    {
+                        // Unsubscribe from events using reflection
+                        var eventInfo = _logService.GetType().GetEvent("RealTimeLogEntry");
+                        if (eventInfo != null)
+                        {
+                            var handler = new EventHandler<LogEntryEventArgs>(OnRealTimeLogEntry);
+                            eventInfo.RemoveEventHandler(_logService, handler);
+                        }
+
+                        // Disable real-time logging using reflection
+                        var disableMethod = _logService.GetType().GetMethod("DisableRealTimeLogging");
+                        if (disableMethod != null)
+                        {
+                            disableMethod.Invoke(_logService, new object[0]);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
+
+            base.OnFormClosed(e);
+        }
+
+        #endregion
     }
 }
    
