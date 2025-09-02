@@ -29,12 +29,12 @@ namespace syncer.ui
         private System.Windows.Forms.GroupBox gbControls;
         private System.Windows.Forms.GroupBox gbTimerJobs;
         private System.Windows.Forms.DataGridView dgvTimerJobs;
-        private System.Windows.Forms.Button btnRefreshTimerJobs;
         private System.Windows.Forms.Button btnStopTimerJob;
         private System.Windows.Forms.Button btnEditTimerJob;
         private System.Windows.Forms.Button btnDeleteTimerJob;
         private System.Windows.Forms.Button btnResumeTimerJob;
         private System.Windows.Forms.Label lblRunningTimerJobs;
+        private System.Windows.Forms.Label lblSeparator;
         
         // Bandwidth Control components
         private System.Windows.Forms.GroupBox gbBandwidthControl;
@@ -113,12 +113,12 @@ namespace syncer.ui
             this.gbControls = new System.Windows.Forms.GroupBox();
             this.gbTimerJobs = new System.Windows.Forms.GroupBox();
             this.dgvTimerJobs = new System.Windows.Forms.DataGridView();
-            this.btnRefreshTimerJobs = new System.Windows.Forms.Button();
             this.btnStopTimerJob = new System.Windows.Forms.Button();
             this.btnEditTimerJob = new System.Windows.Forms.Button();
             this.btnDeleteTimerJob = new System.Windows.Forms.Button();
             this.btnResumeTimerJob = new System.Windows.Forms.Button();
             this.lblRunningTimerJobs = new System.Windows.Forms.Label();
+            this.lblSeparator = new System.Windows.Forms.Label();
             this.showQuickLaunchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             
             // Initialize bandwidth control components
@@ -330,12 +330,12 @@ namespace syncer.ui
             | System.Windows.Forms.AnchorStyles.Left)
             | System.Windows.Forms.AnchorStyles.Right)));
             this.gbTimerJobs.Controls.Add(this.dgvTimerJobs);
-            this.gbTimerJobs.Controls.Add(this.btnRefreshTimerJobs);
             this.gbTimerJobs.Controls.Add(this.btnStopTimerJob);
             this.gbTimerJobs.Controls.Add(this.btnEditTimerJob);
             this.gbTimerJobs.Controls.Add(this.btnDeleteTimerJob);
             this.gbTimerJobs.Controls.Add(this.btnResumeTimerJob);
             this.gbTimerJobs.Controls.Add(this.lblRunningTimerJobs);
+            this.gbTimerJobs.Controls.Add(this.lblSeparator);
             this.gbTimerJobs.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.gbTimerJobs.Location = new System.Drawing.Point(12, 120);
             this.gbTimerJobs.Name = "gbTimerJobs";
@@ -353,73 +353,70 @@ namespace syncer.ui
             this.dgvTimerJobs.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
             this.dgvTimerJobs.BackgroundColor = System.Drawing.SystemColors.Control;
             this.dgvTimerJobs.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.dgvTimerJobs.Location = new System.Drawing.Point(6, 68);
+            this.dgvTimerJobs.Location = new System.Drawing.Point(6, 105);
             this.dgvTimerJobs.Name = "dgvTimerJobs";
             this.dgvTimerJobs.ReadOnly = true;
             this.dgvTimerJobs.RowHeadersWidth = 51;
             this.dgvTimerJobs.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dgvTimerJobs.Size = new System.Drawing.Size(964, 270);
-            this.dgvTimerJobs.TabIndex = 0;
+            this.dgvTimerJobs.Size = new System.Drawing.Size(964, 233);
+            this.dgvTimerJobs.TabIndex = 6;
 
-            // btnRefreshTimerJobs
-            this.btnRefreshTimerJobs.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnRefreshTimerJobs.Location = new System.Drawing.Point(220, 22);
-            this.btnRefreshTimerJobs.Name = "btnRefreshTimerJobs";
-            this.btnRefreshTimerJobs.Size = new System.Drawing.Size(120, 35);
-            this.btnRefreshTimerJobs.TabIndex = 1;
-            this.btnRefreshTimerJobs.Text = "Refresh List";
-            this.btnRefreshTimerJobs.UseVisualStyleBackColor = true;
-            this.btnRefreshTimerJobs.Click += new System.EventHandler(this.btnRefreshTimerJobs_Click);
-
-            // btnStopTimerJob
-            this.btnStopTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnStopTimerJob.Location = new System.Drawing.Point(346, 22);
-            this.btnStopTimerJob.Name = "btnStopTimerJob";
-            this.btnStopTimerJob.Size = new System.Drawing.Size(120, 35);
-            this.btnStopTimerJob.TabIndex = 2;
-            this.btnStopTimerJob.Text = "Stop Selected Job";
-            this.btnStopTimerJob.UseVisualStyleBackColor = true;
-            this.btnStopTimerJob.Click += new System.EventHandler(this.btnStopTimerJob_Click);
-
+            // Job Action Group - Better spaced layout
             // btnEditTimerJob
             this.btnEditTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnEditTimerJob.Location = new System.Drawing.Point(472, 22);
+            this.btnEditTimerJob.Location = new System.Drawing.Point(15, 55);
             this.btnEditTimerJob.Name = "btnEditTimerJob";
-            this.btnEditTimerJob.Size = new System.Drawing.Size(120, 35);
-            this.btnEditTimerJob.TabIndex = 3;
-            this.btnEditTimerJob.Text = "Edit Selected Job";
+            this.btnEditTimerJob.Size = new System.Drawing.Size(130, 35);
+            this.btnEditTimerJob.TabIndex = 1;
+            this.btnEditTimerJob.Text = "Edit Job";
             this.btnEditTimerJob.UseVisualStyleBackColor = true;
             this.btnEditTimerJob.Click += new System.EventHandler(this.btnEditTimerJob_Click);
 
-            // btnDeleteTimerJob
-            this.btnDeleteTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnDeleteTimerJob.Location = new System.Drawing.Point(598, 22);
-            this.btnDeleteTimerJob.Name = "btnDeleteTimerJob";
-            this.btnDeleteTimerJob.Size = new System.Drawing.Size(120, 35);
-            this.btnDeleteTimerJob.TabIndex = 4;
-            this.btnDeleteTimerJob.Text = "Delete Selected Job";
-            this.btnDeleteTimerJob.UseVisualStyleBackColor = true;
-            this.btnDeleteTimerJob.Click += new System.EventHandler(this.btnDeleteTimerJob_Click);
-
             // btnResumeTimerJob
             this.btnResumeTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnResumeTimerJob.Location = new System.Drawing.Point(724, 22);
+            this.btnResumeTimerJob.Location = new System.Drawing.Point(160, 55);
             this.btnResumeTimerJob.Name = "btnResumeTimerJob";
-            this.btnResumeTimerJob.Size = new System.Drawing.Size(120, 35);
-            this.btnResumeTimerJob.TabIndex = 5;
-            this.btnResumeTimerJob.Text = "Resume Selected Job";
+            this.btnResumeTimerJob.Size = new System.Drawing.Size(130, 35);
+            this.btnResumeTimerJob.TabIndex = 2;
+            this.btnResumeTimerJob.Text = "Start Job";
             this.btnResumeTimerJob.UseVisualStyleBackColor = true;
             this.btnResumeTimerJob.Click += new System.EventHandler(this.btnResumeTimerJob_Click);
 
-            
-            // lblRunningTimerJobs
+            // btnStopTimerJob
+            this.btnStopTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnStopTimerJob.Location = new System.Drawing.Point(305, 55);
+            this.btnStopTimerJob.Name = "btnStopTimerJob";
+            this.btnStopTimerJob.Size = new System.Drawing.Size(130, 35);
+            this.btnStopTimerJob.TabIndex = 3;
+            this.btnStopTimerJob.Text = "Stop Job";
+            this.btnStopTimerJob.UseVisualStyleBackColor = true;
+            this.btnStopTimerJob.Click += new System.EventHandler(this.btnStopTimerJob_Click);
+
+            // btnDeleteTimerJob - Separated with extra space for safety
+            this.btnDeleteTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnDeleteTimerJob.Location = new System.Drawing.Point(460, 55);
+            this.btnDeleteTimerJob.Name = "btnDeleteTimerJob";
+            this.btnDeleteTimerJob.Size = new System.Drawing.Size(130, 35);
+            this.btnDeleteTimerJob.TabIndex = 4;
+            this.btnDeleteTimerJob.Text = "Delete Job";
+            this.btnDeleteTimerJob.UseVisualStyleBackColor = true;
+            this.btnDeleteTimerJob.Click += new System.EventHandler(this.btnDeleteTimerJob_Click);
+
+            // lblSeparator - Visual separator line
+            this.lblSeparator.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.lblSeparator.Location = new System.Drawing.Point(15, 100);
+            this.lblSeparator.Name = "lblSeparator";
+            this.lblSeparator.Size = new System.Drawing.Size(950, 2);
+            this.lblSeparator.TabIndex = 7;
+
+            // lblRunningTimerJobs - Job count display with better spacing
             this.lblRunningTimerJobs.AutoSize = true;
-            this.lblRunningTimerJobs.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.lblRunningTimerJobs.Location = new System.Drawing.Point(6, 32);
+            this.lblRunningTimerJobs.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Bold);
+            this.lblRunningTimerJobs.Location = new System.Drawing.Point(15, 25);
             this.lblRunningTimerJobs.Name = "lblRunningTimerJobs";
-            this.lblRunningTimerJobs.Size = new System.Drawing.Size(191, 15);
-            this.lblRunningTimerJobs.TabIndex = 3;
-            this.lblRunningTimerJobs.Text = "Running Timer Jobs: 0";
+            this.lblRunningTimerJobs.Size = new System.Drawing.Size(191, 18);
+            this.lblRunningTimerJobs.TabIndex = 5;
+            this.lblRunningTimerJobs.Text = "Active Timer Jobs: 0";
             
             // gbBandwidthControl
             this.gbBandwidthControl.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)

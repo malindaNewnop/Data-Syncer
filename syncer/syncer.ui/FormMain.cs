@@ -706,7 +706,7 @@ namespace syncer.ui
             // Add selection changed event
             dgvTimerJobs.SelectionChanged += dgvTimerJobs_SelectionChanged;
             
-            // Initially disable action buttons
+            // Initially disable action buttons (job-specific buttons only)
             btnStopTimerJob.Enabled = false;
             btnEditTimerJob.Enabled = false;
             btnDeleteTimerJob.Enabled = false;
@@ -735,7 +735,7 @@ namespace syncer.ui
                 if (timerJobManager == null) return;
                 
                 List<long> runningJobs = timerJobManager.GetRegisteredTimerJobs();
-                lblRunningTimerJobs.Text = string.Format("Running Timer Jobs: {0}", runningJobs.Count);
+                lblRunningTimerJobs.Text = string.Format("Active Timer Jobs: {0}", runningJobs.Count);
                 
                 // Get job details directly from TimerJobManager
                 foreach (long jobId in runningJobs)
@@ -812,11 +812,6 @@ namespace syncer.ui
                 MessageBox.Show("Error loading timer jobs: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 ServiceLocator.LogService.LogError("Error loading timer jobs: " + ex.Message);
             }
-        }
-        
-        private void btnRefreshTimerJobs_Click(object sender, EventArgs e)
-        {
-            RefreshTimerJobsGrid();
         }
         
         private void btnStopTimerJob_Click(object sender, EventArgs e)
