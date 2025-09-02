@@ -59,6 +59,9 @@ namespace syncer.ui
             this.lblNoFilesSelected = new System.Windows.Forms.Label();
             this.btnBrowseFilesForTimer = new System.Windows.Forms.Button();
             this.lblFileSelection = new System.Windows.Forms.Label();
+            this.lblRemotePath = new System.Windows.Forms.Label();
+            this.txtRemotePath = new System.Windows.Forms.TextBox();
+            this.btnBrowseLocalFolder = new System.Windows.Forms.Button();
             this.btnSaveTimerJob = new System.Windows.Forms.Button();
             this.btnLoadConfiguration = new System.Windows.Forms.Button();
             this.btnSave = new System.Windows.Forms.Button();
@@ -388,6 +391,9 @@ namespace syncer.ui
             this.gbFileManager.Controls.Add(this.lblNoFilesSelected);
             this.gbFileManager.Controls.Add(this.btnBrowseFilesForTimer);
             this.gbFileManager.Controls.Add(this.lblFileSelection);
+            this.gbFileManager.Controls.Add(this.lblRemotePath);
+            this.gbFileManager.Controls.Add(this.txtRemotePath);
+            this.gbFileManager.Controls.Add(this.btnBrowseLocalFolder);
             this.gbFileManager.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.gbFileManager.Location = new System.Drawing.Point(445, 95);
             this.gbFileManager.Name = "gbFileManager";
@@ -439,9 +445,9 @@ namespace syncer.ui
             | System.Windows.Forms.AnchorStyles.Right)));
             this.lblNoFilesSelected.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F, System.Drawing.FontStyle.Italic);
             this.lblNoFilesSelected.ForeColor = System.Drawing.Color.Blue;
-            this.lblNoFilesSelected.Location = new System.Drawing.Point(20, 140);
+            this.lblNoFilesSelected.Location = new System.Drawing.Point(20, 170);
             this.lblNoFilesSelected.Name = "lblNoFilesSelected";
-            this.lblNoFilesSelected.Size = new System.Drawing.Size(400, 120);
+            this.lblNoFilesSelected.Size = new System.Drawing.Size(400, 90);
             this.lblNoFilesSelected.TabIndex = 2;
             this.lblNoFilesSelected.Text = "No files selected for timer upload.\r\n\r\nClick \"Browse Folder\" to select a folder" +
     " for automatic uploads.";
@@ -466,6 +472,41 @@ namespace syncer.ui
             this.lblFileSelection.TabIndex = 0;
             this.lblFileSelection.Text = "File Selection: Select a folder and configure filters to automatically upload on" +
     "ly specific file types at regular intervals.";
+            // 
+            // lblRemotePath
+            // 
+            this.lblRemotePath.AutoSize = true;
+            this.lblRemotePath.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
+            this.lblRemotePath.Location = new System.Drawing.Point(20, 95);
+            this.lblRemotePath.Name = "lblRemotePath";
+            this.lblRemotePath.Size = new System.Drawing.Size(75, 13);
+            this.lblRemotePath.TabIndex = 6;
+            this.lblRemotePath.Text = "Remote Path:";
+            this.lblRemotePath.Visible = false;
+            // 
+            // txtRemotePath
+            // 
+            this.txtRemotePath.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.txtRemotePath.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.txtRemotePath.Location = new System.Drawing.Point(100, 92);
+            this.txtRemotePath.Name = "txtRemotePath";
+            this.txtRemotePath.Size = new System.Drawing.Size(320, 21);
+            this.txtRemotePath.TabIndex = 7;
+            this.txtRemotePath.Text = "/";
+            this.txtRemotePath.Visible = false;
+            // 
+            // btnBrowseLocalFolder
+            // 
+            this.btnBrowseLocalFolder.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnBrowseLocalFolder.Location = new System.Drawing.Point(20, 125);
+            this.btnBrowseLocalFolder.Name = "btnBrowseLocalFolder";
+            this.btnBrowseLocalFolder.Size = new System.Drawing.Size(130, 35);
+            this.btnBrowseLocalFolder.TabIndex = 8;
+            this.btnBrowseLocalFolder.Text = "Browse Local";
+            this.btnBrowseLocalFolder.UseVisualStyleBackColor = true;
+            this.btnBrowseLocalFolder.Visible = false;
+            this.btnBrowseLocalFolder.Click += new System.EventHandler(this.btnBrowseLocalFolder_Click);
             // 
             // btnSaveTimerJob
             // 
@@ -580,6 +621,11 @@ namespace syncer.ui
         private System.Windows.Forms.Label lblManualOperations;
         private System.Windows.Forms.Button btnUploadFiles;
         private System.Windows.Forms.Button btnDownloadFile;
+        
+        // Download mode specific controls
+        private System.Windows.Forms.Label lblRemotePath;
+        private System.Windows.Forms.TextBox txtRemotePath;
+        private System.Windows.Forms.Button btnBrowseLocalFolder;
         private System.Windows.Forms.Button btnSaveTimerJob;
         private System.Windows.Forms.Button btnLoadConfiguration;
         private System.Windows.Forms.Button btnSave;
