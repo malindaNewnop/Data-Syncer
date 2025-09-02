@@ -43,6 +43,58 @@ namespace syncer.ui.Interfaces
         bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders);
         
         /// <summary>
+        /// Registers a timer job with subfolder inclusion, delete source, and filter options
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <param name="jobName">The custom name for the job</param>
+        /// <param name="folderPath">The local folder path to monitor and upload</param>
+        /// <param name="remotePath">The remote path to upload to</param>
+        /// <param name="intervalMs">The timer interval in milliseconds</param>
+        /// <param name="includeSubfolders">Whether to include subfolders in file enumeration</param>
+        /// <param name="deleteSourceAfterTransfer">Whether to delete source files after successful transfer</param>
+        /// <param name="filterSettings">File filtering settings</param>
+        /// <returns>True if the job was registered successfully</returns>
+        bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer, object filterSettings);
+        
+        /// <summary>
+        /// Register a download timer job (remote to local)
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <param name="remotePath">The remote folder path to download from</param>
+        /// <param name="localFolderPath">The local path to download to</param>
+        /// <param name="intervalMs">The timer interval in milliseconds</param>
+        /// <param name="deleteSourceAfterTransfer">Whether to delete source files after successful transfer</param>
+        /// <returns>True if the job was registered successfully</returns>
+        bool RegisterDownloadTimerJob(long jobId, string remotePath, string localFolderPath, double intervalMs, bool deleteSourceAfterTransfer = false);
+        
+        /// <summary>
+        /// Register a download timer job (remote to local) with custom name
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <param name="jobName">The custom name for the job</param>
+        /// <param name="remotePath">The remote folder path to download from</param>
+        /// <param name="localFolderPath">The local path to download to</param>
+        /// <param name="intervalMs">The timer interval in milliseconds</param>
+        /// <param name="includeSubfolders">Whether to include subfolders in file enumeration</param>
+        /// <param name="deleteSourceAfterTransfer">Whether to delete source files after successful transfer</param>
+        /// <returns>True if the job was registered successfully</returns>
+        bool RegisterDownloadTimerJob(long jobId, string jobName, string remotePath, string localFolderPath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer = false);
+        
+        /// <summary>
+        /// Register a download timer job (remote to local) with custom name, delete source and filter options
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <param name="jobName">The custom name for the job</param>
+        /// <param name="remotePath">The remote folder path to download from</param>
+        /// <param name="localFolderPath">The local path to download to</param>
+        /// <param name="intervalMs">The timer interval in milliseconds</param>
+        /// <param name="includeSubfolders">Whether to include subfolders in file enumeration</param>
+        /// <param name="deleteSourceAfterTransfer">Whether to delete source files after successful transfer</param>
+        /// <param name="filterSettings">File filtering settings</param>
+        /// <returns>True if the job was registered successfully</returns>
+        bool RegisterDownloadTimerJob(long jobId, string jobName, string remotePath, string localFolderPath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer, object filterSettings);
+        
+        /// <summary>
         /// Starts a timer job
         /// </summary>
         /// <param name="jobId">The ID of the job to start</param>

@@ -43,6 +43,10 @@ namespace syncer.ui.Forms
             this.txtDestinationPath = new System.Windows.Forms.TextBox();
             this.txtSourcePath = new System.Windows.Forms.TextBox();
             this.txtJobName = new System.Windows.Forms.TextBox();
+            this.cmbTransferMode = new System.Windows.Forms.ComboBox();
+            this.lblTransferMode = new System.Windows.Forms.Label();
+            this.lblSourcePath = new System.Windows.Forms.Label();
+            this.lblDestinationPath = new System.Windows.Forms.Label();
             this.label8 = new System.Windows.Forms.Label();
             this.label7 = new System.Windows.Forms.Label();
             this.label6 = new System.Windows.Forms.Label();
@@ -151,6 +155,10 @@ namespace syncer.ui.Forms
             this.tabJob.Controls.Add(this.txtDestinationPath);
             this.tabJob.Controls.Add(this.txtSourcePath);
             this.tabJob.Controls.Add(this.txtJobName);
+            this.tabJob.Controls.Add(this.cmbTransferMode);
+            this.tabJob.Controls.Add(this.lblTransferMode);
+            this.tabJob.Controls.Add(this.lblSourcePath);
+            this.tabJob.Controls.Add(this.lblDestinationPath);
             this.tabJob.Controls.Add(this.label8);
             this.tabJob.Controls.Add(this.label7);
             this.tabJob.Controls.Add(this.label6);
@@ -170,7 +178,7 @@ namespace syncer.ui.Forms
             this.chkEnabled.AutoSize = true;
             this.chkEnabled.Checked = true;
             this.chkEnabled.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkEnabled.Location = new System.Drawing.Point(20, 280);
+            this.chkEnabled.Location = new System.Drawing.Point(130, 180);
             this.chkEnabled.Name = "chkEnabled";
             this.chkEnabled.Size = new System.Drawing.Size(87, 17);
             this.chkEnabled.TabIndex = 13;
@@ -185,14 +193,14 @@ namespace syncer.ui.Forms
             "Seconds",
             "Minutes",
             "Hours"});
-            this.cmbIntervalType.Location = new System.Drawing.Point(200, 240);
+            this.cmbIntervalType.Location = new System.Drawing.Point(200, 150);
             this.cmbIntervalType.Name = "cmbIntervalType";
             this.cmbIntervalType.Size = new System.Drawing.Size(100, 21);
             this.cmbIntervalType.TabIndex = 12;
             // 
             // numInterval
             // 
-            this.numInterval.Location = new System.Drawing.Point(20, 240);
+            this.numInterval.Location = new System.Drawing.Point(130, 150);
             this.numInterval.Maximum = new decimal(new int[] {
             9999,
             0,
@@ -204,17 +212,17 @@ namespace syncer.ui.Forms
             0,
             0});
             this.numInterval.Name = "numInterval";
-            this.numInterval.Size = new System.Drawing.Size(120, 20);
+            this.numInterval.Size = new System.Drawing.Size(60, 20);
             this.numInterval.TabIndex = 11;
             this.numInterval.Value = new decimal(new int[] {
-            5,
+            30,
             0,
             0,
             0});
             // 
             // btnBrowseDestination
             // 
-            this.btnBrowseDestination.Location = new System.Drawing.Point(450, 160);
+            this.btnBrowseDestination.Location = new System.Drawing.Point(440, 108);
             this.btnBrowseDestination.Name = "btnBrowseDestination";
             this.btnBrowseDestination.Size = new System.Drawing.Size(75, 23);
             this.btnBrowseDestination.TabIndex = 10;
@@ -224,7 +232,7 @@ namespace syncer.ui.Forms
             // 
             // btnBrowseSource
             // 
-            this.btnBrowseSource.Location = new System.Drawing.Point(450, 100);
+            this.btnBrowseSource.Location = new System.Drawing.Point(440, 78);
             this.btnBrowseSource.Name = "btnBrowseSource";
             this.btnBrowseSource.Size = new System.Drawing.Size(75, 23);
             this.btnBrowseSource.TabIndex = 9;
@@ -234,29 +242,29 @@ namespace syncer.ui.Forms
             // 
             // txtDestinationPath
             // 
-            this.txtDestinationPath.Location = new System.Drawing.Point(20, 160);
+            this.txtDestinationPath.Location = new System.Drawing.Point(130, 110);
             this.txtDestinationPath.Name = "txtDestinationPath";
-            this.txtDestinationPath.Size = new System.Drawing.Size(420, 20);
+            this.txtDestinationPath.Size = new System.Drawing.Size(300, 20);
             this.txtDestinationPath.TabIndex = 8;
             // 
             // txtSourcePath
             // 
-            this.txtSourcePath.Location = new System.Drawing.Point(20, 100);
+            this.txtSourcePath.Location = new System.Drawing.Point(130, 80);
             this.txtSourcePath.Name = "txtSourcePath";
-            this.txtSourcePath.Size = new System.Drawing.Size(420, 20);
+            this.txtSourcePath.Size = new System.Drawing.Size(300, 20);
             this.txtSourcePath.TabIndex = 7;
             // 
             // txtJobName
             // 
-            this.txtJobName.Location = new System.Drawing.Point(20, 40);
+            this.txtJobName.Location = new System.Drawing.Point(130, 17);
             this.txtJobName.Name = "txtJobName";
-            this.txtJobName.Size = new System.Drawing.Size(400, 20);
+            this.txtJobName.Size = new System.Drawing.Size(300, 20);
             this.txtJobName.TabIndex = 6;
             // 
             // label8
             // 
             this.label8.AutoSize = true;
-            this.label8.Location = new System.Drawing.Point(20, 220);
+            this.label8.Location = new System.Drawing.Point(20, 153);
             this.label8.Name = "label8";
             this.label8.Size = new System.Drawing.Size(73, 13);
             this.label8.TabIndex = 5;
@@ -306,6 +314,45 @@ namespace syncer.ui.Forms
             this.label3.Size = new System.Drawing.Size(62, 13);
             this.label3.TabIndex = 0;
             this.label3.Text = "Job Name:";
+            // 
+            // cmbTransferMode
+            // 
+            this.cmbTransferMode.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbTransferMode.FormattingEnabled = true;
+            this.cmbTransferMode.Items.AddRange(new object[] {
+            "Upload (Local to Remote)",
+            "Download (Remote to Local)"});
+            this.cmbTransferMode.Location = new System.Drawing.Point(130, 50);
+            this.cmbTransferMode.Name = "cmbTransferMode";
+            this.cmbTransferMode.Size = new System.Drawing.Size(200, 21);
+            this.cmbTransferMode.TabIndex = 15;
+            // 
+            // lblTransferMode
+            // 
+            this.lblTransferMode.AutoSize = true;
+            this.lblTransferMode.Location = new System.Drawing.Point(20, 53);
+            this.lblTransferMode.Name = "lblTransferMode";
+            this.lblTransferMode.Size = new System.Drawing.Size(82, 13);
+            this.lblTransferMode.TabIndex = 14;
+            this.lblTransferMode.Text = "Transfer Mode:";
+            // 
+            // lblSourcePath
+            // 
+            this.lblSourcePath.AutoSize = true;
+            this.lblSourcePath.Location = new System.Drawing.Point(20, 83);
+            this.lblSourcePath.Name = "lblSourcePath";
+            this.lblSourcePath.Size = new System.Drawing.Size(75, 13);
+            this.lblSourcePath.TabIndex = 16;
+            this.lblSourcePath.Text = "Source Path:";
+            // 
+            // lblDestinationPath
+            // 
+            this.lblDestinationPath.AutoSize = true;
+            this.lblDestinationPath.Location = new System.Drawing.Point(20, 113);
+            this.lblDestinationPath.Name = "lblDestinationPath";
+            this.lblDestinationPath.Size = new System.Drawing.Size(94, 13);
+            this.lblDestinationPath.TabIndex = 17;
+            this.lblDestinationPath.Text = "Destination Path:";
             // 
             // tabConnection
             // 
@@ -603,6 +650,10 @@ namespace syncer.ui.Forms
         private System.Windows.Forms.TextBox txtDestinationPath;
         private System.Windows.Forms.TextBox txtSourcePath;
         private System.Windows.Forms.TextBox txtJobName;
+        private System.Windows.Forms.ComboBox cmbTransferMode;
+        private System.Windows.Forms.Label lblTransferMode;
+        private System.Windows.Forms.Label lblSourcePath;
+        private System.Windows.Forms.Label lblDestinationPath;
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.Label label6;

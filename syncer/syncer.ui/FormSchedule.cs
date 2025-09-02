@@ -33,7 +33,7 @@ namespace syncer.ui
         }
         
         // Timer-based upload functionality
-        private System.Timers.Timer _uploadTimer;
+        // Removed _uploadTimer - using TimerJobManager instead
         private bool _isTimerRunning = false;
         private DateTime _lastUploadTime;
         private string[] _selectedFilesForTimer; // Store files selected for timer upload
@@ -44,7 +44,7 @@ namespace syncer.ui
         private bool _includeSubfoldersForTimer = true; // Include subfolders in timer uploads (default: true)
 
         // Timer-based download functionality
-        private System.Timers.Timer _downloadTimer;
+        // Removed _downloadTimer - using TimerJobManager instead
         private bool _isDownloadTimerRunning = false;
         private DateTime _lastDownloadTime;
         private string _selectedRemoteFolderForTimer; // Remote folder path for download monitoring
@@ -136,36 +136,27 @@ namespace syncer.ui
             }
             
             // Always stop and clean up both timers when form is closing
-            if (_uploadTimer != null)
+            // This code has been refactored to use the timer job manager
+            
+            // Stop any running jobs using the timer job manager
+            try
             {
-                try
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager != null)
                 {
-                    _uploadTimer.Stop();
-                    _uploadTimer.Elapsed -= OnTimerElapsed;
-                    _uploadTimer.Dispose();
+                    var runningJobs = timerJobManager.GetRunningJobs();
+                    foreach (var jobId in runningJobs.Keys)
+                    {
+                        timerJobManager.StopTimerJob(jobId);
+                    }
+                    _isDownloadTimerRunning = false;
                     _isTimerRunning = false;
-                    ServiceLocator.LogService.LogInfo("Upload timer stopped and disposed during form closing");
-                }
-                catch (Exception ex)
-                {
-                    ServiceLocator.LogService.LogError("Error stopping upload timer during form closing: " + ex.Message);
+                    ServiceLocator.LogService.LogInfo("Timer jobs stopped during form closing");
                 }
             }
-            
-            if (_downloadTimer != null)
+            catch (Exception ex)
             {
-                try
-                {
-                    _downloadTimer.Stop();
-                    _downloadTimer.Elapsed -= OnDownloadTimerElapsed;
-                    _downloadTimer.Dispose();
-                    _isDownloadTimerRunning = false;
-                    ServiceLocator.LogService.LogInfo("Download timer stopped and disposed during form closing");
-                }
-                catch (Exception ex)
-                {
-                    ServiceLocator.LogService.LogError("Error stopping download timer during form closing: " + ex.Message);
-                }
+                ServiceLocator.LogService.LogError("Error stopping timer jobs during form closing: " + ex.Message);
             }
         }
 
@@ -822,21 +813,9 @@ namespace syncer.ui
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             // Clean up timers when form is closed
-            if (_uploadTimer != null)
-            {
-                _uploadTimer.Stop();
-                _uploadTimer.Elapsed -= OnTimerElapsed;
-                _uploadTimer.Dispose();
-                _uploadTimer = null;
-            }
+            // This code has been refactored to use the timer job manager
             
-            if (_downloadTimer != null)
-            {
-                _downloadTimer.Stop();
-                _downloadTimer.Elapsed -= OnDownloadTimerElapsed;
-                _downloadTimer.Dispose();
-                _downloadTimer = null;
-            }
+            // Timer jobs are managed by the timer job manager, no need to dispose of anything here
             
             base.OnFormClosed(e);
         }
@@ -1308,8 +1287,10 @@ namespace syncer.ui
                         else
                         {
                             // Register new timer job
+                            UpdateFilterSettingsFromUI(); // Update filter settings from UI
                             bool registered = timerJobManager.RegisterTimerJob(_currentJob.Id, _currentJob.Name,
-                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders());
+                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), 
+                                chkDeleteSourceAfterTransfer?.Checked ?? false, _jobFilterSettings);
                             
                             bool isTimerCurrentlyRunning = (_currentTransferMode == "Upload" && _isTimerRunning) ||
                                                          (_currentTransferMode == "Download" && _isDownloadTimerRunning);
@@ -1884,94 +1865,197 @@ namespace syncer.ui
 
         private void StartUploadTimer(double intervalMs)
         {
-            if (_uploadTimer == null)
+            try
             {
-                _uploadTimer = new System.Timers.Timer();
-                _uploadTimer.Elapsed += OnTimerElapsed;
-                _uploadTimer.AutoReset = true;
+                // Get unique job ID (can use timestamp or generate from config)
+                long jobId = DateTime.Now.Ticks;
+                string jobName = "Upload Job " + DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+                
+                // Use TimerJobManager to register and start the job
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager == null)
+                {
+                    ServiceLocator.LogService.LogError("Cannot start upload timer job: Timer job manager not available");
+                    return;
+                }
+                
+                // Register upload timer job
+                bool success = timerJobManager.RegisterTimerJob(
+                    jobId, 
+                    jobName,
+                    _selectedFolderForTimer,  // local source folder
+                    txtRemotePath.Text.Trim(),  // remote destination path
+                    intervalMs,
+                    ShouldIncludeSubfolders(), // Include subfolders based on settings
+                    chkDeleteSourceAfterTransfer?.Checked ?? false, // Delete source after transfer
+                    _jobFilterSettings); // Filter settings
+                
+                if (success)
+                {
+                    // Start the job
+                    timerJobManager.StartTimerJob(jobId);
+                    _isTimerRunning = true;
+                    
+                    // Update UI
+                    if (lblTimerStatus != null) lblTimerStatus.Text = "Upload timer running";
+                    if (btnStartTimer != null) btnStartTimer.Enabled = false;
+                    if (btnStopTimer != null) btnStopTimer.Enabled = true;
+                    
+                    // Ask if user wants to save this job configuration
+                    DialogResult saveResult = MessageBox.Show(
+                        "Upload timer started successfully! Do you want to save this job configuration for future use?", 
+                        "Save Job Configuration", 
+                        MessageBoxButtons.YesNo, 
+                        MessageBoxIcon.Question);
+                    
+                    if (saveResult == DialogResult.Yes)
+                    {
+                        SaveJob();
+                        MessageBox.Show(
+                            "Job configuration saved. This timer will continue to run even if this window is closed.", 
+                            "Job Saved", 
+                            MessageBoxButtons.OK, 
+                            MessageBoxIcon.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show(
+                            "Upload timer started successfully! Note: This timer will stop if the application is closed.",
+                            "Timer Started",
+                            MessageBoxButtons.OK, 
+                            MessageBoxIcon.Information);
+                    }
+                    
+                    ServiceLocator.LogService.LogInfo(string.Format("Upload timer job started with interval: {0} ms", intervalMs));
+                }
+                else
+                {
+                    MessageBox.Show("Failed to register upload timer job", "Timer Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
-            
-            _uploadTimer.Interval = intervalMs;
-            _uploadTimer.Start();
-            _isTimerRunning = true;
-            
-            // Update UI
-            if (lblTimerStatus != null) lblTimerStatus.Text = "Upload timer running";
-            if (btnStartTimer != null) btnStartTimer.Enabled = false;
-            if (btnStopTimer != null) btnStopTimer.Enabled = true;
-            
-            // Ask if user wants to save this job configuration
-            DialogResult saveResult = MessageBox.Show(
-                "Upload timer started successfully! Do you want to save this job configuration for future use?", 
-                "Save Job Configuration", 
-                MessageBoxButtons.YesNo, 
-                MessageBoxIcon.Question);
-            
-            if (saveResult == DialogResult.Yes)
+            catch (Exception ex)
             {
-                SaveJob();
-                MessageBox.Show(
-                    "Job configuration saved. This timer will continue to run even if this window is closed.", 
-                    "Job Saved", 
-                    MessageBoxButtons.OK, 
-                    MessageBoxIcon.Information);
+                MessageBox.Show("Error starting upload timer: " + ex.Message, "Timer Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error starting upload timer: " + ex.Message);
             }
-            else
-            {
-                MessageBox.Show(
-                    "Upload timer started successfully! Note: This timer will stop if the application is closed.",
-                    "Timer Started",
-                    MessageBoxButtons.OK, 
-                    MessageBoxIcon.Information);
-            }
-            
-            ServiceLocator.LogService.LogInfo(string.Format("Upload timer started with interval: {0} ms", intervalMs));
         }
 
         private void StartDownloadTimer(double intervalMs)
         {
-            if (_downloadTimer == null)
+            try
             {
-                _downloadTimer = new System.Timers.Timer();
-                _downloadTimer.Elapsed += OnDownloadTimerElapsed;
-                _downloadTimer.AutoReset = true;
+                // Get unique job ID (can use timestamp or generate from config)
+                long jobId = DateTime.Now.Ticks;
+                string jobName = "Download Job " + DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+                
+                // Use TimerJobManager to register and start the job
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager == null)
+                {
+                    ServiceLocator.LogService.LogError("Cannot start download timer job: Timer job manager not available");
+                    return;
+                }
+                
+                // Ensure local destination directory exists before registering job
+                if (!Directory.Exists(_timerDownloadDestination))
+                {
+                    try
+                    {
+                        // Create the entire directory path
+                        string path = _timerDownloadDestination;
+                        if (path.EndsWith("\\") || path.EndsWith("/"))
+                            path = path.Substring(0, path.Length - 1);
+                            
+                        // Start with the drive root
+                        string drivePart = Path.GetPathRoot(path);
+                        string remainingPath = path.Substring(drivePart.Length);
+                        string currentPath = drivePart;
+                        
+                        // Split by directory separator and create each segment
+                        foreach (string segment in remainingPath.Split(new char[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, 
+                            StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            currentPath = Path.Combine(currentPath, segment);
+                            if (!Directory.Exists(currentPath))
+                            {
+                                Directory.CreateDirectory(currentPath);
+                                ServiceLocator.LogService.LogInfo(string.Format("Created directory segment: {0}", currentPath));
+                            }
+                        }
+                        
+                        ServiceLocator.LogService.LogInfo(string.Format("Successfully created full directory path: {0}", _timerDownloadDestination));
+                    }
+                    catch (Exception dirEx)
+                    {
+                        ServiceLocator.LogService.LogError(string.Format("Error creating local destination directory {0}: {1}", _timerDownloadDestination, dirEx.Message));
+                        MessageBox.Show("Error creating local destination directory: " + dirEx.Message, "Directory Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                }
+                
+                // Register download timer job
+                bool success = timerJobManager.RegisterDownloadTimerJob(
+                    jobId, 
+                    jobName,
+                    txtRemotePath.Text.Trim(),  // remote source path
+                    _timerDownloadDestination,  // local destination folder
+                    intervalMs,
+                    ShouldIncludeSubfolders(),  // Include subfolders based on settings
+                    chkDeleteSourceAfterTransfer?.Checked ?? false, // Use delete after transfer setting if available
+                    _jobFilterSettings); // Filter settings
+                
+                if (success)
+                {
+                    // Start the job
+                    timerJobManager.StartTimerJob(jobId);
+                    _isDownloadTimerRunning = true;
+                    
+                    // Update UI
+                    if (lblTimerStatus != null) lblTimerStatus.Text = "Download timer running";
+                    if (btnStartTimer != null) btnStartTimer.Enabled = false;
+                    if (btnStopTimer != null) btnStopTimer.Enabled = true;
+                    
+                    // Ask if user wants to save this job configuration
+                    DialogResult saveResult = MessageBox.Show(
+                        "Download timer started successfully! Do you want to save this job configuration for future use?", 
+                        "Save Job Configuration", 
+                        MessageBoxButtons.YesNo, 
+                        MessageBoxIcon.Question);
+                    
+                    if (saveResult == DialogResult.Yes)
+                    {
+                        SaveJob();
+                        MessageBox.Show(
+                            "Job configuration saved. This timer will continue to run even if this window is closed.", 
+                            "Job Saved", 
+                            MessageBoxButtons.OK, 
+                            MessageBoxIcon.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show(
+                            "Download timer started successfully! Note: This timer will stop if the application is closed.",
+                            "Timer Started",
+                            MessageBoxButtons.OK, 
+                            MessageBoxIcon.Information);
+                    }
+                    
+                    ServiceLocator.LogService.LogInfo(string.Format("Download timer job started with interval: {0} ms", intervalMs));
+                }
+                else
+                {
+                    MessageBox.Show("Failed to register download timer job", "Timer Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
-            
-            _downloadTimer.Interval = intervalMs;
-            _downloadTimer.Start();
-            _isDownloadTimerRunning = true;
-            
-            // Update UI
-            if (lblTimerStatus != null) lblTimerStatus.Text = "Download timer running";
-            if (btnStartTimer != null) btnStartTimer.Enabled = false;
-            if (btnStopTimer != null) btnStopTimer.Enabled = true;
-            
-            // Ask if user wants to save this job configuration
-            DialogResult saveResult = MessageBox.Show(
-                "Download timer started successfully! Do you want to save this job configuration for future use?", 
-                "Save Job Configuration", 
-                MessageBoxButtons.YesNo, 
-                MessageBoxIcon.Question);
-            
-            if (saveResult == DialogResult.Yes)
+            catch (Exception ex)
             {
-                SaveJob();
-                MessageBox.Show(
-                    "Job configuration saved. This timer will continue to run even if this window is closed.", 
-                    "Job Saved", 
-                    MessageBoxButtons.OK, 
-                    MessageBoxIcon.Information);
+                MessageBox.Show("Error starting download timer: " + ex.Message, "Timer Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError("Error starting download timer: " + ex.Message);
             }
-            else
-            {
-                MessageBox.Show(
-                    "Download timer started successfully! Note: This timer will stop if the application is closed.",
-                    "Timer Started",
-                    MessageBoxButtons.OK, 
-                    MessageBoxIcon.Information);
-            }
-            
-            ServiceLocator.LogService.LogInfo(string.Format("Download timer started with interval: {0} ms", intervalMs));
         }
 
         private void btnStopTimer_Click(object sender, EventArgs e)
@@ -1981,21 +2065,28 @@ namespace syncer.ui
                 bool timerStopped = false;
                 string timerType = "";
                 
-                if (_uploadTimer != null && _isTimerRunning)
+                // Get all running timer jobs from the manager
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager == null)
                 {
-                    _uploadTimer.Stop();
-                    _isTimerRunning = false;
-                    timerType = "Upload";
-                    timerStopped = true;
+                    ServiceLocator.LogService.LogError("Cannot stop timer job: Timer job manager not available");
+                    return;
                 }
                 
-                if (_downloadTimer != null && _isDownloadTimerRunning)
+                // Get all jobs and stop them
+                var runningJobs = timerJobManager.GetRunningJobs();
+                foreach (var jobId in runningJobs.Keys)
                 {
-                    _downloadTimer.Stop();
-                    _isDownloadTimerRunning = false;
-                    timerType = "Download";
-                    timerStopped = true;
+                    if (timerJobManager.StopTimerJob(jobId))
+                    {
+                        timerStopped = true;
+                        timerType = "Job"; // Generic type since we might stop both types
+                    }
                 }
+                
+                // Reset UI state
+                _isTimerRunning = false;
+                _isDownloadTimerRunning = false;
                 
                 if (timerStopped)
                 {
@@ -2092,103 +2183,9 @@ namespace syncer.ui
             }
         }
 
-        private void OnTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            try
-            {
-                // Prevent overlapping uploads
-                if (_isUploadInProgress)
-                {
-                    TimeSpan uploadDuration = DateTime.Now - (_uploadStartTime ?? DateTime.Now);
-                    ServiceLocator.LogService.LogWarning(string.Format("Skipping upload timer cycle - previous upload still in progress (running for {0:mm\\:ss})", uploadDuration));
-                    return;
-                }
-                
-                ServiceLocator.LogService.LogInfo("Upload timer elapsed - starting automatic upload");
-                
-                // Mark upload as in progress
-                _isUploadInProgress = true;
-                _uploadStartTime = DateTime.Now;
-                
-                // Run upload on UI thread
-                this.Invoke(new Action(() =>
-                {
-                    try
-                    {
-                        PerformAutomaticUpload();
-                        
-                        TimeSpan totalDuration = DateTime.Now - _uploadStartTime.Value;
-                        ServiceLocator.LogService.LogInfo(string.Format("Upload cycle completed in {0:mm\\:ss}", totalDuration));
-                    }
-                    catch (Exception ex)
-                    {
-                        ServiceLocator.LogService.LogError("Automatic upload error: " + ex.Message);
-                    }
-                    finally
-                    {
-                        // Always reset the upload in progress flag
-                        _isUploadInProgress = false;
-                        _uploadStartTime = null;
-                    }
-                }));
-            }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogError("Upload timer elapsed error: " + ex.Message);
-                // Ensure we reset the flag even if there's an error
-                _isUploadInProgress = false;
-                _uploadStartTime = null;
-            }
-        }
+        // OnTimerElapsed method removed - using TimerJobManager instead
 
-        private void OnDownloadTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            try
-            {
-                // Prevent overlapping downloads
-                if (_isDownloadInProgress)
-                {
-                    TimeSpan downloadDuration = DateTime.Now - (_downloadStartTime ?? DateTime.Now);
-                    ServiceLocator.LogService.LogWarning(string.Format("Skipping download timer cycle - previous download still in progress (running for {0:mm\\:ss})", downloadDuration));
-                    return;
-                }
-                
-                ServiceLocator.LogService.LogInfo("Download timer elapsed - starting automatic download");
-                
-                // Mark download as in progress
-                _isDownloadInProgress = true;
-                _downloadStartTime = DateTime.Now;
-                
-                // Run download on UI thread
-                this.Invoke(new Action(() =>
-                {
-                    try
-                    {
-                        PerformAutomaticDownload();
-                        
-                        TimeSpan totalDuration = DateTime.Now - _downloadStartTime.Value;
-                        ServiceLocator.LogService.LogInfo(string.Format("Download cycle completed in {0:mm\\:ss}", totalDuration));
-                    }
-                    catch (Exception ex)
-                    {
-                        ServiceLocator.LogService.LogError("Automatic download error: " + ex.Message);
-                    }
-                    finally
-                    {
-                        // Always reset the download in progress flag
-                        _isDownloadInProgress = false;
-                        _downloadStartTime = null;
-                    }
-                }));
-            }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogError("Download timer elapsed error: " + ex.Message);
-                // Ensure we reset the flag even if there's an error
-                _isDownloadInProgress = false;
-                _downloadStartTime = null;
-            }
-        }
+        // OnDownloadTimerElapsed method removed - using TimerJobManager instead
 
         private void PerformAutomaticUpload()
         {
@@ -2672,26 +2669,126 @@ namespace syncer.ui
         {
             try
             {
-                if (config.JobSettings != null && !string.IsNullOrEmpty(_selectedFolderForTimer))
+                if (config.JobSettings == null)
                 {
-                    var intervalMs = GetIntervalInMilliseconds(config.JobSettings.IntervalValue, config.JobSettings.IntervalType);
+                    ServiceLocator.LogService.LogError("Cannot start timer job: Job settings are null");
+                    return;
+                }
+                
+                var intervalMs = GetIntervalInMilliseconds(config.JobSettings.IntervalValue, config.JobSettings.IntervalType);
+                
+                // Use the ITimerJobManager service instead of direct timer implementation
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager == null)
+                {
+                    ServiceLocator.LogService.LogError("Cannot start timer job: Timer job manager not available");
+                    return;
+                }
+                
+                bool success = false;
+                
+                // Different handling based on job transfer mode
+                if (config.JobSettings.TransferMode == "Upload" && !string.IsNullOrEmpty(_selectedFolderForTimer))
+                {
+                    // Local to remote (upload)
+                    UpdateFilterSettingsFromUI(); // Update filter settings from UI
+                    success = timerJobManager.RegisterTimerJob(
+                        config.JobSettings.Id, 
+                        config.Name, 
+                        _selectedFolderForTimer, // local source folder
+                        config.JobSettings.DestinationPath, // remote destination
+                        intervalMs,
+                        config.JobSettings.IncludeSubFolders,
+                        config.JobSettings.DeleteSourceAfterTransfer,
+                        _jobFilterSettings);
+                }
+                else if (config.JobSettings.TransferMode == "Download")
+                {
+                    // Determine the local destination path
+                    string localDestination = _timerDownloadDestination;
                     
-                    // Start the timer job similar to btnStartTimer_Click
-                    if (_uploadTimer == null)
+                    // If _timerDownloadDestination is empty but we have a path in the config, use that
+                    if (string.IsNullOrEmpty(localDestination) && !string.IsNullOrEmpty(config.JobSettings.DestinationPath))
                     {
-                        _uploadTimer = new System.Timers.Timer();
-                        _uploadTimer.Elapsed += OnTimerElapsed;
-                        _uploadTimer.AutoReset = true;
+                        localDestination = config.JobSettings.DestinationPath;
                     }
                     
-                    _uploadTimer.Interval = intervalMs;
-                    _uploadTimer.Start();
-                    _isTimerRunning = true;
+                    // Verify we have a valid destination
+                    if (string.IsNullOrEmpty(localDestination))
+                    {
+                        ServiceLocator.LogService.LogError("Cannot start timer job: No local destination folder specified");
+                        MessageBox.Show("No local destination folder specified for download job.", "Configuration Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                    
+                    // Ensure local destination directory exists before registering job
+                    if (!Directory.Exists(localDestination))
+                    {
+                        try
+                        {
+                            // Create the entire directory path
+                            string path = localDestination;
+                            if (path.EndsWith("\\") || path.EndsWith("/"))
+                                path = path.Substring(0, path.Length - 1);
+                                
+                            // Start with the drive root
+                            string drivePart = Path.GetPathRoot(path);
+                            string remainingPath = path.Substring(drivePart.Length);
+                            string currentPath = drivePart;
+                            
+                            // Split by directory separator and create each segment
+                            foreach (string segment in remainingPath.Split(new char[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, 
+                                StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                currentPath = Path.Combine(currentPath, segment);
+                                if (!Directory.Exists(currentPath))
+                                {
+                                    Directory.CreateDirectory(currentPath);
+                                    ServiceLocator.LogService.LogInfo(string.Format("Created directory segment: {0}", currentPath));
+                                }
+                            }
+                            
+                            ServiceLocator.LogService.LogInfo(string.Format("Successfully created full directory path: {0}", localDestination));
+                        }
+                        catch (Exception dirEx)
+                        {
+                            ServiceLocator.LogService.LogError(string.Format("Error creating local destination directory {0}: {1}", localDestination, dirEx.Message));
+                            MessageBox.Show("Error creating local destination directory: " + dirEx.Message, "Directory Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+                    }
+                    
+                    // Remote to local (download)
+                    UpdateFilterSettingsFromUI(); // Update filter settings from UI
+                    success = timerJobManager.RegisterDownloadTimerJob(
+                        config.JobSettings.Id,
+                        config.Name,
+                        config.JobSettings.SourcePath, // remote source path
+                        localDestination, // local destination folder
+                        intervalMs,
+                        config.JobSettings.IncludeSubFolders,
+                        config.JobSettings.DeleteSourceAfterTransfer,
+                        _jobFilterSettings);
+                }
+                
+                if (success)
+                {
+                    timerJobManager.StartTimerJob(config.JobSettings.Id);
+                    
+                    // Set the appropriate status flag based on job type
+                    if (config.JobSettings.TransferMode == "Upload")
+                    {
+                        _isTimerRunning = true;
+                    }
+                    else if (config.JobSettings.TransferMode == "Download")
+                    {
+                        _isDownloadTimerRunning = true;
+                    }
                     
                     // Update UI if controls exist
                     try
                     {
-                        if (lblTimerStatus != null) lblTimerStatus.Text = "Timer running (from loaded config)";
+                        if (lblTimerStatus != null) lblTimerStatus.Text = "Timer running (" + config.JobSettings.TransferMode + " job from loaded config)";
                         if (btnStartTimer != null) btnStartTimer.Enabled = false;
                         if (btnStopTimer != null) btnStopTimer.Enabled = true;
                     }
