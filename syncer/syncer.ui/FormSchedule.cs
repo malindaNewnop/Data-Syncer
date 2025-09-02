@@ -2562,24 +2562,19 @@ namespace syncer.ui
             try
             {
                 var configService = ServiceLocator.SavedJobConfigurationService;
-                var connectionService = ServiceLocator.ConnectionService;
-                var timerJobManager = ServiceLocator.TimerJobManager;
                 
-                // Open the load configuration form
-                using (var loadForm = new Forms.FormLoadJobConfiguration(
-                    configService, 
-                    connectionService, 
-                    timerJobManager))
+                // Open the Configuration Manager form
+                using (var configManager = new Forms.FormSimpleLoadConfiguration(configService))
                 {
-                    if (loadForm.ShowDialog() == DialogResult.OK && loadForm.LoadedConfiguration != null)
+                    if (configManager.ShowDialog() == DialogResult.OK && configManager.SelectedConfiguration != null)
                     {
-                        var config = loadForm.LoadedConfiguration;
+                        var config = configManager.SelectedConfiguration;
                         
                         // Apply the loaded configuration to the form
                         ApplyConfigurationToForm(config);
                         
-                        // If user chose to start the job automatically
-                        if (loadForm.StartJobAfterLoad)
+                        // If user chose Load & Start option
+                        if (configManager.LoadAndStart)
                         {
                             StartTimerJobFromConfiguration(config);
                         }

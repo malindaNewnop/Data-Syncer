@@ -255,59 +255,87 @@ namespace syncer.ui
             }
         }
 
-        private void newConfigurationToolStripMenuItem_Click(object sender, EventArgs e)
+        private void ResetApplicationToNewState()
         {
             try
             {
-                // Open the FormEditConfiguration for creating a new configuration
-                var newConfiguration = new SavedJobConfiguration
+                // Clear timer jobs grid
+                if (dgvTimerJobs.InvokeRequired)
                 {
-                    Name = "",
-                    Description = "",
-                    JobSettings = new SyncJob
-                    {
-                        Name = "",
-                        SourcePath = "",
-                        DestinationPath = "",
-                        IntervalValue = 30,
-                        IntervalType = "Minutes",
-                        IsEnabled = true
-                    },
-                    SourceConnection = new SavedConnection
-                    {
-                        Settings = new syncer.ui.ConnectionSettings
-                        {
-                            Protocol = "FTP",
-                            ProtocolType = 1,
-                            Host = "",
-                            Port = 21,
-                            Username = "",
-                            Password = "",
-                            EnableSsl = false
-                        }
-                    }
-                };
+                    dgvTimerJobs.Invoke(new Action(() => dgvTimerJobs.Rows.Clear()));
+                }
+                else
+                {
+                    dgvTimerJobs.Rows.Clear();
+                }
 
-                using (var editForm = new Forms.FormEditConfiguration(newConfiguration))
+                // Clear any logs or status displays
+                ClearLogDisplays();
+                
+                // Update UI status
+                UpdateServiceStatus();
+                UpdateConnectionStatus();
+
+                ServiceLocator.LogService?.LogInfo("Application reset to new state for creating new configuration");
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService?.LogError("Error resetting application state: " + ex.Message);
+            }
+        }
+
+        private void ClearLogDisplays()
+        {
+            try
+            {
+                // Clear any log-related controls if they exist
+                if (Controls.ContainsKey("richTextBoxLogs"))
                 {
-                    editForm.Text = "New Connection & Job Configuration";
-                    
-                    if (editForm.ShowDialog() == DialogResult.OK)
+                    var logControl = Controls["richTextBoxLogs"] as RichTextBox;
+                    if (logControl != null)
                     {
-                        // Configuration has been saved, refresh the UI
-                        MessageBox.Show("New configuration created successfully!", "Success", 
-                            MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        
-                        // Optionally refresh timer jobs grid if the job was started
-                        RefreshTimerJobsGrid();
+                        if (logControl.InvokeRequired)
+                            logControl.Invoke(new Action(() => logControl.Clear()));
+                        else
+                            logControl.Clear();
+                    }
+                }
+
+                // Clear status labels
+                if (Controls.ContainsKey("labelStatus"))
+                {
+                    var statusLabel = Controls["labelStatus"] as Label;
+                    if (statusLabel != null)
+                    {
+                        if (statusLabel.InvokeRequired)
+                            statusLabel.Invoke(new Action(() => statusLabel.Text = "Ready"));
+                        else
+                            statusLabel.Text = "Ready";
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error creating new configuration: " + ex.Message, "Error", 
+                ServiceLocator.LogService?.LogError("Error clearing log displays: " + ex.Message);
+            }
+        }
+
+        private void newConfigurationToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Reset application to new instance state
+                ResetApplicationToNewState();
+
+                // Show confirmation that application has been reset
+                MessageBox.Show("Application has been reset to a fresh start.", "New", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error resetting application: " + ex.Message, "Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService?.LogError("Error creating new configuration: " + ex.Message);
+                ServiceLocator.LogService?.LogError("Error resetting application: " + ex.Message);
             }
         }
 
@@ -315,30 +343,36 @@ namespace syncer.ui
         {
             try
             {
-                // Open the FormLoadJobConfiguration for loading existing configurations
-                using (var loadForm = new Forms.FormLoadJobConfiguration(
-                    ServiceLocator.SavedJobConfigurationService,
-                    ServiceLocator.ConnectionService,
-                    ServiceLocator.TimerJobManager))
+                // Open the Configuration Manager (FormSimpleLoadConfiguration)
+                using (var configManager = new Forms.FormSimpleLoadConfiguration(
+                    ServiceLocator.SavedJobConfigurationService))
                 {
-                    loadForm.Text = "Load Configuration";
-                    
-                    if (loadForm.ShowDialog() == DialogResult.OK)
+                    if (configManager.ShowDialog() == DialogResult.OK)
                     {
-                        // Configuration has been loaded and started
-                        MessageBox.Show("Configuration loaded successfully!", "Success", 
-                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        // Check if user selected Load & Start option
+                        if (configManager.LoadAndStart && configManager.SelectedConfiguration != null)
+                        {
+                            // Configuration has been loaded and started
+                            MessageBox.Show("Configuration loaded and started successfully!", "Success", 
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        else if (configManager.SelectedConfiguration != null)
+                        {
+                            // Configuration was just loaded (not started)
+                            MessageBox.Show("Configuration loaded successfully!", "Success", 
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
                         
-                        // Refresh timer jobs grid to show the loaded job
+                        // Refresh timer jobs grid to show any loaded/started jobs
                         RefreshTimerJobsGrid();
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error loading configuration: " + ex.Message, "Error", 
+                MessageBox.Show("Error opening configuration manager: " + ex.Message, "Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService?.LogError("Error loading configuration: " + ex.Message);
+                ServiceLocator.LogService?.LogError("Error opening configuration manager: " + ex.Message);
             }
         }
 

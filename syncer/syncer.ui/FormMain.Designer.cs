@@ -168,7 +168,7 @@ namespace syncer.ui
             this.newConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.newConfigurationToolStripMenuItem.Name = "newConfigurationToolStripMenuItem";
             this.newConfigurationToolStripMenuItem.Size = new System.Drawing.Size(200, 22);
-            this.newConfigurationToolStripMenuItem.Text = "New Connection && Job";
+            this.newConfigurationToolStripMenuItem.Text = "New";
             this.newConfigurationToolStripMenuItem.Click += new System.EventHandler(this.newConfigurationToolStripMenuItem_Click);
 
             this.loadConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
