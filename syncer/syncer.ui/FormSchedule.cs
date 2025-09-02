@@ -1112,6 +1112,12 @@ namespace syncer.ui
                 // Load filter settings
                 LoadFilterSettings();
                 
+                // Load delete source after transfer setting
+                if (chkDeleteSourceAfterTransfer != null)
+                {
+                    chkDeleteSourceAfterTransfer.Checked = _currentJob.DeleteSourceAfterTransfer;
+                }
+                
                 // Update UI for the loaded transfer mode
                 UpdateUIForTransferMode();
             }
@@ -1229,6 +1235,9 @@ namespace syncer.ui
             
             // Save filter settings to the job
             _currentJob.FilterSettings = GetCurrentFilterSettings();
+            
+            // Save delete source after transfer setting
+            _currentJob.DeleteSourceAfterTransfer = chkDeleteSourceAfterTransfer.Checked;
             
             // Set connection settings for source and destination based on transfer mode
             var currentConnection = _connectionService.GetConnectionSettings();
@@ -2323,6 +2332,29 @@ namespace syncer.ui
                 if (success)
                 {
                     ServiceLocator.LogService.LogInfo($"Successfully downloaded file '{fileName}'");
+                    
+                    // Delete source file from remote if checkbox is checked
+                    if (chkDeleteSourceAfterTransfer.Checked)
+                    {
+                        try
+                        {
+                            string deleteError;
+                            bool deleteSuccess = _currentTransferClient.DeleteFile(_coreConnectionSettings, remoteFilePath, out deleteError);
+                            
+                            if (deleteSuccess)
+                            {
+                                ServiceLocator.LogService.LogInfo($"Source file deleted from remote after successful download: {fileName}");
+                            }
+                            else
+                            {
+                                ServiceLocator.LogService.LogWarning($"Failed to delete remote source file {fileName}: {deleteError ?? "Unknown error"}");
+                            }
+                        }
+                        catch (Exception deleteEx)
+                        {
+                            ServiceLocator.LogService.LogWarning($"Failed to delete remote source file {fileName}: {deleteEx.Message}");
+                        }
+                    }
                 }
                 else
                 {
@@ -3094,6 +3126,21 @@ namespace syncer.ui
                         else
                         {
                             ServiceLocator.LogService.LogInfo(string.Format("Successfully uploaded: {0}", relativePath));
+                            
+                            // Delete source file if checkbox is checked
+                            if (chkDeleteSourceAfterTransfer.Checked)
+                            {
+                                try
+                                {
+                                    File.Delete(localFile);
+                                    ServiceLocator.LogService.LogInfo(string.Format("Source file deleted after successful upload: {0}", relativePath));
+                                }
+                                catch (Exception deleteEx)
+                                {
+                                    ServiceLocator.LogService.LogWarning(string.Format("Failed to delete source file {0}: {1}", relativePath, deleteEx.Message));
+                                    // Don't throw exception here - upload was successful
+                                }
+                            }
                         }
                     }
                     
@@ -3188,6 +3235,31 @@ namespace syncer.ui
                                 {
                                     FileInfo fileInfo = new FileInfo(localFile);
                                     totalBytes += fileInfo.Length;
+                                }
+                                
+                                // Delete source file from remote if checkbox is checked
+                                if (chkDeleteSourceAfterTransfer.Checked)
+                                {
+                                    try
+                                    {
+                                        string deleteError;
+                                        bool deleteSuccess = _currentTransferClient.DeleteFile(_coreConnectionSettings, remoteFile, out deleteError);
+                                        
+                                        if (deleteSuccess)
+                                        {
+                                            ServiceLocator.LogService.LogInfo($"Source file deleted from remote after successful download: {fileName}");
+                                        }
+                                        else
+                                        {
+                                            ServiceLocator.LogService.LogWarning($"Failed to delete remote source file {fileName}: {deleteError ?? "Unknown error"}");
+                                            // Don't count as failure - download was successful
+                                        }
+                                    }
+                                    catch (Exception deleteEx)
+                                    {
+                                        ServiceLocator.LogService.LogWarning($"Failed to delete remote source file {fileName}: {deleteEx.Message}");
+                                        // Don't count as failure - download was successful
+                                    }
                                 }
                             }
                         }
@@ -3285,11 +3357,14 @@ namespace syncer.ui
                             // Try to verify the upload by checking if file exists on remote
                             bool remoteExists;
                             string verifyError;
+                            bool uploadVerified = false;
+                            
                             if (_currentTransferClient.FileExists(_coreConnectionSettings, remoteFile, out remoteExists, out verifyError))
                             {
                                 if (remoteExists)
                                 {
                                     ServiceLocator.LogService.LogInfo(string.Format("Upload verified: {0} exists on remote server", fileName));
+                                    uploadVerified = true;
                                 }
                                 else
                                 {
@@ -3299,6 +3374,23 @@ namespace syncer.ui
                             else
                             {
                                 ServiceLocator.LogService.LogWarning(string.Format("Could not verify remote file existence: {0}", verifyError ?? "Unknown error"));
+                                // Assume upload was successful if we can't verify (to be safe)
+                                uploadVerified = true;
+                            }
+                            
+                            // Delete source file if checkbox is checked and upload was successful
+                            if (chkDeleteSourceAfterTransfer.Checked && uploadVerified)
+                            {
+                                try
+                                {
+                                    File.Delete(localFile);
+                                    ServiceLocator.LogService.LogInfo(string.Format("Source file deleted after successful upload: {0}", fileName));
+                                }
+                                catch (Exception deleteEx)
+                                {
+                                    ServiceLocator.LogService.LogWarning(string.Format("Failed to delete source file {0}: {1}", fileName, deleteEx.Message));
+                                    // Don't throw exception here - upload was successful
+                                }
                             }
                         }
                     }
@@ -3362,6 +3454,35 @@ namespace syncer.ui
                     {
                         throw new Exception(string.Format("Failed to download {0}: {1}", fileName, error));
                     }
+                    else
+                    {
+                        ServiceLocator.LogService.LogInfo(string.Format("Successfully downloaded: {0}", fileName));
+                        
+                        // Delete source file from remote if checkbox is checked
+                        if (chkDeleteSourceAfterTransfer.Checked)
+                        {
+                            try
+                            {
+                                string deleteError;
+                                bool deleteSuccess = _currentTransferClient.DeleteFile(_coreConnectionSettings, remotePath, out deleteError);
+                                
+                                if (deleteSuccess)
+                                {
+                                    ServiceLocator.LogService.LogInfo(string.Format("Source file deleted from remote after successful download: {0}", fileName));
+                                }
+                                else
+                                {
+                                    ServiceLocator.LogService.LogWarning(string.Format("Failed to delete remote source file {0}: {1}", fileName, deleteError ?? "Unknown error"));
+                                    // Don't throw exception here - download was successful
+                                }
+                            }
+                            catch (Exception deleteEx)
+                            {
+                                ServiceLocator.LogService.LogWarning(string.Format("Failed to delete remote source file {0}: {1}", fileName, deleteEx.Message));
+                                // Don't throw exception here - download was successful
+                            }
+                        }
+                    }
                     
                     worker.ReportProgress(100, "Download completed successfully!");
                 }
@@ -3413,6 +3534,32 @@ namespace syncer.ui
         {
             // Same functionality as btnDownloadFile_Click
             btnDownloadFile_Click(sender, e);
+        }
+
+        private void chkDeleteSourceAfterTransfer_CheckedChanged(object sender, EventArgs e)
+        {
+            // Optional: Add validation or warning for users when they check this option
+            if (chkDeleteSourceAfterTransfer.Checked)
+            {
+                DialogResult result = MessageBox.Show(
+                    "Warning: This option will permanently delete source files after successful transfer.\n\n" +
+                    "Local to Remote transfers: Source files will be deleted from your local machine.\n" +
+                    "Remote to Local transfers: Source files will be deleted from the remote server.\n\n" +
+                    "Are you sure you want to enable this feature?",
+                    "Delete Source Files Warning",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2);
+
+                if (result == DialogResult.No)
+                {
+                    chkDeleteSourceAfterTransfer.Checked = false;
+                }
+                else
+                {
+                    ServiceLocator.LogService.LogInfo("Delete source after transfer option enabled by user");
+                }
+            }
         }
 
         #endregion

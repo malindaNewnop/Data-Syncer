@@ -328,7 +328,6 @@ namespace syncer.ui.Services
             // Settings
             MenuItem settingsItem = new MenuItem("Settings");
             MenuItem connectionItem = new MenuItem("Connection...", OnMenuConnectionClick);
-            MenuItem filtersItem = new MenuItem("Filters...", OnMenuFiltersClick);
             MenuItem traySettingsItem = new MenuItem("Tray Settings...", OnMenuTraySettingsClick);
             MenuItem notificationsItem = new MenuItem("Notifications", OnMenuNotificationsClick);
             notificationsItem.Checked = _notificationsEnabled;
@@ -341,7 +340,6 @@ namespace syncer.ui.Services
             }
             
             settingsItem.MenuItems.Add(connectionItem);
-            settingsItem.MenuItems.Add(filtersItem);
             settingsItem.MenuItems.Add(new MenuItem("-")); // Separator
             settingsItem.MenuItems.Add(traySettingsItem);
             settingsItem.MenuItems.Add(notificationsItem);
@@ -533,22 +531,6 @@ namespace syncer.ui.Services
             catch (Exception ex)
             {
                 MessageBox.Show("Error opening connection settings: " + ex.Message, "Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void OnMenuFiltersClick(object sender, EventArgs e)
-        {
-            try
-            {
-                using (FormFilters filtersForm = new FormFilters())
-                {
-                    filtersForm.ShowDialog();
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error opening filter settings: " + ex.Message, "Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

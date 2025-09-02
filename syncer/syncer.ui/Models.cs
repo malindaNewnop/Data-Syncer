@@ -46,6 +46,9 @@ namespace syncer.ui
 
         // Filter settings
         public FilterSettings FilterSettings { get; set; }
+        
+        // Delete source after transfer setting
+        public bool DeleteSourceAfterTransfer { get; set; }
 
         public SyncJob()
         {
@@ -76,6 +79,9 @@ namespace syncer.ui
             
             // Initialize filter settings
             FilterSettings = new FilterSettings();
+            
+            // Initialize delete source setting
+            DeleteSourceAfterTransfer = false;
         }
 
         public string GetNextRunTime()

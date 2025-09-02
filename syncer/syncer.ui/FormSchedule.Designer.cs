@@ -45,6 +45,7 @@ namespace syncer.ui
             this.lblUploadEvery = new System.Windows.Forms.Label();
             this.chkEnableTimer = new System.Windows.Forms.CheckBox();
             this.chkIncludeSubfolders = new System.Windows.Forms.CheckBox();
+            this.chkDeleteSourceAfterTransfer = new System.Windows.Forms.CheckBox();
             this.gbFileFilters = new System.Windows.Forms.GroupBox();
             this.chkEnableFileFilter = new System.Windows.Forms.CheckBox();
             this.lblIncludeExtensions = new System.Windows.Forms.Label();
@@ -166,6 +167,7 @@ namespace syncer.ui
             // gbTimerSettings
             // 
             this.gbTimerSettings.Controls.Add(this.chkIncludeSubfolders);
+            this.gbTimerSettings.Controls.Add(this.chkDeleteSourceAfterTransfer);
             this.gbTimerSettings.Controls.Add(this.lblLastUpload);
             this.gbTimerSettings.Controls.Add(this.lblTimerStatus);
             this.gbTimerSettings.Controls.Add(this.btnStopTimer);
@@ -195,6 +197,20 @@ namespace syncer.ui
             this.chkIncludeSubfolders.TabIndex = 8;
             this.chkIncludeSubfolders.Text = "Include Subfolders";
             this.chkIncludeSubfolders.UseVisualStyleBackColor = true;
+            // 
+            // chkDeleteSourceAfterTransfer
+            // 
+            this.chkDeleteSourceAfterTransfer.AutoSize = true;
+            this.chkDeleteSourceAfterTransfer.Checked = false;
+            this.chkDeleteSourceAfterTransfer.CheckState = System.Windows.Forms.CheckState.Unchecked;
+            this.chkDeleteSourceAfterTransfer.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.chkDeleteSourceAfterTransfer.Location = new System.Drawing.Point(200, 115);
+            this.chkDeleteSourceAfterTransfer.Name = "chkDeleteSourceAfterTransfer";
+            this.chkDeleteSourceAfterTransfer.Size = new System.Drawing.Size(180, 19);
+            this.chkDeleteSourceAfterTransfer.TabIndex = 9;
+            this.chkDeleteSourceAfterTransfer.Text = "Delete source after transfer";
+            this.chkDeleteSourceAfterTransfer.UseVisualStyleBackColor = true;
+            this.chkDeleteSourceAfterTransfer.CheckedChanged += new System.EventHandler(this.chkDeleteSourceAfterTransfer_CheckedChanged);
             // 
             // lblLastUpload
             // 
@@ -614,6 +630,7 @@ namespace syncer.ui
         private System.Windows.Forms.Label lblTimerStatus;
         private System.Windows.Forms.Label lblLastUpload;
         private System.Windows.Forms.CheckBox chkIncludeSubfolders;
+        private System.Windows.Forms.CheckBox chkDeleteSourceAfterTransfer;
         private System.Windows.Forms.GroupBox gbFileManager;
         private System.Windows.Forms.Label lblFileSelection;
         private System.Windows.Forms.Button btnBrowseFilesForTimer;
