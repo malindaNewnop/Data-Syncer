@@ -369,7 +369,21 @@ namespace syncer.ui.Services
                 IncludeReadOnlyFiles = coreFilter.IncludeReadOnly
             };
 
-            // Convert include extensions to allowed file types
+            // Convert include extensions to simple format
+            if (coreFilter.IncludeExtensions.Count > 0)
+            {
+                var extensions = new List<string>();
+                foreach (var ext in coreFilter.IncludeExtensions)
+                {
+                    extensions.Add("*." + ext);
+                }
+                uiFilter.IncludeFileExtensions = string.Join(",", extensions.ToArray());
+            }
+
+            // Convert exclude pattern to simple format
+            uiFilter.ExcludeFilePatterns = coreFilter.ExcludePattern ?? "";
+
+            // Convert include extensions to allowed file types (legacy support)
             var fileTypes = new List<string>();
             foreach (var ext in coreFilter.IncludeExtensions)
             {
@@ -428,16 +442,52 @@ namespace syncer.ui.Services
                     }
                 }
             }
-            else if (!uiFilter.FiltersEnabled)
+            // Convert simple include extensions (new feature)
+            else if (uiFilter.FiltersEnabled && !string.IsNullOrEmpty(uiFilter.IncludeFileExtensions))
+            {
+                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", 
+                    string.Format("Converting simple include extensions: {0}", uiFilter.IncludeFileExtensions));
+                    
+                string[] extensions = uiFilter.IncludeFileExtensions.Split(',');
+                foreach (string ext in extensions)
+                {
+                    string cleanExt = ext.Trim().ToLowerInvariant();
+                    if (string.IsNullOrEmpty(cleanExt)) continue;
+                    
+                    // Handle patterns like *.txt, .txt, txt
+                    if (cleanExt.StartsWith("*."))
+                    {
+                        string extension = cleanExt.Substring(2); // Remove *.
+                        coreFilter.IncludeExtensions.Add(extension);
+                        coreFilter.FileExtensions.Add("." + extension);
+                    }
+                    else if (cleanExt.StartsWith("."))
+                    {
+                        string extension = cleanExt.Substring(1); // Remove .
+                        coreFilter.IncludeExtensions.Add(extension);
+                        coreFilter.FileExtensions.Add(cleanExt);
+                    }
+                    else
+                    {
+                        coreFilter.IncludeExtensions.Add(cleanExt);
+                        coreFilter.FileExtensions.Add("." + cleanExt);
+                    }
+                }
+            }
+            
+            // Convert simple exclude patterns (new feature)
+            if (uiFilter.FiltersEnabled && !string.IsNullOrEmpty(uiFilter.ExcludeFilePatterns))
+            {
+                // Use the existing exclude pattern field
+                coreFilter.ExcludePattern = uiFilter.ExcludeFilePatterns;
+            }
+            
+            if (!uiFilter.FiltersEnabled)
             {
                 DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", "Filters are disabled, clearing extension filters");
                 // When filters are disabled, clear any existing filters to allow all files
                 coreFilter.FileExtensions.Clear();
                 coreFilter.IncludeExtensions.Clear();
-            }
-            else
-            {
-                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", "No allowed file types specified");
             }
 
             return coreFilter;

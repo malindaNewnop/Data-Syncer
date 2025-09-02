@@ -401,13 +401,19 @@ namespace syncer.ui
         public bool IncludeSystemFiles { get; set; }
         public bool IncludeReadOnlyFiles { get; set; }
         public string ExcludePatterns { get; set; }
+        
+        // Simple filtering properties
+        public string IncludeFileExtensions { get; set; }
+        public string ExcludeFilePatterns { get; set; }
 
         public FilterSettings()
         {
-            FiltersEnabled = true;
+            FiltersEnabled = false;
             MinFileSize = 0;
             MaxFileSize = 100;
             IncludeReadOnlyFiles = true;
+            IncludeFileExtensions = "";
+            ExcludeFilePatterns = "";
         }
     }
 

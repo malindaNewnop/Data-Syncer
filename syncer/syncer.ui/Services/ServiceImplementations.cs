@@ -373,8 +373,55 @@ namespace syncer.ui.Services
                 if (maxSizeBytes > 0 && fileSizeBytes > maxSizeBytes)
                     return false;
                 
-                // Check file extensions
-                if (filterSettings.AllowedFileTypes != null && filterSettings.AllowedFileTypes.Length > 0)
+                // Check file extensions (new simple filtering approach)
+                if (!string.IsNullOrEmpty(filterSettings.IncludeFileExtensions))
+                {
+                    string fileExtension = fileInfo.Extension.ToLower();
+                    string[] includeExtensions = filterSettings.IncludeFileExtensions.Split(',');
+                    bool matchesInclude = false;
+
+                    foreach (string pattern in includeExtensions)
+                    {
+                        string cleanPattern = pattern.Trim().ToLower();
+                        if (string.IsNullOrEmpty(cleanPattern)) continue;
+
+                        // Handle patterns like *.txt, .txt, txt
+                        if (cleanPattern.StartsWith("*."))
+                        {
+                            string ext = cleanPattern.Substring(1); // Remove the *
+                            if (fileExtension == ext)
+                            {
+                                matchesInclude = true;
+                                break;
+                            }
+                        }
+                        else if (cleanPattern.StartsWith("."))
+                        {
+                            if (fileExtension == cleanPattern)
+                            {
+                                matchesInclude = true;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            string ext = "." + cleanPattern;
+                            if (fileExtension == ext)
+                            {
+                                matchesInclude = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!matchesInclude)
+                    {
+                        Console.WriteLine("File " + Path.GetFileName(filePath) + " extension " + fileExtension + " not in include extensions");
+                        return false;
+                    }
+                }
+                // Check file extensions (legacy approach)
+                else if (filterSettings.AllowedFileTypes != null && filterSettings.AllowedFileTypes.Length > 0)
                 {
                     string fileExtension = fileInfo.Extension;
                     bool matchesExtension = false;
@@ -397,8 +444,53 @@ namespace syncer.ui.Services
                     }
                 }
                 
-                // Check exclude patterns
-                if (!string.IsNullOrEmpty(filterSettings.ExcludePatterns))
+                // Check exclude patterns (new simple filtering approach)
+                if (!string.IsNullOrEmpty(filterSettings.ExcludeFilePatterns))
+                {
+                    string fileName = fileInfo.Name.ToLower();
+                    string[] excludePatterns = filterSettings.ExcludeFilePatterns.Split(',');
+
+                    foreach (string pattern in excludePatterns)
+                    {
+                        string cleanPattern = pattern.Trim().ToLower();
+                        if (string.IsNullOrEmpty(cleanPattern)) continue;
+
+                        // Handle patterns like *.tmp, .tmp, tmp, temp*
+                        if (cleanPattern.StartsWith("*."))
+                        {
+                            string ext = cleanPattern.Substring(1); // Remove the *
+                            if (fileInfo.Extension.ToLower() == ext)
+                                return false;
+                        }
+                        else if (cleanPattern.StartsWith("."))
+                        {
+                            if (fileInfo.Extension.ToLower() == cleanPattern)
+                                return false;
+                        }
+                        else if (cleanPattern.EndsWith("*"))
+                        {
+                            string prefix = cleanPattern.Substring(0, cleanPattern.Length - 1);
+                            if (fileName.StartsWith(prefix))
+                                return false;
+                        }
+                        else if (cleanPattern.Contains("*"))
+                        {
+                            // Simple wildcard matching
+                            string regexPattern = "^" + Regex.Escape(cleanPattern).Replace("\\*", ".*") + "$";
+                            if (Regex.IsMatch(fileName, regexPattern))
+                                return false;
+                        }
+                        else
+                        {
+                            // Exact filename or extension match
+                            string ext = "." + cleanPattern;
+                            if (fileInfo.Extension.ToLower() == ext || fileName == cleanPattern)
+                                return false;
+                        }
+                    }
+                }
+                // Check exclude patterns (legacy approach)
+                else if (!string.IsNullOrEmpty(filterSettings.ExcludePatterns))
                 {
                     string fileName = fileInfo.Name;
                     string[] patterns = filterSettings.ExcludePatterns.Split(',', ';');

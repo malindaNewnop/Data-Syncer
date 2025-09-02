@@ -23,11 +23,13 @@ namespace syncer.ui
         private ITransferClient _currentTransferClient;
         private syncer.core.ConnectionSettings _coreConnectionSettings;
         
-        // Override to prevent unwanted resizing
+        // Override to allow resizing and full screen
         protected override void SetBoundsCore(int x, int y, int width, int height, BoundsSpecified specified)
         {
-            // Maintain the designed size
-            base.SetBoundsCore(x, y, 800, 470, specified);
+            // Allow the form to be resized normally, set minimum size only
+            if (width < 900) width = 900;
+            if (height < 580) height = 580;
+            base.SetBoundsCore(x, y, width, height, specified);
         }
         
         // Timer-based upload functionality
@@ -431,10 +433,9 @@ namespace syncer.ui
 
         private void InitializeFilterControls()
         {
-            // Note: Advanced filtering has been simplified for easier job creation
-            // Basic file selection will be done through folder browsing only
+            // Initialize simple file filtering controls
             
-            // Initialize filter settings as minimal/disabled by default
+            // Initialize filter settings
             if (_jobFilterSettings == null)
             {
                 _jobFilterSettings = new FilterSettings();
@@ -444,10 +445,26 @@ namespace syncer.ui
                 _jobFilterSettings.IncludeReadOnlyFiles = true;
                 _jobFilterSettings.MinFileSize = 0;
                 _jobFilterSettings.MaxFileSize = 1000; // 1GB default max
+                _jobFilterSettings.IncludeFileExtensions = "";
+                _jobFilterSettings.ExcludeFilePatterns = "";
             }
 
-            // Filter controls are now handled in the designer file
-            // No need to create additional labels here
+            // Initialize filter UI controls
+            if (chkEnableFileFilter != null)
+            {
+                chkEnableFileFilter.Checked = _jobFilterSettings.FiltersEnabled;
+                chkEnableFileFilter_CheckedChanged(chkEnableFileFilter, EventArgs.Empty);
+            }
+            
+            if (txtIncludeExtensions != null)
+            {
+                txtIncludeExtensions.Text = _jobFilterSettings.IncludeFileExtensions ?? "*.txt,*.doc,*.pdf";
+            }
+            
+            if (txtExcludeFiles != null)
+            {
+                txtExcludeFiles.Text = _jobFilterSettings.ExcludeFilePatterns ?? "*.tmp,*.log";
+            }
         }
 
         private void CreateFileTypesPanel()
@@ -482,6 +499,53 @@ namespace syncer.ui
             return;
         }
 
+        private void chkEnableFileFilter_CheckedChanged(object sender, EventArgs e)
+        {
+            // Enable or disable filter controls based on checkbox state
+            bool enabled = chkEnableFileFilter.Checked;
+            
+            if (txtIncludeExtensions != null)
+                txtIncludeExtensions.Enabled = enabled;
+            if (txtExcludeFiles != null)
+                txtExcludeFiles.Enabled = enabled;
+            if (lblIncludeExtensions != null)
+                lblIncludeExtensions.Enabled = enabled;
+            if (lblExcludeFiles != null)
+                lblExcludeFiles.Enabled = enabled;
+            if (lblFilterHelp != null)
+                lblFilterHelp.Enabled = enabled;
+                
+            // Update filter settings
+            if (_jobFilterSettings != null)
+            {
+                _jobFilterSettings.FiltersEnabled = enabled;
+            }
+        }
+
+        /// <summary>
+        /// Updates the current filter settings from UI controls
+        /// </summary>
+        private void UpdateFilterSettingsFromUI()
+        {
+            if (_jobFilterSettings == null)
+                _jobFilterSettings = new FilterSettings();
+
+            if (chkEnableFileFilter != null)
+            {
+                _jobFilterSettings.FiltersEnabled = chkEnableFileFilter.Checked;
+            }
+
+            if (txtIncludeExtensions != null)
+            {
+                _jobFilterSettings.IncludeFileExtensions = txtIncludeExtensions.Text.Trim();
+            }
+
+            if (txtExcludeFiles != null)
+            {
+                _jobFilterSettings.ExcludeFilePatterns = txtExcludeFiles.Text.Trim();
+            }
+        }
+
         private void UpdateFilterControlStates()
         {
             // Filtering simplified - advanced filter controls removed
@@ -500,17 +564,43 @@ namespace syncer.ui
         {
             FilterSettings settings = new FilterSettings();
             
-            // Basic filter enable/disable - now always disabled for simplicity
-            settings.FiltersEnabled = false;
+            // Check if filters are enabled via checkbox
+            if (chkEnableFileFilter != null)
+            {
+                settings.FiltersEnabled = chkEnableFileFilter.Checked;
+            }
+            else
+            {
+                settings.FiltersEnabled = false;
+            }
             
-            // Set basic defaults for all files
-            settings.AllowedFileTypes = null; // Allow all file types
+            // Get filter settings from UI controls
+            if (settings.FiltersEnabled)
+            {
+                if (txtIncludeExtensions != null)
+                {
+                    settings.IncludeFileExtensions = txtIncludeExtensions.Text.Trim();
+                }
+                
+                if (txtExcludeFiles != null)
+                {
+                    settings.ExcludeFilePatterns = txtExcludeFiles.Text.Trim();
+                }
+            }
+            else
+            {
+                settings.IncludeFileExtensions = "";
+                settings.ExcludeFilePatterns = "";
+            }
+            
+            // Set basic defaults for other properties
+            settings.AllowedFileTypes = null; // Not using this approach anymore
             settings.MinFileSize = 0; // No minimum
             settings.MaxFileSize = 0; // No maximum
             settings.IncludeHiddenFiles = false;
             settings.IncludeSystemFiles = false;
             settings.IncludeReadOnlyFiles = true;
-            settings.ExcludePatterns = null;
+            settings.ExcludePatterns = null; // Using ExcludeFilePatterns instead
             
             return settings;
         }
@@ -521,9 +611,26 @@ namespace syncer.ui
             {
                 _jobFilterSettings = _currentJob.FilterSettings;
                 
-                // Simplified filtering - most UI controls removed
-                // Only basic filter settings are maintained for compatibility
+                // Load simple filter settings into UI controls
+                if (chkEnableFileFilter != null)
+                {
+                    chkEnableFileFilter.Checked = _jobFilterSettings.FiltersEnabled;
+                }
                 
+                if (txtIncludeExtensions != null)
+                {
+                    txtIncludeExtensions.Text = _jobFilterSettings.IncludeFileExtensions ?? "";
+                }
+                
+                if (txtExcludeFiles != null)
+                {
+                    txtExcludeFiles.Text = _jobFilterSettings.ExcludeFilePatterns ?? "";
+                }
+                
+                // Update UI state based on filter enabled state
+                chkEnableFileFilter_CheckedChanged(chkEnableFileFilter, EventArgs.Empty);
+                
+                // Legacy support for old complex filtering (if any exists)
                 if (clbFileTypes != null && _jobFilterSettings.AllowedFileTypes != null)
                 {
                     // Clear all selections first
@@ -566,6 +673,26 @@ namespace syncer.ui
                 
                 UpdateFilterControlStates();
             }
+            else
+            {
+                // Set default values for new jobs
+                if (chkEnableFileFilter != null)
+                {
+                    chkEnableFileFilter.Checked = false;
+                }
+                
+                if (txtIncludeExtensions != null)
+                {
+                    txtIncludeExtensions.Text = "*.txt,*.doc,*.pdf";
+                }
+                
+                if (txtExcludeFiles != null)
+                {
+                    txtExcludeFiles.Text = "*.tmp,*.log";
+                }
+                
+                chkEnableFileFilter_CheckedChanged(chkEnableFileFilter, EventArgs.Empty);
+            }
         }
 
         private void btnTestFilters_Click(object sender, EventArgs e)
@@ -576,8 +703,114 @@ namespace syncer.ui
 
         private bool ShouldIncludeFileForTimer(string filePath, FilterSettings filterSettings)
         {
-            // Simplified: Always include files since advanced filtering is removed
-            return true;
+            // If filters are disabled, include all files
+            if (filterSettings == null || !filterSettings.FiltersEnabled)
+                return true;
+
+            try
+            {
+                FileInfo fileInfo = new FileInfo(filePath);
+                string fileName = fileInfo.Name;
+                string fileExtension = fileInfo.Extension.ToLower();
+
+                // Check include extensions
+                if (!string.IsNullOrEmpty(filterSettings.IncludeFileExtensions))
+                {
+                    string[] includeExtensions = filterSettings.IncludeFileExtensions.Split(',');
+                    bool matchesInclude = false;
+
+                    foreach (string pattern in includeExtensions)
+                    {
+                        string cleanPattern = pattern.Trim().ToLower();
+                        if (string.IsNullOrEmpty(cleanPattern)) continue;
+
+                        // Handle patterns like *.txt, .txt, txt
+                        if (cleanPattern.StartsWith("*."))
+                        {
+                            string ext = cleanPattern.Substring(1); // Remove the *
+                            if (fileExtension == ext)
+                            {
+                                matchesInclude = true;
+                                break;
+                            }
+                        }
+                        else if (cleanPattern.StartsWith("."))
+                        {
+                            if (fileExtension == cleanPattern)
+                            {
+                                matchesInclude = true;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            string ext = "." + cleanPattern;
+                            if (fileExtension == ext)
+                            {
+                                matchesInclude = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // If we have include patterns but file doesn't match any, exclude it
+                    if (!matchesInclude)
+                        return false;
+                }
+
+                // Check exclude patterns
+                if (!string.IsNullOrEmpty(filterSettings.ExcludeFilePatterns))
+                {
+                    string[] excludePatterns = filterSettings.ExcludeFilePatterns.Split(',');
+
+                    foreach (string pattern in excludePatterns)
+                    {
+                        string cleanPattern = pattern.Trim().ToLower();
+                        if (string.IsNullOrEmpty(cleanPattern)) continue;
+
+                        // Handle patterns like *.tmp, .tmp, tmp, temp*
+                        if (cleanPattern.StartsWith("*."))
+                        {
+                            string ext = cleanPattern.Substring(1); // Remove the *
+                            if (fileExtension == ext)
+                                return false;
+                        }
+                        else if (cleanPattern.StartsWith("."))
+                        {
+                            if (fileExtension == cleanPattern)
+                                return false;
+                        }
+                        else if (cleanPattern.EndsWith("*"))
+                        {
+                            string prefix = cleanPattern.Substring(0, cleanPattern.Length - 1);
+                            if (fileName.ToLower().StartsWith(prefix))
+                                return false;
+                        }
+                        else if (cleanPattern.Contains("*"))
+                        {
+                            // Simple wildcard matching
+                            string regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(cleanPattern).Replace("\\*", ".*") + "$";
+                            if (System.Text.RegularExpressions.Regex.IsMatch(fileName.ToLower(), regexPattern))
+                                return false;
+                        }
+                        else
+                        {
+                            // Exact filename or extension match
+                            string ext = "." + cleanPattern;
+                            if (fileExtension == ext || fileName.ToLower() == cleanPattern)
+                                return false;
+                        }
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't exclude file due to error
+                System.Diagnostics.Debug.WriteLine("Filter error for file " + filePath + ": " + ex.Message);
+                return true;
+            }
         }
 
         private bool ShouldIncludeSubfolders()
@@ -822,6 +1055,9 @@ namespace syncer.ui
             {
                 try
                 {
+                    // Update filter settings from UI before saving
+                    UpdateFilterSettingsFromUI();
+                    
                     SaveJob();
                     MessageBox.Show(_isEditMode ? "Job updated successfully!" : "Job created successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     this.DialogResult = DialogResult.OK;
@@ -1475,6 +1711,9 @@ namespace syncer.ui
 
             try
             {
+                // Update filter settings from UI before starting timer
+                UpdateFilterSettingsFromUI();
+                
                 // Calculate interval in milliseconds
                 double intervalMs = CalculateTimerInterval();
                 
@@ -2033,6 +2272,9 @@ namespace syncer.ui
             
             try
             {
+                // Update filter settings from UI before saving
+                UpdateFilterSettingsFromUI();
+                
                 // Save the job using traditional method
                 SaveJob();
                 
@@ -2123,11 +2365,11 @@ namespace syncer.ui
                 RetryDelaySeconds = 5
             };
             
-            // Apply filter settings if available
-            if (_jobFilterSettings != null)
-            {
-                job.FilterSettings = _jobFilterSettings;
-            }
+            // Get current filter settings from the UI controls
+            job.FilterSettings = GetCurrentFilterSettings();
+            
+            // Save filter settings to member variable for consistency
+            _jobFilterSettings = job.FilterSettings;
             
             return job;
         }
