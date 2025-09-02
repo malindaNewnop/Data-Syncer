@@ -21,7 +21,6 @@ namespace syncer.ui.Forms
         
         public SavedJobConfiguration LoadedConfiguration { get; private set; }
         public bool StartJobAfterLoad { get; private set; }
-        public SavedJobConfiguration SelectedConfiguration => _selectedConfiguration;
 
         public FormLoadJobConfiguration(
             ISavedJobConfigurationService configService,

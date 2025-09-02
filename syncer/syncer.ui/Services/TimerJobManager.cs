@@ -3,7 +3,6 @@ using System.Timers;
 using System.Collections.Generic;
 using System.IO;
 using System.Windows.Forms;
-using System.Linq;
 using syncer.ui.Interfaces;
 using syncer.core;
 using syncer.core.Configuration;
@@ -32,15 +31,12 @@ namespace syncer.ui.Services
             public System.Timers.Timer Timer { get; set; }
             public double IntervalMs { get; set; }
             public bool IsRunning { get; set; }
-            public DateTime? LastJobTime { get; set; } // Changed from LastUploadTime to be generic
+            public DateTime? LastUploadTime { get; set; }
             public ITransferClient TransferClient { get; set; }
             public syncer.core.ConnectionSettings ConnectionSettings { get; set; }
-            public bool IsJobInProgress { get; set; } // Prevent overlapping jobs (changed from IsUploadInProgress)
-            public DateTime? JobStartTime { get; set; } // Track job duration (changed from UploadStartTime)
+            public bool IsUploadInProgress { get; set; } // Prevent overlapping uploads
+            public DateTime? UploadStartTime { get; set; } // Track upload duration
             public bool IncludeSubfolders { get; set; } // Whether to include subfolders in file enumeration
-            public bool IsDownloadJob { get; set; } // Whether this job is a download (remote to local) or upload (local to remote)
-            public bool DeleteSourceAfterTransfer { get; set; } // Whether to delete source files after successful transfer
-            public FilterSettings FilterSettings { get; set; } // File filtering settings
         }
         
         public TimerJobManager()
@@ -52,20 +48,15 @@ namespace syncer.ui.Services
         
         public bool RegisterTimerJob(long jobId, string folderPath, string remotePath, double intervalMs)
         {
-            return RegisterTimerJob(jobId, "Timer Job " + jobId, folderPath, remotePath, intervalMs, true, false, null); // Default to include subfolders
+            return RegisterTimerJob(jobId, "Timer Job " + jobId, folderPath, remotePath, intervalMs, true); // Default to include subfolders
         }
         
         public bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs)
         {
-            return RegisterTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, true, false, null); // Default to include subfolders
+            return RegisterTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, true); // Default to include subfolders
         }
         
         public bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders)
-        {
-            return RegisterTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, includeSubfolders, false, null); // Default no delete source, no filters
-        }
-        
-        public bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer = false, FilterSettings filterSettings = null)
         {
             try
             {
@@ -79,12 +70,10 @@ namespace syncer.ui.Services
                     job.RemotePath = remotePath;
                     job.IntervalMs = intervalMs;
                     job.IncludeSubfolders = includeSubfolders; // Update subfolder setting
-                    job.DeleteSourceAfterTransfer = deleteSourceAfterTransfer;
-                    job.FilterSettings = filterSettings;
                     
                     // Initialize new properties if they don't exist
-                    if (!job.IsJobInProgress) job.IsJobInProgress = false;
-                    if (job.JobStartTime == null) job.JobStartTime = null;
+                    if (!job.IsUploadInProgress) job.IsUploadInProgress = false;
+                    if (job.UploadStartTime == null) job.UploadStartTime = null;
                     
                     // Update timer interval if running
                     if (job.Timer != null && job.IsRunning)
@@ -133,20 +122,17 @@ namespace syncer.ui.Services
                     RemotePath = remotePath,
                     IntervalMs = intervalMs,
                     IsRunning = false,
-                    LastJobTime = null,
+                    LastUploadTime = null,
                     TransferClient = transferClient,
                     ConnectionSettings = coreSettings,
-                    IsJobInProgress = false,
-                    JobStartTime = null,
-                    IsDownloadJob = false,
-                    DeleteSourceAfterTransfer = deleteSourceAfterTransfer,
-                    IncludeSubfolders = includeSubfolders,
-                    FilterSettings = filterSettings
+                    IsUploadInProgress = false,
+                    UploadStartTime = null,
+                    IncludeSubfolders = includeSubfolders
                 };
                 
                 _timerJobs.Add(jobId, newJob);
                 
-                _logService.LogInfo(string.Format("Registered upload timer job {0} ({1}) for folder {2}", jobId, jobName, folderPath));
+                _logService.LogInfo(string.Format("Registered timer job {0} ({1}) for folder {2}", jobId, jobName, folderPath));
                 return true;
             }
             catch (Exception ex)
@@ -154,135 +140,6 @@ namespace syncer.ui.Services
                 _logService.LogError(string.Format("Failed to register timer job: {0}", ex.Message));
                 return false;
             }
-        }
-        
-        // Interface overload method to support object type for FilterSettings
-        public bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer, object filterSettings)
-        {
-            // Cast the object back to FilterSettings
-            FilterSettings filters = filterSettings as FilterSettings;
-            return RegisterTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, includeSubfolders, deleteSourceAfterTransfer, filters);
-        }
-        
-        /// <summary>
-        /// Register a download timer job (remote to local)
-        /// </summary>
-        public bool RegisterDownloadTimerJob(long jobId, string remotePath, string localFolderPath, double intervalMs, bool deleteSourceAfterTransfer = false)
-        {
-            return RegisterDownloadTimerJob(jobId, "Timer Download Job " + jobId, remotePath, localFolderPath, intervalMs, true, deleteSourceAfterTransfer, null);
-        }
-        
-        /// <summary>
-        /// Register a download timer job (remote to local) with custom name
-        /// </summary>
-        public bool RegisterDownloadTimerJob(long jobId, string jobName, string remotePath, string localFolderPath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer = false)
-        {
-            return RegisterDownloadTimerJob(jobId, jobName, remotePath, localFolderPath, intervalMs, includeSubfolders, deleteSourceAfterTransfer, null);
-        }
-        
-        /// <summary>
-        /// Register a download timer job (remote to local) with custom name
-        /// </summary>
-        public bool RegisterDownloadTimerJob(long jobId, string jobName, string remotePath, string localFolderPath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer = false, FilterSettings filterSettings = null)
-        {
-            try
-            {
-                // Check if the job already exists
-                if (_timerJobs.ContainsKey(jobId))
-                {
-                    // Update existing job
-                    var job = _timerJobs[jobId];
-                    job.JobName = jobName ?? ("Timer Download Job " + jobId);
-                    job.FolderPath = localFolderPath;  // Local destination
-                    job.RemotePath = remotePath;       // Remote source
-                    job.IntervalMs = intervalMs;
-                    job.IsDownloadJob = true;          // Mark as download job
-                    job.DeleteSourceAfterTransfer = deleteSourceAfterTransfer;
-                    job.IncludeSubfolders = includeSubfolders;
-                    job.FilterSettings = filterSettings;
-                    
-                    // Initialize other properties
-                    if (!job.IsJobInProgress) job.IsJobInProgress = false;
-                    if (job.JobStartTime == null) job.JobStartTime = null;
-                    
-                    // Update timer interval if running
-                    if (job.Timer != null && job.IsRunning)
-                    {
-                        job.Timer.Interval = intervalMs;
-                    }
-                    
-                    _logService.LogInfo(string.Format("Updated download timer job {0} ({1}) from {2} to {3}", 
-                        jobId, jobName, remotePath, localFolderPath));
-                    return true;
-                }
-                
-                // Create a new job
-                ConnectionSettings connectionSettings = _connectionService.GetConnectionSettings();
-                if (connectionSettings == null || !connectionSettings.IsRemoteConnection)
-                {
-                    _logService.LogError("Cannot register download timer job: No remote connection settings available");
-                    return false;
-                }
-                
-                // Convert UI ConnectionSettings to Core ConnectionSettings
-                var coreSettings = new syncer.core.ConnectionSettings
-                {
-                    Protocol = connectionSettings.Protocol == "SFTP" ? 
-                        syncer.core.ProtocolType.Sftp : 
-                        connectionSettings.Protocol == "FTP" ? 
-                            syncer.core.ProtocolType.Ftp : 
-                            syncer.core.ProtocolType.Local,
-                    Host = connectionSettings.Host,
-                    Port = connectionSettings.Port,
-                    Username = connectionSettings.Username,
-                    Password = connectionSettings.Password,
-                    SshKeyPath = connectionSettings.SshKeyPath,
-                    Timeout = connectionSettings.Timeout
-                };
-                
-                // Get the appropriate transfer client using the factory
-                syncer.core.TransferClientFactory factory = new syncer.core.TransferClientFactory();
-                ITransferClient transferClient = factory.Create(coreSettings.Protocol);
-                
-                // Create the job
-                var newJob = new TimerJobInfo
-                {
-                    JobId = jobId,
-                    JobName = jobName ?? ("Timer Download Job " + jobId),
-                    FolderPath = localFolderPath,   // Local destination
-                    RemotePath = remotePath,        // Remote source
-                    IntervalMs = intervalMs,
-                    IsRunning = false,
-                    LastJobTime = null,
-                    TransferClient = transferClient,
-                    ConnectionSettings = coreSettings,
-                    IsJobInProgress = false,
-                    JobStartTime = null,
-                    IsDownloadJob = true,           // Mark as download job
-                    DeleteSourceAfterTransfer = deleteSourceAfterTransfer,
-                    IncludeSubfolders = includeSubfolders,
-                    FilterSettings = filterSettings
-                };
-                
-                _timerJobs.Add(jobId, newJob);
-                
-                _logService.LogInfo(string.Format("Registered download timer job {0} ({1}) from {2} to {3}", 
-                    jobId, jobName, remotePath, localFolderPath));
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(string.Format("Failed to register download timer job: {0}", ex.Message));
-                return false;
-            }
-        }
-        
-        // Interface overload method to support object type for FilterSettings
-        public bool RegisterDownloadTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer, object filterSettings)
-        {
-            // Cast the object back to FilterSettings
-            FilterSettings filters = filterSettings as FilterSettings;
-            return RegisterDownloadTimerJob(jobId, jobName, remotePath, folderPath, intervalMs, includeSubfolders, deleteSourceAfterTransfer, filters);
         }
         
         public bool StartTimerJob(long jobId)
@@ -402,7 +259,7 @@ namespace syncer.ui.Services
                 return null;
             }
             
-            return _timerJobs[jobId].LastJobTime;
+            return _timerJobs[jobId].LastUploadTime;
         }
         
         public string GetTimerJobFolderPath(long jobId)
@@ -457,14 +314,14 @@ namespace syncer.ui.Services
                 return false;
             }
             
-            return _timerJobs[jobId].IsJobInProgress;
+            return _timerJobs[jobId].IsUploadInProgress;
         }
         
         /// <summary>
-        /// Gets the job start time for a timer job
+        /// Gets the upload start time for a timer job
         /// </summary>
         /// <param name="jobId">The ID of the job</param>
-        /// <returns>DateTime when the current job started, or null if not running</returns>
+        /// <returns>DateTime when the current upload started, or null if not uploading</returns>
         public DateTime? GetTimerJobUploadStartTime(long jobId)
         {
             if (!_timerJobs.ContainsKey(jobId))
@@ -472,7 +329,7 @@ namespace syncer.ui.Services
                 return null;
             }
             
-            return _timerJobs[jobId].JobStartTime;
+            return _timerJobs[jobId].UploadStartTime;
         }
         
         public bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs)
@@ -541,46 +398,20 @@ namespace syncer.ui.Services
                 
                 TimerJobInfo job = _timerJobs[jobId];
                 
-                // Prevent overlapping jobs
-                if (job.IsJobInProgress)
+                // Prevent overlapping uploads
+                if (job.IsUploadInProgress)
                 {
-                    TimeSpan jobDuration = DateTime.Now - (job.JobStartTime ?? DateTime.Now);
-                    _logService.LogWarning(string.Format("Skipping timer cycle for job {0} - previous {1} still in progress (running for {2:mm\\:ss})", 
-                        jobId, job.IsDownloadJob ? "download" : "upload", jobDuration));
+                    TimeSpan uploadDuration = DateTime.Now - (job.UploadStartTime ?? DateTime.Now);
+                    _logService.LogWarning(string.Format("Skipping timer cycle for job {0} - previous upload still in progress (running for {1:mm\\:ss})", 
+                        jobId, uploadDuration));
                     return;
                 }
                 
-                _logService.LogInfo(string.Format("Timer elapsed for job {0} - starting {1}", 
-                    jobId, job.IsDownloadJob ? "folder download" : "folder upload"));
+                _logService.LogInfo(string.Format("Timer elapsed for job {0} - starting folder upload", jobId));
                 
-                // Handle differently based on job type
-                if (job.IsDownloadJob)
-                {
-                    // For download jobs, we mark it as in progress and process it
-                    job.IsJobInProgress = true;
-                    job.JobStartTime = DateTime.Now;
-                    
-                    // Process download asynchronously
-                    ProcessDownloadTimerJob(job);
-                    return;
-                }
-                
-                // For upload jobs, continue with the original flow
+                // Get files based on subfolder inclusion setting
                 SearchOption searchOption = job.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-                string[] allFiles = Directory.GetFiles(job.FolderPath, "*", searchOption);
-                
-                // Apply filters if configured
-                string[] currentFiles = allFiles;
-                if (job.FilterSettings != null && job.FilterSettings.FiltersEnabled)
-                {
-                    string[] filteredFiles = ApplyFilters(allFiles, job.FilterSettings);
-                    currentFiles = filteredFiles;
-                    _logService.LogInfo(string.Format("Applied filters: {0} files remain from {1} total files", currentFiles.Length, allFiles.Length));
-                }
-                else
-                {
-                    _logService.LogInfo(string.Format("No filters applied: processing all {0} files", currentFiles.Length));
-                }
+                string[] currentFiles = Directory.GetFiles(job.FolderPath, "*", searchOption);
                 
                 // Also ensure empty directories are created on remote (only if including subfolders)
                 string[] allDirectories = job.IncludeSubfolders ? 
@@ -635,90 +466,35 @@ namespace syncer.ui.Services
                     return;
                 }
                 
-                // Mark job as in progress
-                job.IsJobInProgress = true;
-                job.JobStartTime = DateTime.Now;
+                // Mark upload as in progress and start background upload
+                job.IsUploadInProgress = true;
+                job.UploadStartTime = DateTime.Now;
                 
-                // Choose between upload and download based on job type
-                if (job.IsDownloadJob)
+                // Perform the upload asynchronously to prevent blocking the timer
+                System.Threading.ThreadPool.QueueUserWorkItem(state =>
                 {
-                    // For download jobs, we need to get remote files first
-                    System.Threading.ThreadPool.QueueUserWorkItem(state =>
+                    try
                     {
-                        try
-                        {
-                            // List remote files to download
-                            List<string> remoteFiles;
-                            string listError;
-                            bool success = job.TransferClient.ListFiles(job.ConnectionSettings, job.RemotePath, out remoteFiles, out listError);
-                            
-                            if (!success)
-                            {
-                                _logService.LogError(string.Format("Failed to list remote files for job {0}: {1}", 
-                                    jobId, listError ?? "Unknown error"));
-                                return;
-                            }
-                            
-                            if (remoteFiles == null || remoteFiles.Count == 0)
-                            {
-                                _logService.LogInfo(string.Format("No files found in remote folder {0} for job {1}", 
-                                    job.RemotePath, jobId));
-                                return;
-                            }
-                            
-                            _logService.LogInfo(string.Format("Found {0} files to download from {1} for job {2}", 
-                                remoteFiles.Count, job.RemotePath, jobId));
-                                
-                            // Perform the download
-                            PerformFolderDownload(job, remoteFiles.ToArray());
-                            
-                            // Update last job time
-                            job.LastJobTime = DateTime.Now;
-                            
-                            TimeSpan totalDuration = DateTime.Now - job.JobStartTime.Value;
-                            _logService.LogInfo(string.Format("Download cycle completed for job {0} in {1:mm\\:ss}", 
-                                jobId, totalDuration));
-                        }
-                        catch (Exception ex)
-                        {
-                            _logService.LogError(string.Format("Error in background download for job {0}: {1}", jobId, ex.Message));
-                        }
-                        finally
-                        {
-                            // Always reset the job in progress flag
-                            job.IsJobInProgress = false;
-                            job.JobStartTime = null;
-                        }
-                    });
-                }
-                else
-                {
-                    // Perform the upload asynchronously to prevent blocking the timer
-                    System.Threading.ThreadPool.QueueUserWorkItem(state =>
+                        PerformFolderUpload(job, currentFiles);
+                        
+                        // Update last upload time
+                        job.LastUploadTime = DateTime.Now;
+                        
+                        TimeSpan totalDuration = DateTime.Now - job.UploadStartTime.Value;
+                        _logService.LogInfo(string.Format("Upload cycle completed for job {0} in {1:mm\\:ss}", 
+                            jobId, totalDuration));
+                    }
+                    catch (Exception ex)
                     {
-                        try
-                        {
-                            PerformFolderUpload(job, currentFiles);
-                            
-                            // Update last job time
-                            job.LastJobTime = DateTime.Now;
-                            
-                            TimeSpan totalDuration = DateTime.Now - job.JobStartTime.Value;
-                            _logService.LogInfo(string.Format("Upload cycle completed for job {0} in {1:mm\\:ss}", 
-                                jobId, totalDuration));
-                        }
-                        catch (Exception ex)
-                        {
-                            _logService.LogError(string.Format("Error in background upload for job {0}: {1}", jobId, ex.Message));
-                        }
-                        finally
-                        {
-                            // Always reset the job in progress flag
-                            job.IsJobInProgress = false;
-                            job.JobStartTime = null;
-                        }
-                    });
-                }
+                        _logService.LogError(string.Format("Error in background upload for job {0}: {1}", jobId, ex.Message));
+                    }
+                    finally
+                    {
+                        // Always reset the upload in progress flag
+                        job.IsUploadInProgress = false;
+                        job.UploadStartTime = null;
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -727,8 +503,8 @@ namespace syncer.ui.Services
                 // Ensure we reset the flag even if there's an error
                 if (_timerJobs.ContainsKey(jobId))
                 {
-                    _timerJobs[jobId].IsJobInProgress = false;
-                    _timerJobs[jobId].JobStartTime = null;
+                    _timerJobs[jobId].IsUploadInProgress = false;
+                    _timerJobs[jobId].UploadStartTime = null;
                 }
             }
         }
@@ -889,21 +665,6 @@ namespace syncer.ui.Services
                                 {
                                     _logService.LogWarning(string.Format("Could not verify upload of {0}: {1}", fileName, verifyEx.Message));
                                 }
-                                
-                                // Delete source file if specified and upload was successful (even if verification failed)
-                                if (job.DeleteSourceAfterTransfer)
-                                {
-                                    try
-                                    {
-                                        File.Delete(localFile);
-                                        _logService.LogInfo(string.Format("Source file deleted after successful upload: {0}", fileName));
-                                    }
-                                    catch (Exception deleteEx)
-                                    {
-                                        _logService.LogWarning(string.Format("Failed to delete local source file {0}: {1}", 
-                                            fileName, deleteEx.Message));
-                                    }
-                                }
                             }
                         }
                         catch (Exception fileEx)
@@ -927,101 +688,6 @@ namespace syncer.ui.Services
             {
                 _logService.LogError(string.Format("Error in folder upload for job {0}: {1}", job.JobId, ex.Message));
             }
-        }
-        
-        /// <summary>
-        /// Apply filters to a list of files based on FilterSettings
-        /// </summary>
-        private string[] ApplyFilters(string[] allFiles, FilterSettings filterSettings)
-        {
-            if (filterSettings == null)
-            {
-                return allFiles; // No filters, return all files
-            }
-            
-            List<string> filteredFiles = new List<string>();
-            
-            foreach (string file in allFiles)
-            {
-                if (ShouldIncludeFile(file, filterSettings))
-                {
-                    filteredFiles.Add(file);
-                }
-            }
-            
-            return filteredFiles.ToArray();
-        }
-        
-        /// <summary>
-        /// Determine if a file should be included based on filter settings
-        /// </summary>
-        private bool ShouldIncludeFile(string filePath, FilterSettings filterSettings)
-        {
-            if (filterSettings == null || !filterSettings.FiltersEnabled) return true;
-            
-            string fileName = Path.GetFileName(filePath);
-            string fileExtension = Path.GetExtension(filePath).ToLower();
-            
-            // Check exclude file patterns (e.g., .pdf, .tmp)
-            if (!string.IsNullOrEmpty(filterSettings.ExcludeFilePatterns))
-            {
-                string[] excludePatterns = filterSettings.ExcludeFilePatterns.Split(new char[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (string excludePattern in excludePatterns)
-                {
-                    string cleanPattern = excludePattern.Trim();
-                    
-                    // If it starts with a dot, treat it as an extension
-                    if (cleanPattern.StartsWith("."))
-                    {
-                        if (fileExtension == cleanPattern.ToLower())
-                        {
-                            return false; // Exclude this file extension
-                        }
-                    }
-                    else
-                    {
-                        // Treat as wildcard pattern for filename
-                        if (IsWildcardMatch(fileName, cleanPattern))
-                        {
-                            return false; // Exclude this file pattern
-                        }
-                    }
-                }
-            }
-            
-            // Check include file extensions (if specified, only include these extensions)
-            if (!string.IsNullOrEmpty(filterSettings.IncludeFileExtensions))
-            {
-                string[] includeExtensions = filterSettings.IncludeFileExtensions.Split(new char[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                bool matchesInclude = false;
-                foreach (string includeExt in includeExtensions)
-                {
-                    string cleanExt = includeExt.Trim().ToLower();
-                    if (!cleanExt.StartsWith(".")) cleanExt = "." + cleanExt;
-                    
-                    if (fileExtension == cleanExt)
-                    {
-                        matchesInclude = true;
-                        break;
-                    }
-                }
-                if (!matchesInclude) return false; // Not in include list
-            }
-            
-            return true; // File passes all filters
-        }
-        
-        /// <summary>
-        /// Simple wildcard pattern matching (* and ? supported)
-        /// </summary>
-        private bool IsWildcardMatch(string text, string pattern)
-        {
-            if (string.IsNullOrEmpty(pattern)) return true;
-            if (string.IsNullOrEmpty(text)) return pattern == "*";
-            
-            // Convert wildcard pattern to regex
-            string regexPattern = "^" + pattern.Replace("*", ".*").Replace("?", ".") + "$";
-            return System.Text.RegularExpressions.Regex.IsMatch(text, regexPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         }
         
         public Dictionary<long, object> GetRunningJobs()
@@ -1059,299 +725,6 @@ namespace syncer.ui.Services
                 _logService.LogError(string.Format("Error getting all jobs: {0}", ex.Message));
             }
             return allJobs;
-        }
-        
-        /// <summary>
-        /// Download files from remote to local
-        /// </summary>
-        /// <param name="job">The timer job</param>
-        /// <param name="remoteFilePaths">Array of remote file paths to download</param>
-        private void PerformFolderDownload(TimerJobInfo job, string[] remoteFilePaths)
-        {
-            try
-            {
-                _logService.LogInfo(string.Format("Starting folder download for job {0} with {1} files from {2} to {3}", 
-                    job.JobId, remoteFilePaths.Length, job.RemotePath, job.FolderPath));
-                
-                _logService.LogInfo(string.Format("Connection: {0}@{1}:{2}", 
-                    job.ConnectionSettings.Username, job.ConnectionSettings.Host, job.ConnectionSettings.Port));
-                
-                // Track download statistics
-                int successfulDownloads = 0;
-                int failedDownloads = 0;
-                long totalBytes = 0;
-                
-                // Ensure local destination directory exists - Create all directories in the path
-                try
-                {
-                    if (!Directory.Exists(job.FolderPath))
-                    {
-                        // Create all directories in the path
-                        Directory.CreateDirectory(job.FolderPath);
-                        _logService.LogInfo(string.Format("Created local destination directory: {0}", job.FolderPath));
-                    }
-                }
-                catch (Exception dirEx)
-                {
-                    _logService.LogError(string.Format("Error creating local destination directory {0}: {1}", job.FolderPath, dirEx.Message));
-                    
-                    // Try a different approach to create the entire directory path
-                    try
-                    {
-                        // Break down the path and try to create each segment
-                        string path = job.FolderPath;
-                        if (path.EndsWith("\\") || path.EndsWith("/"))
-                            path = path.Substring(0, path.Length - 1);
-                            
-                        // Start with the drive root
-                        string drivePart = Path.GetPathRoot(path);
-                        string remainingPath = path.Substring(drivePart.Length);
-                        string currentPath = drivePart;
-                        
-                        // Split by directory separator and create each segment
-                        foreach (string segment in remainingPath.Split(new char[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, 
-                            StringSplitOptions.RemoveEmptyEntries))
-                        {
-                            currentPath = Path.Combine(currentPath, segment);
-                            if (!Directory.Exists(currentPath))
-                            {
-                                Directory.CreateDirectory(currentPath);
-                                _logService.LogInfo(string.Format("Created directory segment: {0}", currentPath));
-                            }
-                        }
-                        
-                        _logService.LogInfo(string.Format("Successfully created full directory path: {0}", job.FolderPath));
-                    }
-                    catch (Exception segmentEx)
-                    {
-                        _logService.LogError(string.Format("Failed to create directory path segments for {0}: {1}", job.FolderPath, segmentEx.Message));
-                        throw; // Re-throw to be caught by outer try/catch
-                    }
-                }
-                
-                // Process files in smaller batches to improve responsiveness
-                const int batchSize = 5; // Process 5 files at a time
-                int totalBatches = (int)Math.Ceiling((double)remoteFilePaths.Length / batchSize);
-                
-                for (int batchIndex = 0; batchIndex < totalBatches; batchIndex++)
-                {
-                    int startIndex = batchIndex * batchSize;
-                    int endIndex = Math.Min(startIndex + batchSize, remoteFilePaths.Length);
-                    
-                    for (int i = startIndex; i < endIndex; i++)
-                    {
-                        string remoteFile = remoteFilePaths[i];
-                        string fileName = Path.GetFileName(remoteFile);
-                        
-                        // Calculate relative path if needed for subdirectories
-                        string relativePath = "";
-                        string remotePath = job.RemotePath.Replace('\\', '/');
-                        if (!remotePath.EndsWith("/")) remotePath += "/";
-                        
-                        // Normalize remoteFile path to handle different path formats
-                        string normalizedRemoteFile = remoteFile.Replace('\\', '/');
-                        
-                        if (normalizedRemoteFile.StartsWith(remotePath, StringComparison.OrdinalIgnoreCase))
-                        {
-                            // Extract relative path (subfolders) from remote file path
-                            string remoteRelative = normalizedRemoteFile.Substring(remotePath.Length);
-                            relativePath = Path.GetDirectoryName(remoteRelative);
-                            
-                            if (!string.IsNullOrEmpty(relativePath))
-                            {
-                                relativePath = relativePath.Replace('/', Path.DirectorySeparatorChar);
-                                _logService.LogInfo(string.Format("Found subfolder structure: {0}", relativePath));
-                            }
-                        }
-                        else
-                        {
-                            // Check if we can extract the file name if the path doesn't match exactly
-                            // This can happen due to different formats of slashes or different directory representations
-                            _logService.LogInfo(string.Format("Remote file path format doesn't match base path. Trying to extract filename from: {0}", normalizedRemoteFile));
-                            
-                            // Try to get just the filename component if it's just a filename without path
-                            if (!normalizedRemoteFile.Contains("/"))
-                            {
-                                fileName = normalizedRemoteFile; // Use as-is if it's just a filename
-                                _logService.LogInfo(string.Format("Using filename without path: {0}", fileName));
-                            }
-                            else
-                            {
-                                // Try to extract the relative path by finding the common part
-                                int lastSlashPos = normalizedRemoteFile.LastIndexOf('/');
-                                if (lastSlashPos >= 0)
-                                {
-                                    string remoteDir = normalizedRemoteFile.Substring(0, lastSlashPos + 1);
-                                    fileName = normalizedRemoteFile.Substring(lastSlashPos + 1);
-                                    
-                                    // If remote path is a parent of the remoteDir, extract the relative path
-                                    if (remoteDir.StartsWith(remotePath, StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        relativePath = remoteDir.Substring(remotePath.Length).Replace('/', Path.DirectorySeparatorChar);
-                                        if (relativePath.EndsWith(Path.DirectorySeparatorChar.ToString()))
-                                            relativePath = relativePath.Substring(0, relativePath.Length - 1);
-                                        _logService.LogInfo(string.Format("Extracted subfolder: {0}", relativePath));
-                                    }
-                                }
-                            }
-                            
-                            _logService.LogInfo(string.Format("Will use filename: {0} with relative path: {1}", fileName, relativePath));
-                        }
-                        
-                        // Calculate full local file path (including any subfolders)
-                        string localFile;
-                        if (string.IsNullOrEmpty(relativePath))
-                        {
-                            localFile = Path.Combine(job.FolderPath, fileName);
-                        }
-                        else
-                        {
-                            // Create subdirectory structure if needed
-                            string localSubDir = Path.Combine(job.FolderPath, relativePath);
-                            if (!Directory.Exists(localSubDir))
-                            {
-                                try
-                                {
-                                    Directory.CreateDirectory(localSubDir);
-                                    _logService.LogInfo(string.Format("Created local subdirectory: {0}", localSubDir));
-                                }
-                                catch (Exception dirEx)
-                                {
-                                    _logService.LogError(string.Format("Error creating local subdirectory {0}: {1}", localSubDir, dirEx.Message));
-                                }
-                            }
-                            localFile = Path.Combine(localSubDir, fileName);
-                        }
-                        
-                        _logService.LogInfo(string.Format("Downloading: {0} -> {1}", remoteFile, localFile));
-                        
-                        try
-                        {
-                            string downloadError;
-                            bool success = job.TransferClient.DownloadFile(job.ConnectionSettings, remoteFile, localFile, true, out downloadError);
-                            
-                            if (!success)
-                            {
-                                string errorMsg = string.Format("Failed to download {0}: {1}", 
-                                    fileName, downloadError == null ? "Unknown error" : downloadError);
-                                _logService.LogError(errorMsg);
-                                failedDownloads++;
-                                
-                                // Don't break here - continue trying to download other files
-                            }
-                            else
-                            {
-                                _logService.LogInfo(string.Format("Successfully downloaded: {0}", fileName));
-                                successfulDownloads++;
-                                
-                                // Get file size for statistics
-                                if (File.Exists(localFile))
-                                {
-                                    FileInfo fileInfo = new FileInfo(localFile);
-                                    totalBytes += fileInfo.Length;
-                                }
-                                
-                                // Delete source file from remote if specified
-                                if (job.DeleteSourceAfterTransfer)
-                                {
-                                    try
-                                    {
-                                        string deleteError;
-                                        bool deleteSuccess = job.TransferClient.DeleteFile(job.ConnectionSettings, remoteFile, out deleteError);
-                                        
-                                        if (deleteSuccess)
-                                        {
-                                            _logService.LogInfo(string.Format("Source file deleted from remote after successful download: {0}", fileName));
-                                        }
-                                        else
-                                        {
-                                            _logService.LogWarning(string.Format("Failed to delete remote source file {0}: {1}", 
-                                                fileName, deleteError ?? "Unknown error"));
-                                        }
-                                    }
-                                    catch (Exception deleteEx)
-                                    {
-                                        _logService.LogWarning(string.Format("Failed to delete remote source file {0}: {1}", 
-                                            fileName, deleteEx.Message));
-                                    }
-                                }
-                            }
-                        }
-                        catch (Exception fileEx)
-                        {
-                            _logService.LogError(string.Format("Error downloading {0}: {1}", fileName, fileEx.Message));
-                            failedDownloads++;
-                        }
-                    }
-                }
-                
-                _logService.LogInfo(string.Format("Folder download completed: {0} files successful, {1} failed, {2} bytes transferred", 
-                    successfulDownloads, failedDownloads, totalBytes));
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(string.Format("Error in folder download: {0}", ex.Message));
-            }
-        }
-        
-        /// <summary>
-        /// Process a download timer job asynchronously
-        /// </summary>
-        private void ProcessDownloadTimerJob(TimerJobInfo job)
-        {
-            System.Threading.ThreadPool.QueueUserWorkItem(state =>
-            {
-                try
-                {
-                    // List remote files to download
-                    List<string> remoteFiles;
-                    string listError;
-                    bool success;
-                    
-                    // We're just using the basic listing capability provided by the client
-                    _logService.LogInfo(string.Format("Listing files from {0} for job {1}", 
-                        job.RemotePath, job.JobId));
-                    
-                    success = job.TransferClient.ListFiles(job.ConnectionSettings, job.RemotePath, out remoteFiles, out listError);
-                    
-                    if (!success)
-                    {
-                        _logService.LogError(string.Format("Failed to list remote files for job {0}: {1}", 
-                            job.JobId, listError ?? "Unknown error"));
-                        return;
-                    }
-                    
-                    if (remoteFiles == null || remoteFiles.Count == 0)
-                    {
-                        _logService.LogInfo(string.Format("No files found in remote folder {0} for job {1}", 
-                            job.RemotePath, job.JobId));
-                        return;
-                    }
-                    
-                    _logService.LogInfo(string.Format("Found {0} files to download from {1} for job {2}", 
-                        remoteFiles.Count, job.RemotePath, job.JobId));
-                        
-                    // Perform the download
-                    PerformFolderDownload(job, remoteFiles.ToArray());
-                    
-                    // Update last job time
-                    job.LastJobTime = DateTime.Now;
-                    
-                    TimeSpan totalDuration = DateTime.Now - job.JobStartTime.Value;
-                    _logService.LogInfo(string.Format("Download cycle completed for job {0} in {1:mm\\:ss}", 
-                        job.JobId, totalDuration));
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogError(string.Format("Error in background download for job {0}: {1}", job.JobId, ex.Message));
-                }
-                finally
-                {
-                    // Always reset the job in progress flag
-                    job.IsJobInProgress = false;
-                    job.JobStartTime = null;
-                }
-            });
         }
     }
 }

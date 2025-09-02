@@ -23,10 +23,6 @@ namespace syncer.ui.Forms
                 
             if (cmbIntervalType.Items.Count > 0 && cmbIntervalType.SelectedIndex < 0)
                 cmbIntervalType.SelectedIndex = 1; // Minutes
-                
-            // Set default transfer mode if not set
-            if (cmbTransferMode.Items.Count > 0 && cmbTransferMode.SelectedIndex < 0)
-                cmbTransferMode.SelectedIndex = 0; // Upload (Local to Remote)
         }
 
         private void LoadConfigurationData()
@@ -50,13 +46,6 @@ namespace syncer.ui.Forms
                     int index = cmbIntervalType.FindString(_configuration.JobSettings.IntervalType);
                     if (index >= 0) cmbIntervalType.SelectedIndex = index;
                 }
-                
-                // Load transfer mode - default to Upload if not specified
-                string transferMode = _configuration.JobSettings.TransferMode ?? "Upload";
-                if (transferMode == "Upload")
-                    cmbTransferMode.SelectedIndex = 0;
-                else
-                    cmbTransferMode.SelectedIndex = 1;
                 
                 chkEnabled.Checked = _configuration.JobSettings.IsEnabled;
             }
@@ -139,12 +128,6 @@ namespace syncer.ui.Forms
                 _configuration.JobSettings.IntervalValue = (int)numInterval.Value;
                 _configuration.JobSettings.IntervalType = cmbIntervalType.Text;
                 _configuration.JobSettings.IsEnabled = chkEnabled.Checked;
-                
-                // Set transfer mode based on selection
-                if (cmbTransferMode.SelectedIndex == 0)
-                    _configuration.JobSettings.TransferMode = "Upload";
-                else
-                    _configuration.JobSettings.TransferMode = "Download";
 
                 // Update connection settings
                 if (_configuration.SourceConnection == null)

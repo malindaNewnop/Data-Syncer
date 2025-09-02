@@ -147,9 +147,6 @@ namespace syncer.ui
                 startupTimer.Stop();
                 startupTimer.Dispose();
                 ShowQuickLaunchPopup();
-                
-                // Load and start saved jobs after form has fully loaded
-                LoadAndStartSavedJobs();
             };
             startupTimer.Start();
         }
@@ -159,169 +156,6 @@ namespace syncer.ui
             // Refresh timer jobs grid when form becomes active
             // This ensures the grid is always up-to-date when user returns to main form
             RefreshTimerJobsGrid();
-        }
-
-        /// <summary>
-        /// Load and automatically start saved timer jobs at application startup
-        /// </summary>
-        private void LoadAndStartSavedJobs()
-        {
-            try
-            {
-                ServiceLocator.LogService.LogInfo("Loading and starting saved timer jobs at application startup", "UI");
-                
-                if (_savedJobConfigService == null)
-                {
-                    ServiceLocator.LogService.LogWarning("Cannot load saved jobs: SavedJobConfigurationService not available", "UI");
-                    return;
-                }
-                
-                // Get all saved job configurations
-                var savedConfigs = _savedJobConfigService.GetAllConfigurations();
-                if (savedConfigs == null || savedConfigs.Count == 0)
-                {
-                    ServiceLocator.LogService.LogInfo("No saved job configurations found", "UI");
-                    return;
-                }
-                
-                int startedCount = 0;
-                var timerJobManager = ServiceLocator.TimerJobManager;
-                if (timerJobManager == null)
-                {
-                    ServiceLocator.LogService.LogError("Cannot start saved jobs: Timer job manager not available", "UI");
-                    return;
-                }
-                
-                foreach (var config in savedConfigs)
-                {
-                    try
-                    {
-                        if (config.JobSettings == null || !config.JobSettings.IsEnabled)
-                        {
-                            continue; // Skip disabled jobs
-                        }
-                        
-                        // Calculate interval in milliseconds
-                        double intervalMs = CalculateIntervalInMilliseconds(config.JobSettings.IntervalValue, config.JobSettings.IntervalType);
-                        
-                        bool success = false;
-                        
-                        // Handle based on job type
-                        if (config.JobSettings.TransferMode == "Upload")
-                        {
-                            // Local to remote (upload)
-                            success = timerJobManager.RegisterTimerJob(
-                                config.JobSettings.Id, 
-                                config.Name, 
-                                config.JobSettings.SourcePath, // local source folder
-                                config.JobSettings.DestinationPath, // remote destination
-                                intervalMs,
-                                config.JobSettings.IncludeSubFolders);
-                        }
-                        else if (config.JobSettings.TransferMode == "Download")
-                        {
-                            // Ensure local destination directory exists before registering job
-                            string localDestination = config.JobSettings.DestinationPath;
-                            
-                            if (!string.IsNullOrEmpty(localDestination))
-                            {
-                                try
-                                {
-                                    if (!System.IO.Directory.Exists(localDestination))
-                                    {
-                                        // Create the entire directory path
-                                        string path = localDestination;
-                                        if (path.EndsWith("\\") || path.EndsWith("/"))
-                                            path = path.Substring(0, path.Length - 1);
-                                            
-                                        // Start with the drive root
-                                        string drivePart = System.IO.Path.GetPathRoot(path);
-                                        string remainingPath = path.Substring(drivePart.Length);
-                                        string currentPath = drivePart;
-                                        
-                                        // Split by directory separator and create each segment
-                                        foreach (string segment in remainingPath.Split(new char[] { System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar }, 
-                                            StringSplitOptions.RemoveEmptyEntries))
-                                        {
-                                            currentPath = System.IO.Path.Combine(currentPath, segment);
-                                            if (!System.IO.Directory.Exists(currentPath))
-                                            {
-                                                System.IO.Directory.CreateDirectory(currentPath);
-                                                ServiceLocator.LogService.LogInfo($"Created directory segment: {currentPath}", "UI");
-                                            }
-                                        }
-                                        
-                                        ServiceLocator.LogService.LogInfo($"Successfully created full directory path: {localDestination}", "UI");
-                                    }
-                                    
-                                    // Remote to local (download)
-                                    success = timerJobManager.RegisterDownloadTimerJob(
-                                        config.JobSettings.Id,
-                                        config.Name,
-                                        config.JobSettings.SourcePath, // remote source path
-                                        localDestination, // local destination folder
-                                        intervalMs,
-                                        config.JobSettings.IncludeSubFolders,
-                                        config.JobSettings.DeleteSourceAfterTransfer);
-                                }
-                                catch (Exception dirEx)
-                                {
-                                    ServiceLocator.LogService.LogError($"Error creating local directory {localDestination} for job {config.Name}: {dirEx.Message}", "UI");
-                                    continue;
-                                }
-                            }
-                            else
-                            {
-                                ServiceLocator.LogService.LogError($"Cannot start job {config.Name}: No local destination directory specified", "UI");
-                                continue;
-                            }
-                        }
-                        
-                        if (success)
-                        {
-                            timerJobManager.StartTimerJob(config.JobSettings.Id);
-                            startedCount++;
-                            ServiceLocator.LogService.LogInfo($"Automatically started job '{config.Name}' ({config.JobSettings.TransferMode}) at application startup", "UI");
-                        }
-                    }
-                    catch (Exception jobEx)
-                    {
-                        ServiceLocator.LogService.LogError($"Error starting job {config.Name}: {jobEx.Message}", "UI");
-                    }
-                }
-                
-                if (startedCount > 0)
-                {
-                    _notificationService?.ShowNotification(
-                        "Jobs Started", 
-                        $"Started {startedCount} job(s) automatically",
-                        ToolTipIcon.Info);
-                }
-                
-                ServiceLocator.LogService.LogInfo($"Finished loading saved jobs. Started {startedCount} out of {savedConfigs.Count} jobs", "UI");
-            }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogError($"Error loading and starting saved jobs: {ex.Message}", "UI");
-            }
-        }
-        
-        /// <summary>
-        /// Calculate interval in milliseconds based on value and unit
-        /// </summary>
-        private double CalculateIntervalInMilliseconds(int intervalValue, string intervalType)
-        {
-            switch (intervalType?.ToLower())
-            {
-                case "seconds":
-                    return intervalValue * 1000;
-                case "minutes":
-                    return intervalValue * 60 * 1000;
-                case "hours":
-                    return intervalValue * 60 * 60 * 1000;
-                default:
-                    return intervalValue * 60 * 1000; // Default to minutes
-            }
         }
 
 
@@ -425,12 +259,40 @@ namespace syncer.ui
         {
             try
             {
-                // Open the new combined FormNewConnectionAndJob
-                using (var newForm = new Forms.FormNewConnectionAndJob())
+                // Open the FormEditConfiguration for creating a new configuration
+                var newConfiguration = new SavedJobConfiguration
                 {
-                    newForm.Text = "New Connection & Job Configuration";
+                    Name = "",
+                    Description = "",
+                    JobSettings = new SyncJob
+                    {
+                        Name = "",
+                        SourcePath = "",
+                        DestinationPath = "",
+                        IntervalValue = 30,
+                        IntervalType = "Minutes",
+                        IsEnabled = true
+                    },
+                    SourceConnection = new SavedConnection
+                    {
+                        Settings = new syncer.ui.ConnectionSettings
+                        {
+                            Protocol = "FTP",
+                            ProtocolType = 1,
+                            Host = "",
+                            Port = 21,
+                            Username = "",
+                            Password = "",
+                            EnableSsl = false
+                        }
+                    }
+                };
+
+                using (var editForm = new Forms.FormEditConfiguration(newConfiguration))
+                {
+                    editForm.Text = "New Connection & Job Configuration";
                     
-                    if (newForm.ShowDialog() == DialogResult.OK)
+                    if (editForm.ShowDialog() == DialogResult.OK)
                     {
                         // Configuration has been saved, refresh the UI
                         MessageBox.Show("New configuration created successfully!", "Success", 
