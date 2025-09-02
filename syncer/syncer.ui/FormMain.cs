@@ -1056,7 +1056,7 @@ namespace syncer.ui
         {
             try
             {
-                // Check if we have a current job and connection to save
+                // Check if we have a current connection to save
                 var connectionService = ServiceLocator.ConnectionService;
                 var configService = ServiceLocator.SavedJobConfigurationService;
                 
@@ -1068,33 +1068,29 @@ namespace syncer.ui
                         "No Connection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
-                
-                // Create a sample job if none exists (user would normally have created one)
-                var currentJob = new SyncJob
+
+                // Check if there are timer jobs to save
+                if (dgvTimerJobs.Rows.Count == 0)
                 {
-                    Name = "Current Job Configuration",
-                    Description = "Job configuration saved from main form",
-                    SourcePath = "",
-                    DestinationPath = "",
-                    IntervalValue = 60,
-                    IntervalType = "Minutes",
-                    TransferMode = "Copy (Keep both files)",
-                    IncludeSubFolders = true,
-                    OverwriteExisting = true,
-                    IsEnabled = true
-                };
+                    MessageBox.Show("Please add at least one timer job before saving configuration.", "No Timer Jobs", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                
+                // Create a comprehensive job configuration from current state
+                var currentJob = CreateJobFromCurrentState();
                 
                 // Open the save configuration form
                 using (var saveForm = new Forms.FormSaveJobConfiguration(
                     currentJob, 
                     currentConnection, 
-                    currentConnection, // Using same connection for both source and destination as example
+                    currentConnection, // Using same connection for both source and destination
                     configService,
                     connectionService))
                 {
                     if (saveForm.ShowDialog() == DialogResult.OK)
                     {
-                        MessageBox.Show("Configuration saved successfully!", "Save Successful", 
+                        MessageBox.Show("Configuration saved successfully! You can access it from Quick Launch menu.", "Save Successful", 
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
@@ -1104,6 +1100,88 @@ namespace syncer.ui
                 MessageBox.Show($"Error saving configuration: {ex.Message}", "Save Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 ServiceLocator.LogService.LogError($"Error saving configuration: {ex.Message}", "UI");
+            }
+        }
+
+        private SyncJob CreateJobFromCurrentState()
+        {
+            try
+            {
+                // Get first timer job from grid as primary job
+                if (dgvTimerJobs.Rows.Count > 0)
+                {
+                    var firstRow = dgvTimerJobs.Rows[0];
+                    var jobName = firstRow.Cells["JobName"].Value?.ToString() ?? "Saved Configuration";
+                    var sourcePath = firstRow.Cells["FolderPath"].Value?.ToString() ?? "";
+                    var remotePath = firstRow.Cells["RemotePath"].Value?.ToString() ?? "";
+                    var intervalText = firstRow.Cells["Interval"].Value?.ToString() ?? "30 Minutes";
+                    
+                    // Parse interval
+                    string intervalType = "Minutes";
+                    int intervalValue = 30;
+                    ParseIntervalText(intervalText, out intervalValue, out intervalType);
+                    
+                    return new SyncJob
+                    {
+                        Name = $"Configuration - {jobName}",
+                        Description = $"Saved configuration with {dgvTimerJobs.Rows.Count} timer job(s)",
+                        SourcePath = sourcePath,
+                        DestinationPath = remotePath,
+                        IntervalValue = intervalValue,
+                        IntervalType = intervalType,
+                        TransferMode = "Copy (Keep both files)",
+                        IncludeSubFolders = true,
+                        OverwriteExisting = true,
+                        IsEnabled = true
+                    };
+                }
+                
+                // Fallback if no jobs in grid
+                return new SyncJob
+                {
+                    Name = "Current Configuration",
+                    Description = "Configuration saved from main form",
+                    SourcePath = "",
+                    DestinationPath = "",
+                    IntervalValue = 30,
+                    IntervalType = "Minutes",
+                    TransferMode = "Copy (Keep both files)",
+                    IncludeSubFolders = true,
+                    OverwriteExisting = true,
+                    IsEnabled = true
+                };
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService?.LogError("Error creating job from current state: " + ex.Message);
+                throw;
+            }
+        }
+
+        private void ParseIntervalText(string intervalText, out int intervalValue, out string intervalType)
+        {
+            try
+            {
+                intervalValue = 30;
+                intervalType = "Minutes";
+                
+                if (string.IsNullOrEmpty(intervalText))
+                    return;
+                
+                var parts = intervalText.Split(' ');
+                if (parts.Length >= 2)
+                {
+                    if (int.TryParse(parts[0], out int value))
+                    {
+                        intervalValue = value;
+                        intervalType = parts[1].TrimEnd('s'); // Remove plural 's' if present
+                    }
+                }
+            }
+            catch
+            {
+                intervalValue = 30;
+                intervalType = "Minutes";
             }
         }
 
