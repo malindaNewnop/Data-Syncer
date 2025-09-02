@@ -3,23 +3,50 @@ using System.Collections.Generic;
 using System.IO;
 using System.Windows.Forms;
 using System.Threading;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace syncer.ui
 {
     internal static class Program
     {
+        // Single instance mutex
+        private static Mutex instanceMutex = null;
+        private const string MUTEX_NAME = "DataSyncerApplication_SingleInstance_Mutex_12345";
+        
+        // Windows API declarations for window activation
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+        
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+        
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+        
+        // ShowWindow constants
+        private const int SW_RESTORE = 9;
+        private const int SW_SHOW = 5;
+        
         /// <summary>
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
         static void Main()
         {
+            // Check for single instance
+            if (!CheckSingleInstance())
+            {
+                return; // Exit if another instance is already running
+            }
+            
             try
             {
                 // Set application-wide exception handler
                 Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
                 Application.ThreadException += new ThreadExceptionEventHandler(Application_ThreadException);
                 AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
+                Application.ApplicationExit += new EventHandler(Application_ApplicationExit);
 
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
@@ -133,6 +160,71 @@ namespace syncer.ui
                 MessageBox.Show("Fatal Error: " + ex.Message, 
                               "Application Error", 
                               MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private static bool CheckSingleInstance()
+        {
+            bool createdNew;
+            instanceMutex = new Mutex(true, MUTEX_NAME, out createdNew);
+            
+            if (!createdNew)
+            {
+                // Another instance is running, try to find and activate it
+                ActivateExistingInstance();
+                return false;
+            }
+            
+            return true;
+        }
+
+        private static void ActivateExistingInstance()
+        {
+            try
+            {
+                Process currentProcess = Process.GetCurrentProcess();
+                Process[] processes = Process.GetProcessesByName(currentProcess.ProcessName);
+                
+                foreach (Process process in processes)
+                {
+                    if (process.Id != currentProcess.Id)
+                    {
+                        IntPtr hWnd = process.MainWindowHandle;
+                        if (hWnd != IntPtr.Zero)
+                        {
+                            // Restore window if minimized
+                            if (IsIconic(hWnd))
+                            {
+                                ShowWindow(hWnd, 9); // SW_RESTORE = 9
+                            }
+                            
+                            // Bring window to foreground
+                            SetForegroundWindow(hWnd);
+                            break;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // If activation fails, just ignore - user can manually switch to existing instance
+            }
+        }
+
+        static void Application_ApplicationExit(object sender, EventArgs e)
+        {
+            try
+            {
+                if (instanceMutex != null)
+                {
+                    instanceMutex.ReleaseMutex();
+                    instanceMutex.Close();
+                    instanceMutex = null;
+                }
+            }
+            catch
+            {
+                // Ignore cleanup errors
             }
         }
 
