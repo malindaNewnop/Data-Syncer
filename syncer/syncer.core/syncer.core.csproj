@@ -51,6 +51,7 @@
     <Compile Include="Core\Paths.cs" />
     <Compile Include="Core\ServiceFactory.cs" />
     <Compile Include="Services\PreviewService.cs" />
+    <Compile Include="Services\BandwidthControlService.cs" />
     <Compile Include="Services\AutoStartService.cs" />
     <Compile Include="Services\JobRunner.cs" />
     <Compile Include="Services\MultiJobRunner.cs" />

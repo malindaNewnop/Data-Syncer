@@ -6,6 +6,7 @@ using System.Linq;
 using syncer.ui.Services;
 using syncer.ui.Interfaces;
 using syncer.ui.Forms;
+using syncer.core.Services;
 
 namespace syncer.ui
 {
@@ -25,6 +26,10 @@ namespace syncer.ui
         private FormWindowState _previousWindowState;
         private FormBorderStyle _previousBorderStyle;
         private bool _previousMenuVisible;
+        
+        // Bandwidth control
+        private BandwidthControlService _bandwidthService;
+        private Timer _speedUpdateTimer;
 
         public FormMain()
         {
@@ -34,6 +39,7 @@ namespace syncer.ui
                 InitializeServices();
                 InitializeSystemTray();
                 InitializeCustomComponents();
+                InitializeBandwidthControl();
             }
             catch (Exception ex)
             {
@@ -110,9 +116,9 @@ namespace syncer.ui
         private void InitializeCustomComponents()
         {
             this.Text = "DataSyncer - Main Dashboard";
-            this.Size = new Size(1000, 600);
+            this.Size = new Size(1000, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.MinimumSize = new Size(800, 500);
+            this.MinimumSize = new Size(800, 600);
             this.WindowState = FormWindowState.Normal;
             
             // Initialize full screen menu state
@@ -249,23 +255,90 @@ namespace syncer.ui
             }
         }
 
-        private void connectionManagerToolStripMenuItem_Click(object sender, EventArgs e)
+        private void newConfigurationToolStripMenuItem_Click(object sender, EventArgs e)
         {
             try
             {
-                using (var connectionManager = new FormConnectionManager())
+                // Open the FormEditConfiguration for creating a new configuration
+                var newConfiguration = new SavedJobConfiguration
                 {
-                    connectionManager.ShowDialog(this);
+                    Name = "",
+                    Description = "",
+                    JobSettings = new SyncJob
+                    {
+                        Name = "",
+                        SourcePath = "",
+                        DestinationPath = "",
+                        IntervalValue = 30,
+                        IntervalType = "Minutes",
+                        IsEnabled = true
+                    },
+                    SourceConnection = new SavedConnection
+                    {
+                        Settings = new syncer.ui.ConnectionSettings
+                        {
+                            Protocol = "FTP",
+                            ProtocolType = 1,
+                            Host = "",
+                            Port = 21,
+                            Username = "",
+                            Password = "",
+                            EnableSsl = false
+                        }
+                    }
+                };
+
+                using (var editForm = new Forms.FormEditConfiguration(newConfiguration))
+                {
+                    editForm.Text = "New Connection & Job Configuration";
                     
-                    // Update connection status after using connection manager
-                    UpdateConnectionStatus();
+                    if (editForm.ShowDialog() == DialogResult.OK)
+                    {
+                        // Configuration has been saved, refresh the UI
+                        MessageBox.Show("New configuration created successfully!", "Success", 
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        
+                        // Optionally refresh timer jobs grid if the job was started
+                        RefreshTimerJobsGrid();
+                    }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error opening connection manager: {ex.Message}", 
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService?.LogError($"Error opening connection manager: {ex.Message}");
+                MessageBox.Show("Error creating new configuration: " + ex.Message, "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService?.LogError("Error creating new configuration: " + ex.Message);
+            }
+        }
+
+        private void loadConfigurationToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Open the FormLoadJobConfiguration for loading existing configurations
+                using (var loadForm = new Forms.FormLoadJobConfiguration(
+                    ServiceLocator.SavedJobConfigurationService,
+                    ServiceLocator.ConnectionService,
+                    ServiceLocator.TimerJobManager))
+                {
+                    loadForm.Text = "Load Configuration";
+                    
+                    if (loadForm.ShowDialog() == DialogResult.OK)
+                    {
+                        // Configuration has been loaded and started
+                        MessageBox.Show("Configuration loaded successfully!", "Success", 
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        
+                        // Refresh timer jobs grid to show the loaded job
+                        RefreshTimerJobsGrid();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error loading configuration: " + ex.Message, "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService?.LogError("Error loading configuration: " + ex.Message);
             }
         }
 
@@ -636,6 +709,8 @@ namespace syncer.ui
             // Initially disable action buttons
             btnStopTimerJob.Enabled = false;
             btnEditTimerJob.Enabled = false;
+            btnDeleteTimerJob.Enabled = false;
+            btnResumeTimerJob.Enabled = false;
         }
         
         private void dgvTimerJobs_SelectionChanged(object sender, EventArgs e)
@@ -644,6 +719,8 @@ namespace syncer.ui
             bool hasSelection = dgvTimerJobs.SelectedRows.Count > 0;
             btnStopTimerJob.Enabled = hasSelection;
             btnEditTimerJob.Enabled = hasSelection;
+            btnDeleteTimerJob.Enabled = hasSelection;
+            btnResumeTimerJob.Enabled = hasSelection;
         }
         
         private void RefreshTimerJobsGrid()
@@ -842,6 +919,105 @@ namespace syncer.ui
                 try { ServiceLocator.LogService.LogError("Error editing timer job: " + ex.Message); } catch { }
             }
         }
+
+        private void btnDeleteTimerJob_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (dgvTimerJobs.SelectedRows.Count == 0) return;
+
+                // Get selected job ID and details
+                DataGridViewRow selectedRow = dgvTimerJobs.SelectedRows[0];
+                long jobId = Convert.ToInt64(selectedRow.Cells["JobId"].Value);
+                string jobName = selectedRow.Cells["JobName"].Value?.ToString() ?? "Timer Job " + jobId;
+
+                // Confirm deletion
+                DialogResult result = MessageBox.Show(
+                    string.Format("Are you sure you want to delete the timer job '{0}'?\n\nThis action cannot be undone.", jobName),
+                    "Confirm Deletion",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+
+                if (result != DialogResult.Yes) return;
+
+                // Get the timer job manager
+                ITimerJobManager timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager == null)
+                {
+                    MessageBox.Show("Timer job manager is not available.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                // Stop the job first if it's running
+                if (timerJobManager.IsTimerJobRunning(jobId))
+                {
+                    timerJobManager.StopTimerJob(jobId);
+                }
+
+                // Delete the job
+                if (timerJobManager.RemoveTimerJob(jobId))
+                {
+                    MessageBox.Show("Timer job deleted successfully.", "Job Deleted", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    RefreshTimerJobsGrid();
+                    ServiceLocator.LogService.LogInfo(string.Format("Timer job '{0}' (ID: {1}) has been deleted", jobName, jobId));
+                }
+                else
+                {
+                    MessageBox.Show("Failed to delete timer job.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error deleting timer job: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                try { ServiceLocator.LogService.LogError("Error deleting timer job: " + ex.Message); } catch { }
+            }
+        }
+
+        private void btnResumeTimerJob_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (dgvTimerJobs.SelectedRows.Count == 0) return;
+
+                // Get selected job ID and details
+                DataGridViewRow selectedRow = dgvTimerJobs.SelectedRows[0];
+                long jobId = Convert.ToInt64(selectedRow.Cells["JobId"].Value);
+                string jobName = selectedRow.Cells["JobName"].Value?.ToString() ?? "Timer Job " + jobId;
+
+                // Get the timer job manager
+                ITimerJobManager timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager == null)
+                {
+                    MessageBox.Show("Timer job manager is not available.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                // Check if job is already running
+                if (timerJobManager.IsTimerJobRunning(jobId))
+                {
+                    MessageBox.Show(string.Format("Timer job '{0}' is already running.", jobName), 
+                        "Job Already Running", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // Resume/start the job
+                if (timerJobManager.StartTimerJob(jobId))
+                {
+                    MessageBox.Show("Timer job resumed successfully.", "Job Resumed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    RefreshTimerJobsGrid();
+                    ServiceLocator.LogService.LogInfo(string.Format("Timer job '{0}' (ID: {1}) has been resumed", jobName, jobId));
+                }
+                else
+                {
+                    MessageBox.Show("Failed to resume timer job.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error resuming timer job: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                try { ServiceLocator.LogService.LogError("Error resuming timer job: " + ex.Message); } catch { }
+            }
+        }
         
         #endregion
 
@@ -899,35 +1075,6 @@ namespace syncer.ui
                 MessageBox.Show($"Error saving configuration: {ex.Message}", "Save Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 ServiceLocator.LogService.LogError($"Error saving configuration: {ex.Message}", "UI");
-            }
-        }
-
-        private void loadConfigurationToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                var configService = ServiceLocator.SavedJobConfigurationService;
-                
-                // Open the simplified load configuration form
-                using (var loadForm = new Forms.FormSimpleLoadConfiguration(configService))
-                {
-                    if (loadForm.ShowDialog() == DialogResult.OK && loadForm.SelectedConfiguration != null)
-                    {
-                        var config = loadForm.SelectedConfiguration;
-                        
-                        // Apply the loaded configuration
-                        ApplyLoadedConfiguration(config, loadForm.LoadAndStart);
-                        
-                        MessageBox.Show("Configuration '" + config.Name + "' loaded successfully!", 
-                            "Load Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error loading configuration: {ex.Message}", "Load Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService.LogError($"Error loading configuration: {ex.Message}", "UI");
             }
         }
 
@@ -1150,6 +1297,216 @@ namespace syncer.ui
             }
         }
 
+        #endregion
+
+        #region Bandwidth Control Methods
+        
+        private void InitializeBandwidthControl()
+        {
+            try
+            {
+                _bandwidthService = BandwidthControlService.Instance;
+                
+                // Load current settings
+                LoadBandwidthSettings();
+                
+                // Set up the speed update timer
+                _speedUpdateTimer = new Timer();
+                _speedUpdateTimer.Interval = 2000; // Update every 2 seconds
+                _speedUpdateTimer.Tick += SpeedUpdateTimer_Tick;
+                _speedUpdateTimer.Start();
+                
+                // Subscribe to bandwidth settings changed event
+                _bandwidthService.BandwidthSettingsChanged += BandwidthService_SettingsChanged;
+                
+                ServiceLocator.LogService.LogInfo("Bandwidth control initialized successfully", "UI");
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError($"Error initializing bandwidth control: {ex.Message}", "UI");
+            }
+        }
+        
+        /// <summary>
+        /// Apply bandwidth limits to SFTP configuration based on transfer direction
+        /// </summary>
+        public void ApplyBandwidthLimitsToSftpConfig(syncer.core.Configuration.SftpConfiguration config, bool isUpload)
+        {
+            try
+            {
+                if (_bandwidthService != null)
+                {
+                    _bandwidthService.ApplyLimitsToSftpConfig(config, isUpload);
+                    
+                    ServiceLocator.LogService.LogInfo($"Applied bandwidth limits to SFTP config - Upload: {isUpload}, " +
+                        $"Limit: {(config.BandwidthLimitBytesPerSecond > 0 ? (config.BandwidthLimitBytesPerSecond / 1024) + " KB/s" : "Unlimited")}", "BandwidthControl");
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError($"Error applying bandwidth limits: {ex.Message}", "BandwidthControl");
+            }
+        }
+        
+        /// <summary>
+        /// Create SFTP configuration with bandwidth limits applied
+        /// </summary>
+        public syncer.core.Configuration.SftpConfiguration CreateBandwidthLimitedSftpConfig(bool isUpload)
+        {
+            var config = new syncer.core.Configuration.SftpConfiguration();
+            ApplyBandwidthLimitsToSftpConfig(config, isUpload);
+            return config;
+        }
+        
+        private void LoadBandwidthSettings()
+        {
+            try
+            {
+                chkEnableBandwidthControl.Checked = _bandwidthService.IsBandwidthControlEnabled;
+                numUploadLimit.Value = (decimal)_bandwidthService.GetUploadLimitKBps();
+                numDownloadLimit.Value = (decimal)_bandwidthService.GetDownloadLimitKBps();
+                
+                UpdateBandwidthControlsState();
+                UpdateSpeedLabels();
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError($"Error loading bandwidth settings: {ex.Message}", "UI");
+            }
+        }
+        
+        private void UpdateBandwidthControlsState()
+        {
+            bool enabled = chkEnableBandwidthControl.Checked;
+            lblUploadLimit.Enabled = enabled;
+            numUploadLimit.Enabled = enabled;
+            lblUploadUnit.Enabled = enabled;
+            lblDownloadLimit.Enabled = enabled;
+            numDownloadLimit.Enabled = enabled;
+            lblDownloadUnit.Enabled = enabled;
+        }
+        
+        private void UpdateSpeedLabels()
+        {
+            try
+            {
+                // This is a placeholder - in a real implementation, you would get actual transfer speeds
+                // from active transfer operations or from a monitoring service
+                lblCurrentUploadSpeed.Text = "Current Upload: 0 B/s";
+                lblCurrentDownloadSpeed.Text = "Current Download: 0 B/s";
+                
+                // Update color coding based on limits
+                if (_bandwidthService.IsBandwidthControlEnabled)
+                {
+                    long uploadLimit = _bandwidthService.GetUploadLimitKBps();
+                    long downloadLimit = _bandwidthService.GetDownloadLimitKBps();
+                    
+                    if (uploadLimit > 0)
+                    {
+                        lblCurrentUploadSpeed.Text += $" (Limit: {uploadLimit} KB/s)";
+                    }
+                    
+                    if (downloadLimit > 0)
+                    {
+                        lblCurrentDownloadSpeed.Text += $" (Limit: {downloadLimit} KB/s)";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError($"Error updating speed labels: {ex.Message}", "UI");
+            }
+        }
+        
+        private void SpeedUpdateTimer_Tick(object sender, EventArgs e)
+        {
+            UpdateSpeedLabels();
+        }
+        
+        private void BandwidthService_SettingsChanged(object sender, EventArgs e)
+        {
+            // Update UI when settings change from another source
+            if (InvokeRequired)
+            {
+                BeginInvoke(new EventHandler(BandwidthService_SettingsChanged), sender, e);
+                return;
+            }
+            
+            LoadBandwidthSettings();
+        }
+        
+        private void chkEnableBandwidthControl_CheckedChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                _bandwidthService.IsBandwidthControlEnabled = chkEnableBandwidthControl.Checked;
+                UpdateBandwidthControlsState();
+                UpdateSpeedLabels();
+                
+                ServiceLocator.LogService.LogInfo($"Bandwidth control {(chkEnableBandwidthControl.Checked ? "enabled" : "disabled")}", "UI");
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError($"Error changing bandwidth control state: {ex.Message}", "UI");
+                MessageBox.Show($"Error changing bandwidth control state: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        
+        private void btnApplyBandwidthSettings_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                long uploadLimitKBps = (long)numUploadLimit.Value;
+                long downloadLimitKBps = (long)numDownloadLimit.Value;
+                
+                _bandwidthService.SetUploadLimitKBps(uploadLimitKBps);
+                _bandwidthService.SetDownloadLimitKBps(downloadLimitKBps);
+                
+                UpdateSpeedLabels();
+                
+                string message = "Bandwidth settings applied successfully!\n" +
+                               $"Upload limit: {(uploadLimitKBps == 0 ? "Unlimited" : uploadLimitKBps + " KB/s")}\n" +
+                               $"Download limit: {(downloadLimitKBps == 0 ? "Unlimited" : downloadLimitKBps + " KB/s")}";
+                
+                MessageBox.Show(message, "Settings Applied", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                
+                ServiceLocator.LogService.LogInfo($"Bandwidth settings applied - Upload: {uploadLimitKBps} KB/s, Download: {downloadLimitKBps} KB/s", "UI");
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError($"Error applying bandwidth settings: {ex.Message}", "UI");
+                MessageBox.Show($"Error applying bandwidth settings: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        
+        private void btnResetBandwidthSettings_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var result = MessageBox.Show("Are you sure you want to reset all bandwidth settings to default values?", 
+                    "Reset Bandwidth Settings", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                
+                if (result == DialogResult.Yes)
+                {
+                    _bandwidthService.ResetToDefaults();
+                    LoadBandwidthSettings();
+                    
+                    MessageBox.Show("Bandwidth settings have been reset to default values.", 
+                        "Settings Reset", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    
+                    ServiceLocator.LogService.LogInfo("Bandwidth settings reset to defaults", "UI");
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError($"Error resetting bandwidth settings: {ex.Message}", "UI");
+                MessageBox.Show($"Error resetting bandwidth settings: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        
         #endregion
 
         #endregion

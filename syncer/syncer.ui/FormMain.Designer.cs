@@ -9,11 +9,12 @@ namespace syncer.ui
         private System.Windows.Forms.ToolStripMenuItem viewToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem helpToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem connectionSettingsToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem connectionManagerToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
         private System.Windows.Forms.ToolStripMenuItem viewLogsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem newConfigurationToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem loadConfigurationToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem sshKeyGenerationToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem fullScreenToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem normalViewToolStripMenuItem;
@@ -31,16 +32,55 @@ namespace syncer.ui
         private System.Windows.Forms.Button btnRefreshTimerJobs;
         private System.Windows.Forms.Button btnStopTimerJob;
         private System.Windows.Forms.Button btnEditTimerJob;
+        private System.Windows.Forms.Button btnDeleteTimerJob;
+        private System.Windows.Forms.Button btnResumeTimerJob;
         private System.Windows.Forms.Label lblRunningTimerJobs;
+        
+        // Bandwidth Control components
+        private System.Windows.Forms.GroupBox gbBandwidthControl;
+        private System.Windows.Forms.CheckBox chkEnableBandwidthControl;
+        private System.Windows.Forms.Label lblUploadLimit;
+        private System.Windows.Forms.NumericUpDown numUploadLimit;
+        private System.Windows.Forms.Label lblUploadUnit;
+        private System.Windows.Forms.Label lblDownloadLimit;
+        private System.Windows.Forms.NumericUpDown numDownloadLimit;
+        private System.Windows.Forms.Label lblDownloadUnit;
+        private System.Windows.Forms.Button btnApplyBandwidthSettings;
+        private System.Windows.Forms.Button btnResetBandwidthSettings;
+        private System.Windows.Forms.Label lblCurrentUploadSpeed;
+        private System.Windows.Forms.Label lblCurrentDownloadSpeed;
         
         // Quick Launch menu item
         private System.Windows.Forms.ToolStripMenuItem showQuickLaunchToolStripMenuItem;
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing && (components != null))
+            if (disposing)
             {
-                components.Dispose();
+                // Dispose of bandwidth control resources
+                if (_speedUpdateTimer != null)
+                {
+                    _speedUpdateTimer.Stop();
+                    _speedUpdateTimer.Dispose();
+                    _speedUpdateTimer = null;
+                }
+                
+                // Unsubscribe from events
+                if (_bandwidthService != null)
+                {
+                    _bandwidthService.BandwidthSettingsChanged -= BandwidthService_SettingsChanged;
+                }
+                
+                // Dispose of other resources
+                if (_trayManager != null)
+                {
+                    _trayManager.Dispose();
+                }
+                
+                if (components != null)
+                {
+                    components.Dispose();
+                }
             }
             base.Dispose(disposing);
         }
@@ -53,7 +93,8 @@ namespace syncer.ui
             this.exitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.settingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.connectionSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.connectionManagerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.newConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.loadConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.sshKeyGenerationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.viewLogsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.viewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -75,13 +116,33 @@ namespace syncer.ui
             this.btnRefreshTimerJobs = new System.Windows.Forms.Button();
             this.btnStopTimerJob = new System.Windows.Forms.Button();
             this.btnEditTimerJob = new System.Windows.Forms.Button();
+            this.btnDeleteTimerJob = new System.Windows.Forms.Button();
+            this.btnResumeTimerJob = new System.Windows.Forms.Button();
             this.lblRunningTimerJobs = new System.Windows.Forms.Label();
             this.showQuickLaunchToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            
+            // Initialize bandwidth control components
+            this.gbBandwidthControl = new System.Windows.Forms.GroupBox();
+            this.chkEnableBandwidthControl = new System.Windows.Forms.CheckBox();
+            this.lblUploadLimit = new System.Windows.Forms.Label();
+            this.numUploadLimit = new System.Windows.Forms.NumericUpDown();
+            this.lblUploadUnit = new System.Windows.Forms.Label();
+            this.lblDownloadLimit = new System.Windows.Forms.Label();
+            this.numDownloadLimit = new System.Windows.Forms.NumericUpDown();
+            this.lblDownloadUnit = new System.Windows.Forms.Label();
+            this.btnApplyBandwidthSettings = new System.Windows.Forms.Button();
+            this.btnResetBandwidthSettings = new System.Windows.Forms.Button();
+            this.lblCurrentUploadSpeed = new System.Windows.Forms.Label();
+            this.lblCurrentDownloadSpeed = new System.Windows.Forms.Label();
+            
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvTimerJobs)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numUploadLimit)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numDownloadLimit)).BeginInit();
             this.statusStrip1.SuspendLayout();
             this.gbControls.SuspendLayout();
             this.gbTimerJobs.SuspendLayout();
+            this.gbBandwidthControl.SuspendLayout();
             this.SuspendLayout();
 
             // Initialize sshKeyGenerationToolStripMenuItem
@@ -102,8 +163,24 @@ namespace syncer.ui
             this.menuStrip1.Size = new System.Drawing.Size(1200, 24);
             this.menuStrip1.TabIndex = 0;
             this.menuStrip1.Text = "menuStrip1";
+            
+            // Initialize menu items first
+            this.newConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.newConfigurationToolStripMenuItem.Name = "newConfigurationToolStripMenuItem";
+            this.newConfigurationToolStripMenuItem.Size = new System.Drawing.Size(200, 22);
+            this.newConfigurationToolStripMenuItem.Text = "New Connection && Job";
+            this.newConfigurationToolStripMenuItem.Click += new System.EventHandler(this.newConfigurationToolStripMenuItem_Click);
+
+            this.loadConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.loadConfigurationToolStripMenuItem.Name = "loadConfigurationToolStripMenuItem";
+            this.loadConfigurationToolStripMenuItem.Size = new System.Drawing.Size(200, 22);
+            this.loadConfigurationToolStripMenuItem.Text = "Load Configuration";
+            this.loadConfigurationToolStripMenuItem.Click += new System.EventHandler(this.loadConfigurationToolStripMenuItem_Click);
+            
             // fileToolStripMenuItem
             this.fileToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.newConfigurationToolStripMenuItem,
+            this.loadConfigurationToolStripMenuItem,
             this.showQuickLaunchToolStripMenuItem,
             this.toolStripSeparator2,
             this.exitToolStripMenuItem});
@@ -113,20 +190,19 @@ namespace syncer.ui
             
             // showQuickLaunchToolStripMenuItem
             this.showQuickLaunchToolStripMenuItem.Name = "showQuickLaunchToolStripMenuItem";
-            this.showQuickLaunchToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.showQuickLaunchToolStripMenuItem.Size = new System.Drawing.Size(200, 22);
             this.showQuickLaunchToolStripMenuItem.Text = "Quick Launch Panel";
             this.showQuickLaunchToolStripMenuItem.Enabled = true;
             this.showQuickLaunchToolStripMenuItem.Click += new System.EventHandler(this.showQuickLaunchToolStripMenuItem_Click);
             // exitToolStripMenuItem
             this.exitToolStripMenuItem.Name = "exitToolStripMenuItem";
-            this.exitToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.exitToolStripMenuItem.Size = new System.Drawing.Size(200, 22);
             this.exitToolStripMenuItem.Text = "Exit";
             this.exitToolStripMenuItem.Click += new System.EventHandler(this.exitToolStripMenuItem_Click);
             
             // settingsToolStripMenuItem
             this.settingsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.connectionSettingsToolStripMenuItem,
-            this.connectionManagerToolStripMenuItem,
             this.sshKeyGenerationToolStripMenuItem,
             this.viewLogsToolStripMenuItem});
             this.settingsToolStripMenuItem.Name = "settingsToolStripMenuItem";
@@ -163,14 +239,6 @@ namespace syncer.ui
             this.connectionSettingsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
             this.connectionSettingsToolStripMenuItem.Text = "Connection Settings";
             this.connectionSettingsToolStripMenuItem.Click += new System.EventHandler(this.connectionSettingsToolStripMenuItem_Click);
-            // 
-            // connectionManagerToolStripMenuItem
-            // 
-            this.connectionManagerToolStripMenuItem.Name = "connectionManagerToolStripMenuItem";
-            this.connectionManagerToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
-            this.connectionManagerToolStripMenuItem.Text = "Connection Manager";
-            this.connectionManagerToolStripMenuItem.Click += new System.EventHandler(this.connectionManagerToolStripMenuItem_Click);
-            // 
             // viewLogsToolStripMenuItem
             this.viewLogsToolStripMenuItem.Name = "viewLogsToolStripMenuItem";
             this.viewLogsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
@@ -265,11 +333,13 @@ namespace syncer.ui
             this.gbTimerJobs.Controls.Add(this.btnRefreshTimerJobs);
             this.gbTimerJobs.Controls.Add(this.btnStopTimerJob);
             this.gbTimerJobs.Controls.Add(this.btnEditTimerJob);
+            this.gbTimerJobs.Controls.Add(this.btnDeleteTimerJob);
+            this.gbTimerJobs.Controls.Add(this.btnResumeTimerJob);
             this.gbTimerJobs.Controls.Add(this.lblRunningTimerJobs);
             this.gbTimerJobs.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.gbTimerJobs.Location = new System.Drawing.Point(12, 120);
             this.gbTimerJobs.Name = "gbTimerJobs";
-            this.gbTimerJobs.Size = new System.Drawing.Size(976, 447);
+            this.gbTimerJobs.Size = new System.Drawing.Size(976, 340);
             this.gbTimerJobs.TabIndex = 8;
             this.gbTimerJobs.TabStop = false;
             this.gbTimerJobs.Text = "Running Timer Jobs";
@@ -288,7 +358,7 @@ namespace syncer.ui
             this.dgvTimerJobs.ReadOnly = true;
             this.dgvTimerJobs.RowHeadersWidth = 51;
             this.dgvTimerJobs.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dgvTimerJobs.Size = new System.Drawing.Size(964, 373);
+            this.dgvTimerJobs.Size = new System.Drawing.Size(964, 270);
             this.dgvTimerJobs.TabIndex = 0;
 
             // btnRefreshTimerJobs
@@ -321,6 +391,26 @@ namespace syncer.ui
             this.btnEditTimerJob.UseVisualStyleBackColor = true;
             this.btnEditTimerJob.Click += new System.EventHandler(this.btnEditTimerJob_Click);
 
+            // btnDeleteTimerJob
+            this.btnDeleteTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnDeleteTimerJob.Location = new System.Drawing.Point(598, 22);
+            this.btnDeleteTimerJob.Name = "btnDeleteTimerJob";
+            this.btnDeleteTimerJob.Size = new System.Drawing.Size(120, 35);
+            this.btnDeleteTimerJob.TabIndex = 4;
+            this.btnDeleteTimerJob.Text = "Delete Selected Job";
+            this.btnDeleteTimerJob.UseVisualStyleBackColor = true;
+            this.btnDeleteTimerJob.Click += new System.EventHandler(this.btnDeleteTimerJob_Click);
+
+            // btnResumeTimerJob
+            this.btnResumeTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnResumeTimerJob.Location = new System.Drawing.Point(724, 22);
+            this.btnResumeTimerJob.Name = "btnResumeTimerJob";
+            this.btnResumeTimerJob.Size = new System.Drawing.Size(120, 35);
+            this.btnResumeTimerJob.TabIndex = 5;
+            this.btnResumeTimerJob.Text = "Resume Selected Job";
+            this.btnResumeTimerJob.UseVisualStyleBackColor = true;
+            this.btnResumeTimerJob.Click += new System.EventHandler(this.btnResumeTimerJob_Click);
+
             
             // lblRunningTimerJobs
             this.lblRunningTimerJobs.AutoSize = true;
@@ -330,17 +420,141 @@ namespace syncer.ui
             this.lblRunningTimerJobs.Size = new System.Drawing.Size(191, 15);
             this.lblRunningTimerJobs.TabIndex = 3;
             this.lblRunningTimerJobs.Text = "Running Timer Jobs: 0";
+            
+            // gbBandwidthControl
+            this.gbBandwidthControl.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.gbBandwidthControl.Controls.Add(this.chkEnableBandwidthControl);
+            this.gbBandwidthControl.Controls.Add(this.lblUploadLimit);
+            this.gbBandwidthControl.Controls.Add(this.numUploadLimit);
+            this.gbBandwidthControl.Controls.Add(this.lblUploadUnit);
+            this.gbBandwidthControl.Controls.Add(this.lblDownloadLimit);
+            this.gbBandwidthControl.Controls.Add(this.numDownloadLimit);
+            this.gbBandwidthControl.Controls.Add(this.lblDownloadUnit);
+            this.gbBandwidthControl.Controls.Add(this.btnApplyBandwidthSettings);
+            this.gbBandwidthControl.Controls.Add(this.btnResetBandwidthSettings);
+            this.gbBandwidthControl.Controls.Add(this.lblCurrentUploadSpeed);
+            this.gbBandwidthControl.Controls.Add(this.lblCurrentDownloadSpeed);
+            this.gbBandwidthControl.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            this.gbBandwidthControl.Location = new System.Drawing.Point(12, 470);
+            this.gbBandwidthControl.Name = "gbBandwidthControl";
+            this.gbBandwidthControl.Size = new System.Drawing.Size(976, 100);
+            this.gbBandwidthControl.TabIndex = 9;
+            this.gbBandwidthControl.TabStop = false;
+            this.gbBandwidthControl.Text = "Bandwidth Control";
+            
+            // chkEnableBandwidthControl
+            this.chkEnableBandwidthControl.AutoSize = true;
+            this.chkEnableBandwidthControl.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.chkEnableBandwidthControl.Location = new System.Drawing.Point(15, 25);
+            this.chkEnableBandwidthControl.Name = "chkEnableBandwidthControl";
+            this.chkEnableBandwidthControl.Size = new System.Drawing.Size(157, 19);
+            this.chkEnableBandwidthControl.TabIndex = 0;
+            this.chkEnableBandwidthControl.Text = "Enable Bandwidth Control";
+            this.chkEnableBandwidthControl.UseVisualStyleBackColor = true;
+            this.chkEnableBandwidthControl.CheckedChanged += new System.EventHandler(this.chkEnableBandwidthControl_CheckedChanged);
+            
+            // lblUploadLimit
+            this.lblUploadLimit.AutoSize = true;
+            this.lblUploadLimit.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblUploadLimit.Location = new System.Drawing.Point(200, 26);
+            this.lblUploadLimit.Name = "lblUploadLimit";
+            this.lblUploadLimit.Size = new System.Drawing.Size(77, 15);
+            this.lblUploadLimit.TabIndex = 1;
+            this.lblUploadLimit.Text = "Upload Limit:";
+            
+            // numUploadLimit
+            this.numUploadLimit.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.numUploadLimit.Location = new System.Drawing.Point(283, 24);
+            this.numUploadLimit.Maximum = new decimal(new int[] { 1000000, 0, 0, 0 });
+            this.numUploadLimit.Name = "numUploadLimit";
+            this.numUploadLimit.Size = new System.Drawing.Size(80, 21);
+            this.numUploadLimit.TabIndex = 2;
+            
+            // lblUploadUnit
+            this.lblUploadUnit.AutoSize = true;
+            this.lblUploadUnit.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblUploadUnit.Location = new System.Drawing.Point(369, 26);
+            this.lblUploadUnit.Name = "lblUploadUnit";
+            this.lblUploadUnit.Size = new System.Drawing.Size(88, 15);
+            this.lblUploadUnit.TabIndex = 3;
+            this.lblUploadUnit.Text = "KB/s (0=unlim.)";
+            
+            // lblDownloadLimit
+            this.lblDownloadLimit.AutoSize = true;
+            this.lblDownloadLimit.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblDownloadLimit.Location = new System.Drawing.Point(470, 26);
+            this.lblDownloadLimit.Name = "lblDownloadLimit";
+            this.lblDownloadLimit.Size = new System.Drawing.Size(93, 15);
+            this.lblDownloadLimit.TabIndex = 4;
+            this.lblDownloadLimit.Text = "Download Limit:";
+            
+            // numDownloadLimit
+            this.numDownloadLimit.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.numDownloadLimit.Location = new System.Drawing.Point(569, 24);
+            this.numDownloadLimit.Maximum = new decimal(new int[] { 1000000, 0, 0, 0 });
+            this.numDownloadLimit.Name = "numDownloadLimit";
+            this.numDownloadLimit.Size = new System.Drawing.Size(80, 21);
+            this.numDownloadLimit.TabIndex = 5;
+            
+            // lblDownloadUnit
+            this.lblDownloadUnit.AutoSize = true;
+            this.lblDownloadUnit.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblDownloadUnit.Location = new System.Drawing.Point(655, 26);
+            this.lblDownloadUnit.Name = "lblDownloadUnit";
+            this.lblDownloadUnit.Size = new System.Drawing.Size(88, 15);
+            this.lblDownloadUnit.TabIndex = 6;
+            this.lblDownloadUnit.Text = "KB/s (0=unlim.)";
+            
+            // btnApplyBandwidthSettings
+            this.btnApplyBandwidthSettings.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnApplyBandwidthSettings.Location = new System.Drawing.Point(770, 22);
+            this.btnApplyBandwidthSettings.Name = "btnApplyBandwidthSettings";
+            this.btnApplyBandwidthSettings.Size = new System.Drawing.Size(75, 25);
+            this.btnApplyBandwidthSettings.TabIndex = 7;
+            this.btnApplyBandwidthSettings.Text = "Apply";
+            this.btnApplyBandwidthSettings.UseVisualStyleBackColor = true;
+            this.btnApplyBandwidthSettings.Click += new System.EventHandler(this.btnApplyBandwidthSettings_Click);
+            
+            // btnResetBandwidthSettings
+            this.btnResetBandwidthSettings.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnResetBandwidthSettings.Location = new System.Drawing.Point(851, 22);
+            this.btnResetBandwidthSettings.Name = "btnResetBandwidthSettings";
+            this.btnResetBandwidthSettings.Size = new System.Drawing.Size(75, 25);
+            this.btnResetBandwidthSettings.TabIndex = 8;
+            this.btnResetBandwidthSettings.Text = "Reset";
+            this.btnResetBandwidthSettings.UseVisualStyleBackColor = true;
+            this.btnResetBandwidthSettings.Click += new System.EventHandler(this.btnResetBandwidthSettings_Click);
+            
+            // lblCurrentUploadSpeed
+            this.lblCurrentUploadSpeed.AutoSize = true;
+            this.lblCurrentUploadSpeed.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblCurrentUploadSpeed.Location = new System.Drawing.Point(15, 55);
+            this.lblCurrentUploadSpeed.Name = "lblCurrentUploadSpeed";
+            this.lblCurrentUploadSpeed.Size = new System.Drawing.Size(122, 15);
+            this.lblCurrentUploadSpeed.TabIndex = 9;
+            this.lblCurrentUploadSpeed.Text = "Current Upload: 0 B/s";
+            
+            // lblCurrentDownloadSpeed
+            this.lblCurrentDownloadSpeed.AutoSize = true;
+            this.lblCurrentDownloadSpeed.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblCurrentDownloadSpeed.Location = new System.Drawing.Point(15, 75);
+            this.lblCurrentDownloadSpeed.Name = "lblCurrentDownloadSpeed";
+            this.lblCurrentDownloadSpeed.Size = new System.Drawing.Size(138, 15);
+            this.lblCurrentDownloadSpeed.TabIndex = 10;
+            this.lblCurrentDownloadSpeed.Text = "Current Download: 0 B/s";
 
             // FormMain
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1000, 600);
+            this.ClientSize = new System.Drawing.Size(1000, 700);
+            this.Controls.Add(this.gbBandwidthControl);
             this.Controls.Add(this.gbTimerJobs);
             this.Controls.Add(this.gbControls);
             this.Controls.Add(this.statusStrip1);
             this.Controls.Add(this.menuStrip1);
             this.MainMenuStrip = this.menuStrip1;
-            this.MinimumSize = new System.Drawing.Size(800, 500);
+            this.MinimumSize = new System.Drawing.Size(800, 600);
             this.Name = "FormMain";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "DataSyncer - Main Dashboard";
@@ -348,11 +562,15 @@ namespace syncer.ui
             this.menuStrip1.ResumeLayout(false);
             this.menuStrip1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvTimerJobs)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numUploadLimit)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numDownloadLimit)).EndInit();
             this.statusStrip1.ResumeLayout(false);
             this.statusStrip1.PerformLayout();
             this.gbControls.ResumeLayout(false);
             this.gbTimerJobs.ResumeLayout(false);
             this.gbTimerJobs.PerformLayout();
+            this.gbBandwidthControl.ResumeLayout(false);
+            this.gbBandwidthControl.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
         }
