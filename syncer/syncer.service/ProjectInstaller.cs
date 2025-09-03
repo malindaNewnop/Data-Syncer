@@ -27,8 +27,8 @@ namespace syncer.service
             this.serviceProcessInstaller.Username = null;
 
             // Service Installer
-            this.serviceInstaller.ServiceName = "DataSyncerService";
-            this.serviceInstaller.DisplayName = "Data Syncer Service";
+            this.serviceInstaller.ServiceName = "FTPSyncerService";
+            this.serviceInstaller.DisplayName = "FTPSyncer Service";
             this.serviceInstaller.Description = "Automated file synchronization service";
             this.serviceInstaller.StartType = ServiceStartMode.Automatic;
 

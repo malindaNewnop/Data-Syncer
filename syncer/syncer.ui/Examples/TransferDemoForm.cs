@@ -91,7 +91,7 @@ namespace syncer.ui.Examples
 
         private void InitializeComponent()
         {
-            this.Text = "Data Syncer - FTP/SFTP Transfer Demo";
+            this.Text = "FTPSyncer - FTP/SFTP Transfer Demo";
             this.Size = new Size(800, 600);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new Size(600, 400);

@@ -550,7 +550,7 @@ namespace syncer.ui
             this.MinimumSize = new System.Drawing.Size(800, 600);
             this.Name = "FormMain";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "DataSyncer - Main Dashboard";
+            this.Text = "FTPSyncer - Main Dashboard";
             this.WindowState = System.Windows.Forms.FormWindowState.Normal;
             this.menuStrip1.ResumeLayout(false);
             this.menuStrip1.PerformLayout();

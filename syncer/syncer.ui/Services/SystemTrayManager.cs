@@ -158,7 +158,7 @@ namespace syncer.ui.Services
                 int showDuration = duration ?? _notificationDuration;
                 
                 // Ensure title and message are not too long
-                string safeTitle = StringExtensions.Truncate(title ?? "Data Syncer", 63);
+                string safeTitle = StringExtensions.Truncate(title ?? "FTPSyncer", 63);
                 string safeMessage = message ?? "";
                 if (safeMessage.Length > 255)
                 {
@@ -220,7 +220,7 @@ namespace syncer.ui.Services
             {
                 // Update tooltip
                 string status = serviceRunning ? "Running" : "Stopped";
-                string tooltip = "Data Syncer - Service: " + status;
+                string tooltip = "FTPSyncer - Service: " + status;
                 
                 if (lastSyncTime.HasValue)
                 {
@@ -278,7 +278,7 @@ namespace syncer.ui.Services
         {
             _notifyIcon = new NotifyIcon();
             _notifyIcon.ContextMenu = _contextMenu;
-            _notifyIcon.Text = "Data Syncer";
+            _notifyIcon.Text = "FTPSyncer";
             _notifyIcon.Icon = GetApplicationIcon();
             _notifyIcon.Visible = true;
 
@@ -911,7 +911,7 @@ namespace syncer.ui.Services
                     string status = _serviceManager.GetServiceStatus();
                     
                     UpdateStatus(isRunning);
-                    UpdateToolTip("Data Syncer - Service: " + status);
+                    UpdateToolTip("FTPSyncer - Service: " + status);
                     
                     ShowNotification("Status Refreshed", "Service is currently: " + status, ToolTipIcon.Info);
                     

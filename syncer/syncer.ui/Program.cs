@@ -12,7 +12,7 @@ namespace syncer.ui
     {
         // Single instance mutex
         private static Mutex instanceMutex = null;
-        private const string MUTEX_NAME = "DataSyncerApplication_SingleInstance_Mutex_12345";
+        private const string MUTEX_NAME = "FTPSyncerApplication_SingleInstance_Mutex_12345";
         
         // Windows API declarations for window activation
         [DllImport("user32.dll")]
@@ -57,7 +57,7 @@ namespace syncer.ui
                 {
                     // First ensure CommonApplicationData folder is accessible
                     string appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-                    string dataSyncerFolder = Path.Combine(appDataFolder, "DataSyncer");
+                    string dataSyncerFolder = Path.Combine(appDataFolder, "FTPSyncer");
                     
                     try
                     {

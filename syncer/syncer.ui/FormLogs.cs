@@ -814,7 +814,7 @@ namespace syncer.ui
             {
                 dialog.Filter = "CSV files (*.csv)|*.csv|Text files (*.txt)|*.txt";
                 dialog.DefaultExt = "csv";
-                dialog.FileName = "DataSyncer_Logs_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                dialog.FileName = "FTPSyncer_Logs_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
 
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
@@ -1046,7 +1046,7 @@ namespace syncer.ui
             
             // Set default file path suggestion
             string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string dataFolderPath = System.IO.Path.Combine(documentsPath, "DataSyncerLogs");
+            string dataFolderPath = System.IO.Path.Combine(documentsPath, "FTPSyncerLogs");
             string defaultPath = System.IO.Path.Combine(dataFolderPath, 
                 string.Format("syncer_realtime_{0:yyyyMMdd}.csv", DateTime.Now));
             txtRealTimeLogPath.Text = defaultPath;

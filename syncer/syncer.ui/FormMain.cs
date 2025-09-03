@@ -77,7 +77,7 @@ namespace syncer.ui
                 // Update the tray icon tooltip with application status
                 string serviceStatus = _serviceManager != null ? 
                     (_serviceManager.IsServiceRunning() ? "Running" : "Stopped") : "Unknown";
-                _trayManager.UpdateToolTip(string.Format("Data Syncer - Service: {0}", serviceStatus));
+                _trayManager.UpdateToolTip(string.Format("FTPSyncer - Service: {0}", serviceStatus));
                 
                 // Load user preference for startup notification
                 bool showStartupNotification = true;
@@ -98,7 +98,7 @@ namespace syncer.ui
                 if (showStartupNotification)
                 {
                     _notificationService.ShowNotification(
-                        "Data Syncer Started", 
+                        "FTPSyncer Started", 
                         "Application is running and will minimize to the system tray when closed.",
                         ToolTipIcon.Info);
                 }
@@ -115,7 +115,7 @@ namespace syncer.ui
 
         private void InitializeCustomComponents()
         {
-            this.Text = "DataSyncer - Main Dashboard";
+            this.Text = "FTPSyncer - Main Dashboard";
             this.Size = new Size(1000, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new Size(800, 600);
@@ -174,7 +174,7 @@ namespace syncer.ui
                 // Update the tray icon tooltip
                 if (_trayManager != null)
                 {
-                    _trayManager.UpdateToolTip($"Data Syncer - Service: {status}");
+                    _trayManager.UpdateToolTip($"FTPSyncer - Service: {status}");
                 }
             }
             catch (Exception ex)
@@ -488,7 +488,7 @@ namespace syncer.ui
 
         private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("DataSyncer v1.0\nFile Synchronization Tool\n\nDeveloped for automated file transfers.", "About DataSyncer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("FTPSyncer v1.0\nFile Synchronization Tool\n\nDeveloped for automated file transfers.", "About FTPSyncer", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         
 
@@ -538,7 +538,7 @@ namespace syncer.ui
                             {
                                 _notificationService.ShowNotification(
                                     "Service Auto-Started",
-                                    "Data Syncer service started automatically for new job.",
+                                    "FTPSyncer service started automatically for new job.",
                                     ToolTipIcon.Info);
                             }
                         }
@@ -631,7 +631,7 @@ namespace syncer.ui
                 {
                     // No system tray support, ask the user if they want to exit
                     DialogResult result = MessageBox.Show(
-                        "Are you sure you want to exit Data Syncer?", 
+                        "Are you sure you want to exit FTPSyncer?", 
                         "Confirm Exit", 
                         MessageBoxButtons.YesNo, 
                         MessageBoxIcon.Question);

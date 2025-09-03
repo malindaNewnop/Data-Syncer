@@ -26,7 +26,7 @@ namespace syncer.core
             {
                 string appDataPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "DataSyncer");
+                    "FTPSyncer");
                 
                 if (!Directory.Exists(appDataPath))
                 {

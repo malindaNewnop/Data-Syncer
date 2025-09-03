@@ -20,7 +20,7 @@ namespace syncer.service
         public Service1()
         {
             InitializeComponent();
-            this.ServiceName = "DataSyncerService"; // Set the service name
+            this.ServiceName = "FTPSyncerService"; // Set the service name
         }
 
         protected override void OnStart(string[] args)
@@ -42,7 +42,7 @@ namespace syncer.service
                 _timer.Elapsed += OnTick;
                 _timer.Start();
 
-                _log.LogInfo(null, "Data Syncer Service started with multi-job support");
+                _log.LogInfo(null, "FTPSyncer Service started with multi-job support");
                 OnTick(this, null);
             }
             catch (Exception ex)
