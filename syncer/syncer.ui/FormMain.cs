@@ -1015,6 +1015,15 @@ namespace syncer.ui
                 bool isRunning = timerJobManager.IsTimerJobRunning(jobId);
                 DateTime? lastUpload = timerJobManager.GetLastUploadTime(jobId);
                 
+                // Get additional job settings from TimerJobManager
+                bool isDownloadJob = timerJobManager.IsTimerJobDownloadJob(jobId);
+                bool includeSubfolders = timerJobManager.GetTimerJobIncludeSubfolders(jobId);
+                bool deleteSourceAfterTransfer = timerJobManager.GetTimerJobDeleteSourceAfterTransfer(jobId);
+                bool enableFilters = timerJobManager.GetTimerJobEnableFilters(jobId);
+                List<string> includeExtensions = timerJobManager.GetTimerJobIncludeExtensions(jobId);
+                List<string> excludeExtensions = timerJobManager.GetTimerJobExcludeExtensions(jobId);
+                DateTime? lastDownload = timerJobManager.GetLastDownloadTime(jobId);
+                
                 // Create a SyncJob object to pass to the FormSchedule
                 SyncJob jobToEdit = new SyncJob
                 {
@@ -1023,12 +1032,31 @@ namespace syncer.ui
                     SourcePath = folderPath ?? "",
                     DestinationPath = remotePath ?? "/",
                     IsEnabled = isRunning,
-                    LastRun = lastUpload,
-                    TransferMode = "Upload",
-                    // Convert interval from milliseconds to minutes for display
-                    IntervalValue = (int)(intervalMs / 60000), // Convert ms to minutes
-                    IntervalType = "Minutes"
+                    LastRun = isDownloadJob ? lastDownload : lastUpload,
+                    TransferMode = isDownloadJob ? "Download" : "Upload",
+                    IncludeSubFolders = includeSubfolders,
+                    DeleteSourceAfterTransfer = deleteSourceAfterTransfer,
+                    EnableFilters = enableFilters,
+                    IncludeFileTypes = includeExtensions != null && includeExtensions.Count > 0 ? string.Join(",", includeExtensions.ToArray()) : "",
+                    ExcludeFileTypes = excludeExtensions != null && excludeExtensions.Count > 0 ? string.Join(",", excludeExtensions.ToArray()) : ""
                 };
+                
+                // Convert interval from milliseconds to appropriate display unit
+                if (intervalMs >= 3600000) // 1 hour or more
+                {
+                    jobToEdit.IntervalValue = (int)(intervalMs / 3600000);
+                    jobToEdit.IntervalType = "Hours";
+                }
+                else if (intervalMs >= 60000) // 1 minute or more
+                {
+                    jobToEdit.IntervalValue = (int)(intervalMs / 60000);
+                    jobToEdit.IntervalType = "Minutes";
+                }
+                else // Less than 1 minute, use seconds
+                {
+                    jobToEdit.IntervalValue = Math.Max(1, (int)(intervalMs / 1000));
+                    jobToEdit.IntervalType = "Seconds";
+                }
                 
                 // Open the FormSchedule in edit mode
                 using (FormSchedule editForm = new FormSchedule(jobToEdit))
@@ -1388,33 +1416,6 @@ namespace syncer.ui
         }
 
         #region Configuration Button Event Handlers
-
-        private void btnSaveCurrentConfig_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                // Create a basic job configuration from current settings
-                var currentJob = new SyncJob();
-                var sourceConn = new ConnectionSettings();
-                var destConn = new ConnectionSettings();
-                
-                // Open the save dialog to let user enter details
-                using (var saveForm = new FormSaveJobConfiguration(currentJob, sourceConn, destConn, 
-                    _savedJobConfigService, _connectionService))
-                {
-                    if (saveForm.ShowDialog() == DialogResult.OK)
-                    {
-                        MessageBox.Show("Configuration saved successfully!", "Save Configuration", 
-                            MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(string.Format("Error saving configuration: {0}", ex.Message), 
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
 
         private void btnLoadConfiguration_Click(object sender, EventArgs e)
         {

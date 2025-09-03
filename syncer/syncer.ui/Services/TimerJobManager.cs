@@ -1338,5 +1338,55 @@ namespace syncer.ui.Services
             
             return _timerJobs[jobId].IsDownloadJob;
         }
+        
+        public bool GetTimerJobIncludeSubfolders(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return true; // Default value
+            }
+            
+            return _timerJobs[jobId].IncludeSubfolders;
+        }
+        
+        public bool GetTimerJobDeleteSourceAfterTransfer(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return false; // Default value
+            }
+            
+            return _timerJobs[jobId].DeleteSourceAfterTransfer;
+        }
+        
+        public bool GetTimerJobEnableFilters(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return false; // Default value
+            }
+            
+            return _timerJobs[jobId].EnableFilters;
+        }
+        
+        public List<string> GetTimerJobIncludeExtensions(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return new List<string>(); // Default empty list
+            }
+            
+            return _timerJobs[jobId].IncludeExtensions ?? new List<string>();
+        }
+        
+        public List<string> GetTimerJobExcludeExtensions(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return new List<string>(); // Default empty list
+            }
+            
+            return _timerJobs[jobId].ExcludeExtensions ?? new List<string>();
+        }
     }
 }

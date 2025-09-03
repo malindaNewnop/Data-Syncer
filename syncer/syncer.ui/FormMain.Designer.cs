@@ -22,7 +22,6 @@ namespace syncer.ui
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.Button btnAddJob;
         private System.Windows.Forms.Button btnStartStop;
-        private System.Windows.Forms.Button btnSaveCurrentConfig;
         private System.Windows.Forms.Button btnLoadConfiguration;
         private System.Windows.Forms.StatusStrip statusStrip1;
         private System.Windows.Forms.ToolStripStatusLabel lblServiceStatus;
@@ -107,7 +106,6 @@ namespace syncer.ui
             this.aboutToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.btnAddJob = new System.Windows.Forms.Button();
             this.btnStartStop = new System.Windows.Forms.Button();
-            this.btnSaveCurrentConfig = new System.Windows.Forms.Button();
             this.btnLoadConfiguration = new System.Windows.Forms.Button();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.lblServiceStatus = new System.Windows.Forms.ToolStripStatusLabel();
@@ -284,22 +282,12 @@ namespace syncer.ui
             this.btnStartStop.Visible = false; // Hide the button
             this.btnStartStop.Click += new System.EventHandler(this.btnStartStop_Click);
             
-            // btnSaveCurrentConfig - Adjusted position since btnStartStop is hidden
-            this.btnSaveCurrentConfig.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.btnSaveCurrentConfig.Location = new System.Drawing.Point(150, 19);
-            this.btnSaveCurrentConfig.Name = "btnSaveCurrentConfig";
-            this.btnSaveCurrentConfig.Size = new System.Drawing.Size(150, 35);
-            this.btnSaveCurrentConfig.TabIndex = 4;
-            this.btnSaveCurrentConfig.Text = "Save Current Config";
-            this.btnSaveCurrentConfig.UseVisualStyleBackColor = true;
-            this.btnSaveCurrentConfig.Click += new System.EventHandler(this.btnSaveCurrentConfig_Click);
-            
-            // btnLoadConfiguration - Adjusted position
+            // btnLoadConfiguration - Adjusted position since btnSaveCurrentConfig removed
             this.btnLoadConfiguration.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.btnLoadConfiguration.Location = new System.Drawing.Point(315, 19);
+            this.btnLoadConfiguration.Location = new System.Drawing.Point(150, 19);
             this.btnLoadConfiguration.Name = "btnLoadConfiguration";
             this.btnLoadConfiguration.Size = new System.Drawing.Size(150, 35);
-            this.btnLoadConfiguration.TabIndex = 5;
+            this.btnLoadConfiguration.TabIndex = 4;
             this.btnLoadConfiguration.Text = "Load Configuration";
             this.btnLoadConfiguration.UseVisualStyleBackColor = true;
             this.btnLoadConfiguration.Click += new System.EventHandler(this.btnLoadConfiguration_Click);
@@ -324,7 +312,6 @@ namespace syncer.ui
             this.gbControls.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
             | System.Windows.Forms.AnchorStyles.Right)));
             this.gbControls.Controls.Add(this.btnAddJob);
-            this.gbControls.Controls.Add(this.btnSaveCurrentConfig);
             this.gbControls.Controls.Add(this.btnLoadConfiguration);
             this.gbControls.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.gbControls.Location = new System.Drawing.Point(12, 35);

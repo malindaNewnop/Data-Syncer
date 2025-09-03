@@ -8,7 +8,7 @@ namespace syncer.ui.Forms
         private System.ComponentModel.IContainer components = null;
 
         /// <summary>
-        /// Clean up any resources being built.
+        /// Clean up any resourc        private System.Windows.Forms.Button btnLoadAndStart; being built.
         /// </summary>
         /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
         protected override void Dispose(bool disposing)
@@ -241,7 +241,7 @@ namespace syncer.ui.Forms
             // btnLoadAndStart
             // 
             this.btnLoadAndStart.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnLoadAndStart.Location = new System.Drawing.Point(150, 480);
+            this.btnLoadAndStart.Location = new System.Drawing.Point(24, 480);
             this.btnLoadAndStart.Name = "btnLoadAndStart";
             this.btnLoadAndStart.Size = new System.Drawing.Size(120, 35);
             this.btnLoadAndStart.TabIndex = 4;
@@ -249,16 +249,7 @@ namespace syncer.ui.Forms
             this.btnLoadAndStart.UseVisualStyleBackColor = true;
             this.btnLoadAndStart.Click += new System.EventHandler(this.btnLoadAndStart_Click);
             // 
-            // btnLoad
-            // 
-            this.btnLoad.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnLoad.Location = new System.Drawing.Point(24, 480);
-            this.btnLoad.Name = "btnLoad";
-            this.btnLoad.Size = new System.Drawing.Size(110, 35);
-            this.btnLoad.TabIndex = 3;
-            this.btnLoad.Text = "Load Only";
-            this.btnLoad.UseVisualStyleBackColor = true;
-            this.btnLoad.Click += new System.EventHandler(this.btnLoad_Click);
+
             // 
             // FormSimpleLoadConfiguration
             // 
@@ -271,7 +262,6 @@ namespace syncer.ui.Forms
             this.Controls.Add(this.btnDelete);
             this.Controls.Add(this.btnEdit);
             this.Controls.Add(this.btnLoadAndStart);
-            this.Controls.Add(this.btnLoad);
             this.Controls.Add(this.panelSeparator);
             this.Controls.Add(this.groupBoxDetails);
             this.Controls.Add(this.listBoxConfigurations);

@@ -54,8 +54,7 @@ namespace syncer.ui
             this.lblRemotePath = new System.Windows.Forms.Label();
             this.txtRemotePath = new System.Windows.Forms.TextBox();
             this.btnBrowseLocalFolder = new System.Windows.Forms.Button();
-            this.btnSaveTimerJob = new System.Windows.Forms.Button();
-            this.btnLoadConfiguration = new System.Windows.Forms.Button();
+
             this.btnSave = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
             this.gbJobDetails.SuspendLayout();
@@ -406,29 +405,7 @@ namespace syncer.ui
             this.btnBrowseLocalFolder.Visible = false;
             this.btnBrowseLocalFolder.Click += new System.EventHandler(this.btnBrowseLocalFolder_Click);
             // 
-            // btnSaveTimerJob
-            // 
-            this.btnSaveTimerJob.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnSaveTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnSaveTimerJob.Location = new System.Drawing.Point(15, 570);
-            this.btnSaveTimerJob.Name = "btnSaveTimerJob";
-            this.btnSaveTimerJob.Size = new System.Drawing.Size(160, 40);
-            this.btnSaveTimerJob.TabIndex = 5;
-            this.btnSaveTimerJob.Text = "Save Timer Job";
-            this.btnSaveTimerJob.UseVisualStyleBackColor = true;
-            this.btnSaveTimerJob.Click += new System.EventHandler(this.btnSaveTimerJob_Click);
-            // 
-            // btnLoadConfiguration
-            // 
-            this.btnLoadConfiguration.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnLoadConfiguration.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnLoadConfiguration.Location = new System.Drawing.Point(185, 570);
-            this.btnLoadConfiguration.Name = "btnLoadConfiguration";
-            this.btnLoadConfiguration.Size = new System.Drawing.Size(140, 40);
-            this.btnLoadConfiguration.TabIndex = 6;
-            this.btnLoadConfiguration.Text = "Load Config";
-            this.btnLoadConfiguration.UseVisualStyleBackColor = true;
-            this.btnLoadConfiguration.Click += new System.EventHandler(this.btnLoadConfiguration_Click);
+
             // 
             // btnSave
             // 
@@ -461,8 +438,6 @@ namespace syncer.ui
             this.ClientSize = new System.Drawing.Size(900, 650);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnSave);
-            this.Controls.Add(this.btnLoadConfiguration);
-            this.Controls.Add(this.btnSaveTimerJob);
             this.Controls.Add(this.gbFileManager);
             this.Controls.Add(this.gbTimerSettings);
             this.Controls.Add(this.gbTransfer);
@@ -520,8 +495,6 @@ namespace syncer.ui
         private System.Windows.Forms.Label lblRemotePath;
         private System.Windows.Forms.TextBox txtRemotePath;
         private System.Windows.Forms.Button btnBrowseLocalFolder;
-        private System.Windows.Forms.Button btnSaveTimerJob;
-        private System.Windows.Forms.Button btnLoadConfiguration;
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
     }

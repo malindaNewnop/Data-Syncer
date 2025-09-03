@@ -17,6 +17,9 @@ namespace syncer.ui.Forms
             
             LoadConfigurationData();
             
+            // Set up tooltips for filter controls (since PlaceholderText is not available in .NET 3.5)
+            SetupFilterTooltips();
+            
             // Set default values for combo boxes
             if (cmbConnectionType.Items.Count > 0 && cmbConnectionType.SelectedIndex < 0)
                 cmbConnectionType.SelectedIndex = 0;
@@ -48,6 +51,16 @@ namespace syncer.ui.Forms
                 }
                 
                 chkEnabled.Checked = _configuration.JobSettings.IsEnabled;
+                chkIncludeSubfolders.Checked = _configuration.JobSettings.IncludeSubFolders;
+                chkDeleteSourceAfterTransfer.Checked = _configuration.JobSettings.DeleteSourceAfterTransfer;
+                
+                // Load filter settings
+                chkEnableFilters.Checked = _configuration.JobSettings.EnableFilters;
+                txtIncludeFileTypes.Text = _configuration.JobSettings.IncludeFileTypes ?? "";
+                txtExcludeFileTypes.Text = _configuration.JobSettings.ExcludeFileTypes ?? "";
+                
+                // Update filter control states
+                UpdateFilterControlStates();
             }
 
             // Connection settings
@@ -122,6 +135,13 @@ namespace syncer.ui.Forms
                 _configuration.JobSettings.IntervalValue = (int)numInterval.Value;
                 _configuration.JobSettings.IntervalType = cmbIntervalType.Text;
                 _configuration.JobSettings.IsEnabled = chkEnabled.Checked;
+                _configuration.JobSettings.IncludeSubFolders = chkIncludeSubfolders.Checked;
+                _configuration.JobSettings.DeleteSourceAfterTransfer = chkDeleteSourceAfterTransfer.Checked;
+                
+                // Update filter settings
+                _configuration.JobSettings.EnableFilters = chkEnableFilters.Checked;
+                _configuration.JobSettings.IncludeFileTypes = txtIncludeFileTypes.Text.Trim();
+                _configuration.JobSettings.ExcludeFileTypes = txtExcludeFileTypes.Text.Trim();
 
                 // Update connection settings
                 if (_configuration.SourceConnection == null)
@@ -233,6 +253,79 @@ namespace syncer.ui.Forms
                 Cursor = Cursors.Default;
                 btnTestConnection.Enabled = true;
                 btnTestConnection.Text = "Test Connection";
+            }
+        }
+
+        private void chkDeleteSourceAfterTransfer_CheckedChanged(object sender, EventArgs e)
+        {
+            // Add warning for delete source option
+            if (chkDeleteSourceAfterTransfer.Checked)
+            {
+                DialogResult result = MessageBox.Show(
+                    "Warning: This option will permanently delete source files after successful transfer.\n\n" +
+                    "Are you sure you want to enable this feature?",
+                    "Delete Source Files Warning",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2);
+
+                if (result == DialogResult.No)
+                {
+                    chkDeleteSourceAfterTransfer.Checked = false;
+                }
+            }
+        }
+
+        private void chkEnableFilters_CheckedChanged(object sender, EventArgs e)
+        {
+            UpdateFilterControlStates();
+        }
+
+        private void UpdateFilterControlStates()
+        {
+            bool enableFiltering = chkEnableFilters?.Checked ?? false;
+            
+            // Enable/disable controls based on checkbox state, but keep them visible
+            if (lblIncludeTypes != null) 
+            {
+                lblIncludeTypes.Enabled = enableFiltering;
+                lblIncludeTypes.Visible = true;
+            }
+            if (txtIncludeFileTypes != null) 
+            {
+                txtIncludeFileTypes.Enabled = enableFiltering;
+                txtIncludeFileTypes.Visible = true;
+            }
+            if (lblExcludeTypes != null) 
+            {
+                lblExcludeTypes.Enabled = enableFiltering;
+                lblExcludeTypes.Visible = true;
+            }
+            if (txtExcludeFileTypes != null) 
+            {
+                txtExcludeFileTypes.Enabled = enableFiltering;
+                txtExcludeFileTypes.Visible = true;
+            }
+            if (lblFilterHint != null) 
+            {
+                lblFilterHint.Enabled = enableFiltering;
+                lblFilterHint.Visible = true;
+            }
+        }
+
+        private void SetupFilterTooltips()
+        {
+            // Add tooltips for filter controls (since PlaceholderText is not available in .NET 3.5)
+            if (txtIncludeFileTypes != null)
+            {
+                ToolTip toolTip1 = new ToolTip();
+                toolTip1.SetToolTip(txtIncludeFileTypes, "Enter file extensions separated by commas (e.g., pdf,jpg,png)");
+            }
+            
+            if (txtExcludeFileTypes != null)
+            {
+                ToolTip toolTip2 = new ToolTip();
+                toolTip2.SetToolTip(txtExcludeFileTypes, "Enter file extensions separated by commas (e.g., tmp,bak,log)");
             }
         }
     }

@@ -19,8 +19,6 @@ namespace syncer.ui
         private System.Windows.Forms.CheckBox chkShowPassword;
         private System.Windows.Forms.Button btnTestConnection;
         private System.Windows.Forms.Button btnSaveConnection;
-        private System.Windows.Forms.Button btnLoadConnection;
-        private System.Windows.Forms.Button btnManageConnections;
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
         
@@ -73,8 +71,6 @@ namespace syncer.ui
             this.btnBrowseSSHKey = new System.Windows.Forms.Button();
             this.btnTestConnection = new System.Windows.Forms.Button();
             this.btnSaveConnection = new System.Windows.Forms.Button();
-            this.btnLoadConnection = new System.Windows.Forms.Button();
-            this.btnManageConnections = new System.Windows.Forms.Button();
             this.tabSSHKeyGeneration = new System.Windows.Forms.TabPage();
             this.lblKeyPath = new System.Windows.Forms.Label();
             this.txtKeyPath = new System.Windows.Forms.TextBox();
@@ -122,8 +118,6 @@ namespace syncer.ui
             this.tabConnectionSettings.Controls.Add(this.btnBrowseSSHKey);
             this.tabConnectionSettings.Controls.Add(this.btnTestConnection);
             this.tabConnectionSettings.Controls.Add(this.btnSaveConnection);
-            this.tabConnectionSettings.Controls.Add(this.btnLoadConnection);
-            this.tabConnectionSettings.Controls.Add(this.btnManageConnections);
             this.tabConnectionSettings.Location = new System.Drawing.Point(4, 27);
             this.tabConnectionSettings.Name = "tabConnectionSettings";
             this.tabConnectionSettings.Padding = new System.Windows.Forms.Padding(20);
@@ -314,7 +308,7 @@ namespace syncer.ui
             // 
             // btnSaveConnection
             //            this.btnSaveConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnSaveConnection.Location = new System.Drawing.Point(150, 330);
+            this.btnSaveConnection.Location = new System.Drawing.Point(200, 330);
             this.btnSaveConnection.Name = "btnSaveConnection";
             this.btnSaveConnection.Size = new System.Drawing.Size(100, 35);
             this.btnSaveConnection.TabIndex = 18;
@@ -322,26 +316,7 @@ namespace syncer.ui
             this.btnSaveConnection.UseVisualStyleBackColor = true;
             this.btnSaveConnection.Click += new System.EventHandler(this.btnSaveConnection_Click);
             // 
-            // btnLoadConnection
-            //            this.btnLoadConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnLoadConnection.Location = new System.Drawing.Point(270, 330);
-            this.btnLoadConnection.Name = "btnLoadConnection";
-            this.btnLoadConnection.Size = new System.Drawing.Size(100, 35);
-            this.btnLoadConnection.TabIndex = 20;
-            this.btnLoadConnection.Text = "Load Config";
-            this.btnLoadConnection.UseVisualStyleBackColor = true;
-            this.btnLoadConnection.Click += new System.EventHandler(this.btnLoadConnection_Click);
-            // 
-            // btnManageConnections
-            // 
-            this.btnManageConnections.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnManageConnections.Location = new System.Drawing.Point(390, 330);
-            this.btnManageConnections.Name = "btnManageConnections";
-            this.btnManageConnections.Size = new System.Drawing.Size(100, 35);
-            this.btnManageConnections.TabIndex = 19;
-            this.btnManageConnections.Text = "Manage";
-            this.btnManageConnections.UseVisualStyleBackColor = true;
-            this.btnManageConnections.Click += new System.EventHandler(this.btnManageConnections_Click);
+
             // 
             // tabSSHKeyGeneration
             // 

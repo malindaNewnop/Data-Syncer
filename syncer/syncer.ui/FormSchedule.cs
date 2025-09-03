@@ -2459,58 +2459,7 @@ namespace syncer.ui
                    "Last Upload: " + lastUpload;
         }
         
-        private void btnSaveTimerJob_Click(object sender, EventArgs e)
-        {
-            if (string.IsNullOrEmpty(_selectedFolderForTimer))
-            {
-                MessageBox.Show("Please select a folder for timer upload first.", 
-                    "No Folder Selected", 
-                    MessageBoxButtons.OK, 
-                    MessageBoxIcon.Warning);
-                return;
-            }
-            
-            if (UIStringExtensions.IsNullOrWhiteSpace(txtJobName.Text))
-            {
-                MessageBox.Show("Please enter a job name.", 
-                    "Job Name Required", 
-                    MessageBoxButtons.OK, 
-                    MessageBoxIcon.Warning);
-                txtJobName.Focus();
-                return;
-            }
-            
-            try
-            {
 
-                
-                // Save the job using traditional method
-                SaveJob();
-                
-                // Also save as a reusable configuration
-                SaveAsConfiguration();
-                
-                MessageBox.Show(
-                    "Timer job saved successfully! The job configuration has also been saved for future use.\n\nYou can load this configuration later from the File menu.",
-                    "Timer Job Saved",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-                
-                ServiceLocator.LogService.LogInfo(string.Format(
-                    "Timer job '{0}' saved for folder: {1}", 
-                    txtJobName.Text, 
-                    _selectedFolderForTimer));
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    "Error saving timer job: " + ex.Message,
-                    "Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-                ServiceLocator.LogService.LogError("Error saving timer job: " + ex.Message);
-            }
-        }
 
         private void SaveAsConfiguration()
         {
@@ -2579,43 +2528,6 @@ namespace syncer.ui
             
 
             return job;
-        }
-
-        private void btnLoadConfiguration_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                var configService = ServiceLocator.SavedJobConfigurationService;
-                
-                // Open the Configuration Manager form
-                using (var configManager = new Forms.FormSimpleLoadConfiguration(configService))
-                {
-                    if (configManager.ShowDialog() == DialogResult.OK && configManager.SelectedConfiguration != null)
-                    {
-                        var config = configManager.SelectedConfiguration;
-                        
-                        // Apply the loaded configuration to the form
-                        ApplyConfigurationToForm(config);
-                        
-                        // If user chose Load & Start option
-                        if (configManager.LoadAndStart)
-                        {
-                            StartTimerJobFromConfiguration(config);
-                        }
-                        
-                        MessageBox.Show($"Configuration '{config.DisplayName}' loaded successfully!", 
-                            "Configuration Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            
-                        ServiceLocator.LogService.LogInfo($"Configuration '{config.DisplayName}' loaded in FormSchedule", "UI");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error loading configuration: {ex.Message}", "Load Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService.LogError($"Error loading configuration: {ex.Message}", "UI");
-            }
         }
 
         private void ApplyConfigurationToForm(SavedJobConfiguration config)

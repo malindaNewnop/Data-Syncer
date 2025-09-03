@@ -89,7 +89,6 @@ namespace syncer.ui.Forms
                 if (_configurations == null || _configurations.Count == 0)
                 {
                     listBoxConfigurations.Items.Add("No saved configurations found");
-                    btnLoad.Enabled = false;
                     btnLoadAndStart.Enabled = false;
                     btnEdit.Enabled = false;
                     btnDelete.Enabled = false;
@@ -107,7 +106,6 @@ namespace syncer.ui.Forms
                 btnImport.Enabled = true;
                 
                 // Other buttons will be enabled when a selection is made
-                btnLoad.Enabled = false;
                 btnLoadAndStart.Enabled = false;
                 btnEdit.Enabled = false;
                 btnDelete.Enabled = false;
@@ -137,7 +135,6 @@ namespace syncer.ui.Forms
                 lblDestinationConnection.Text = "Destination Connection: ";
                 
                 // Disable action buttons
-                btnLoad.Enabled = false;
                 btnLoadAndStart.Enabled = false;
                 btnEdit.Enabled = false;
                 btnDelete.Enabled = false;
@@ -204,7 +201,6 @@ namespace syncer.ui.Forms
             }
             
             // Enable action buttons
-            btnLoad.Enabled = true;
             btnLoadAndStart.Enabled = true;
             btnEdit.Enabled = true;
             btnDelete.Enabled = true;
@@ -222,11 +218,6 @@ namespace syncer.ui.Forms
         {
             // Double click to load and start
             LoadConfiguration(true);
-        }
-
-        private void btnLoad_Click(object sender, EventArgs e)
-        {
-            LoadConfiguration(false);
         }
 
         private void btnLoadAndStart_Click(object sender, EventArgs e)

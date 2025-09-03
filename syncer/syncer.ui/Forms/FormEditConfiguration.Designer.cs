@@ -35,6 +35,8 @@ namespace syncer.ui.Forms
             this.label2 = new System.Windows.Forms.Label();
             this.label1 = new System.Windows.Forms.Label();
             this.tabJob = new System.Windows.Forms.TabPage();
+            this.chkDeleteSourceAfterTransfer = new System.Windows.Forms.CheckBox();
+            this.chkIncludeSubfolders = new System.Windows.Forms.CheckBox();
             this.chkEnabled = new System.Windows.Forms.CheckBox();
             this.cmbIntervalType = new System.Windows.Forms.ComboBox();
             this.numInterval = new System.Windows.Forms.NumericUpDown();
@@ -49,6 +51,13 @@ namespace syncer.ui.Forms
             this.label5 = new System.Windows.Forms.Label();
             this.label4 = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
+            this.tabFilters = new System.Windows.Forms.TabPage();
+            this.lblFilterHint = new System.Windows.Forms.Label();
+            this.txtExcludeFileTypes = new System.Windows.Forms.TextBox();
+            this.lblExcludeTypes = new System.Windows.Forms.Label();
+            this.txtIncludeFileTypes = new System.Windows.Forms.TextBox();
+            this.lblIncludeTypes = new System.Windows.Forms.Label();
+            this.chkEnableFilters = new System.Windows.Forms.CheckBox();
             this.tabConnection = new System.Windows.Forms.TabPage();
             this.btnTestConnection = new System.Windows.Forms.Button();
             this.chkUseSSL = new System.Windows.Forms.CheckBox();
@@ -77,6 +86,7 @@ namespace syncer.ui.Forms
             // 
             this.tabControl1.Controls.Add(this.tabGeneral);
             this.tabControl1.Controls.Add(this.tabJob);
+            this.tabControl1.Controls.Add(this.tabFilters);
             this.tabControl1.Controls.Add(this.tabConnection);
             this.tabControl1.Location = new System.Drawing.Point(12, 12);
             this.tabControl1.Name = "tabControl1";
@@ -134,6 +144,8 @@ namespace syncer.ui.Forms
             // 
             // tabJob
             // 
+            this.tabJob.Controls.Add(this.chkDeleteSourceAfterTransfer);
+            this.tabJob.Controls.Add(this.chkIncludeSubfolders);
             this.tabJob.Controls.Add(this.chkEnabled);
             this.tabJob.Controls.Add(this.cmbIntervalType);
             this.tabJob.Controls.Add(this.numInterval);
@@ -298,6 +310,96 @@ namespace syncer.ui.Forms
             this.label3.TabIndex = 0;
             this.label3.Text = "Job Name:";
             // 
+            // chkIncludeSubfolders
+            // 
+            this.chkIncludeSubfolders.AutoSize = true;
+            this.chkIncludeSubfolders.Checked = true;
+            this.chkIncludeSubfolders.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkIncludeSubfolders.Location = new System.Drawing.Point(20, 300);
+            this.chkIncludeSubfolders.Name = "chkIncludeSubfolders";
+            this.chkIncludeSubfolders.Size = new System.Drawing.Size(134, 17);
+            this.chkIncludeSubfolders.TabIndex = 13;
+            this.chkIncludeSubfolders.Text = "Include Subfolders";
+            this.chkIncludeSubfolders.UseVisualStyleBackColor = true;
+            // 
+            // chkDeleteSourceAfterTransfer
+            // 
+            this.chkDeleteSourceAfterTransfer.AutoSize = true;
+            this.chkDeleteSourceAfterTransfer.Location = new System.Drawing.Point(200, 300);
+            this.chkDeleteSourceAfterTransfer.Name = "chkDeleteSourceAfterTransfer";
+            this.chkDeleteSourceAfterTransfer.Size = new System.Drawing.Size(180, 17);
+            this.chkDeleteSourceAfterTransfer.TabIndex = 14;
+            this.chkDeleteSourceAfterTransfer.Text = "Delete source after transfer";
+            this.chkDeleteSourceAfterTransfer.UseVisualStyleBackColor = true;
+            this.chkDeleteSourceAfterTransfer.CheckedChanged += new System.EventHandler(this.chkDeleteSourceAfterTransfer_CheckedChanged);
+            // 
+            // tabFilters
+            // 
+            this.tabFilters.Controls.Add(this.lblFilterHint);
+            this.tabFilters.Controls.Add(this.txtExcludeFileTypes);
+            this.tabFilters.Controls.Add(this.lblExcludeTypes);
+            this.tabFilters.Controls.Add(this.txtIncludeFileTypes);
+            this.tabFilters.Controls.Add(this.lblIncludeTypes);
+            this.tabFilters.Controls.Add(this.chkEnableFilters);
+            this.tabFilters.Location = new System.Drawing.Point(4, 22);
+            this.tabFilters.Name = "tabFilters";
+            this.tabFilters.Size = new System.Drawing.Size(552, 394);
+            this.tabFilters.TabIndex = 2;
+            this.tabFilters.Text = "Filters";
+            this.tabFilters.UseVisualStyleBackColor = true;
+            // 
+            // chkEnableFilters
+            // 
+            this.chkEnableFilters.AutoSize = true;
+            this.chkEnableFilters.Location = new System.Drawing.Point(20, 20);
+            this.chkEnableFilters.Name = "chkEnableFilters";
+            this.chkEnableFilters.Size = new System.Drawing.Size(130, 17);
+            this.chkEnableFilters.TabIndex = 0;
+            this.chkEnableFilters.Text = "Enable file filtering";
+            this.chkEnableFilters.UseVisualStyleBackColor = true;
+            this.chkEnableFilters.CheckedChanged += new System.EventHandler(this.chkEnableFilters_CheckedChanged);
+            // 
+            // lblIncludeTypes
+            // 
+            this.lblIncludeTypes.AutoSize = true;
+            this.lblIncludeTypes.Location = new System.Drawing.Point(20, 50);
+            this.lblIncludeTypes.Name = "lblIncludeTypes";
+            this.lblIncludeTypes.Size = new System.Drawing.Size(160, 13);
+            this.lblIncludeTypes.TabIndex = 1;
+            this.lblIncludeTypes.Text = "Include only these file types:";
+            // 
+            // txtIncludeFileTypes
+            // 
+            this.txtIncludeFileTypes.Location = new System.Drawing.Point(20, 70);
+            this.txtIncludeFileTypes.Name = "txtIncludeFileTypes";
+            this.txtIncludeFileTypes.Size = new System.Drawing.Size(500, 20);
+            this.txtIncludeFileTypes.TabIndex = 2;
+            // 
+            // lblExcludeTypes
+            // 
+            this.lblExcludeTypes.AutoSize = true;
+            this.lblExcludeTypes.Location = new System.Drawing.Point(20, 100);
+            this.lblExcludeTypes.Name = "lblExcludeTypes";
+            this.lblExcludeTypes.Size = new System.Drawing.Size(152, 13);
+            this.lblExcludeTypes.TabIndex = 3;
+            this.lblExcludeTypes.Text = "Exclude these file types:";
+            // 
+            // txtExcludeFileTypes
+            // 
+            this.txtExcludeFileTypes.Location = new System.Drawing.Point(20, 120);
+            this.txtExcludeFileTypes.Name = "txtExcludeFileTypes";
+            this.txtExcludeFileTypes.Size = new System.Drawing.Size(500, 20);
+            this.txtExcludeFileTypes.TabIndex = 4;
+            // 
+            // lblFilterHint
+            // 
+            this.lblFilterHint.ForeColor = System.Drawing.Color.Gray;
+            this.lblFilterHint.Location = new System.Drawing.Point(20, 150);
+            this.lblFilterHint.Name = "lblFilterHint";
+            this.lblFilterHint.Size = new System.Drawing.Size(500, 45);
+            this.lblFilterHint.TabIndex = 5;
+            this.lblFilterHint.Text = "Enter file extensions separated by commas (e.g., pdf,jpg,png for include or tmp,bak,log for exclude).\r\nInclude takes priority - if both are specified, files matching include types will be transferred unless excluded.";
+            // 
             // tabConnection
             // 
             this.tabConnection.Controls.Add(this.btnTestConnection);
@@ -316,7 +418,7 @@ namespace syncer.ui.Forms
             this.tabConnection.Location = new System.Drawing.Point(4, 22);
             this.tabConnection.Name = "tabConnection";
             this.tabConnection.Size = new System.Drawing.Size(552, 394);
-            this.tabConnection.TabIndex = 2;
+            this.tabConnection.TabIndex = 3;
             this.tabConnection.Text = "Connection";
             this.tabConnection.UseVisualStyleBackColor = true;
             // 
@@ -540,5 +642,14 @@ namespace syncer.ui.Forms
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
+        private System.Windows.Forms.CheckBox chkIncludeSubfolders;
+        private System.Windows.Forms.CheckBox chkDeleteSourceAfterTransfer;
+        private System.Windows.Forms.TabPage tabFilters;
+        private System.Windows.Forms.CheckBox chkEnableFilters;
+        private System.Windows.Forms.Label lblIncludeTypes;
+        private System.Windows.Forms.TextBox txtIncludeFileTypes;
+        private System.Windows.Forms.Label lblExcludeTypes;
+        private System.Windows.Forms.TextBox txtExcludeFileTypes;
+        private System.Windows.Forms.Label lblFilterHint;
     }
 }

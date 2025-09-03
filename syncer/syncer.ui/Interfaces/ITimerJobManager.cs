@@ -263,5 +263,40 @@ namespace syncer.ui.Interfaces
         /// <param name="jobId">The ID of the job</param>
         /// <returns>True if the job is a download job</returns>
         bool IsTimerJobDownloadJob(long jobId);
+        
+        /// <summary>
+        /// Gets whether the timer job includes subfolders
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>True if subfolders are included</returns>
+        bool GetTimerJobIncludeSubfolders(long jobId);
+        
+        /// <summary>
+        /// Gets whether the timer job deletes source files after transfer
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>True if source files are deleted after transfer</returns>
+        bool GetTimerJobDeleteSourceAfterTransfer(long jobId);
+        
+        /// <summary>
+        /// Gets whether the timer job has file filtering enabled
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>True if file filtering is enabled</returns>
+        bool GetTimerJobEnableFilters(long jobId);
+        
+        /// <summary>
+        /// Gets the list of file extensions to include for the timer job
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>List of file extensions to include</returns>
+        List<string> GetTimerJobIncludeExtensions(long jobId);
+        
+        /// <summary>
+        /// Gets the list of file extensions to exclude for the timer job
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>List of file extensions to exclude</returns>
+        List<string> GetTimerJobExcludeExtensions(long jobId);
     }
 }
