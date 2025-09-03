@@ -28,32 +28,6 @@ namespace syncer.core
     }
 
     [Serializable]
-    public class FilterSettings
-    {
-        public string IncludePattern = "";
-        public string ExcludePattern = "";
-        public List<string> FileExtensions = new List<string>();
-        public List<string> IncludeExtensions = new List<string>();
-        public List<string> ExcludeExtensions = new List<string>();
-        public long MinSizeBytes = -1;
-        public long MaxSizeBytes = -1;
-        public long MinSizeKB = -1;
-        public long MaxSizeKB = -1;
-        public bool IncludeHidden = false;
-        public bool IncludeSystem = false;
-        public bool IncludeReadOnly = true;
-        public bool IncludeSubdirectories = false;
-        public bool RecursiveSearch = true;
-        public List<string> ExcludePatterns = new List<string>();
-        public DateTime? ModifiedAfter;
-        public DateTime? ModifiedBefore;
-        public bool ValidateAfterTransfer = true;
-        public ValidationOptions ValidationOptions = ValidationOptions.Existence | ValidationOptions.FileSize;
-        public RelocationOptions SourceFileHandling = RelocationOptions.None;
-        public string CustomRelocationPath;
-    }
-
-    [Serializable]
     public class ScheduleSettings
     {
         public DateTime StartTime = DateTime.Now;
@@ -101,7 +75,6 @@ namespace syncer.core
         public ConnectionSettings SourceConnection = new ConnectionSettings();
         public ConnectionSettings DestinationConnection = new ConnectionSettings();
         public bool IncludeSubFolders = true; // Alias for compatibility
-        public FilterSettings Filters = new FilterSettings();
         public ScheduleSettings Schedule = new ScheduleSettings();
         public PostProcessSettings PostProcess = new PostProcessSettings();
         public DateTime CreatedDate = DateTime.Now;
@@ -116,6 +89,7 @@ namespace syncer.core
         public int RetryCount = 0;
         public int MaxRetries = 3;
         public int RetryIntervalMinutes = 5;
+        public FilterSettings Filters = new FilterSettings();
     }
 
     public class LogEntry
@@ -509,5 +483,61 @@ namespace syncer.core
         public double SuccessRate { get; set; }
         public int MaxConcurrentJobs { get; set; }
         public bool IsActive { get; set; }
+    }
+
+    /// <summary>
+    /// Settings for file filtering and validation
+    /// .NET 3.5 Compatible
+    /// </summary>
+    [Serializable]
+    public class FilterSettings
+    {
+        public List<string> IncludeExtensions = new List<string>();
+        public List<string> ExcludeExtensions = new List<string>();
+        public string IncludePattern = "";
+        public string ExcludePattern = "";
+        public long MinSizeKB = 0;
+        public long MaxSizeKB = 0;
+        public DateTime ModifiedAfter = DateTime.MinValue;
+        public DateTime ModifiedBefore = DateTime.MinValue;
+        public bool RecursiveSearch = true;
+        public bool ValidateAfterTransfer = true;
+        public ValidationOptions ValidationOptions = ValidationOptions.Existence | ValidationOptions.FileSize;
+        public RelocationOptions SourceFileHandling = RelocationOptions.None;
+        public string CustomRelocationPath = "";
+        
+        public FilterSettings()
+        {
+            // Default constructor with empty lists
+            IncludeExtensions = new List<string>();
+            ExcludeExtensions = new List<string>();
+        }
+
+        public FilterSettings Clone()
+        {
+            var clone = new FilterSettings
+            {
+                IncludePattern = this.IncludePattern,
+                ExcludePattern = this.ExcludePattern,
+                MinSizeKB = this.MinSizeKB,
+                MaxSizeKB = this.MaxSizeKB,
+                ModifiedAfter = this.ModifiedAfter,
+                ModifiedBefore = this.ModifiedBefore,
+                RecursiveSearch = this.RecursiveSearch,
+                ValidateAfterTransfer = this.ValidateAfterTransfer,
+                ValidationOptions = this.ValidationOptions,
+                SourceFileHandling = this.SourceFileHandling,
+                CustomRelocationPath = this.CustomRelocationPath
+            };
+
+            // Deep copy lists
+            foreach (var ext in this.IncludeExtensions)
+                clone.IncludeExtensions.Add(ext);
+
+            foreach (var ext in this.ExcludeExtensions)
+                clone.ExcludeExtensions.Add(ext);
+
+            return clone;
+        }
     }
 }

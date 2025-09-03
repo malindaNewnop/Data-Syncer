@@ -179,7 +179,6 @@ namespace syncer.core
                     {
                         files.AddRange(_fileEnumerator.EnumerateFiles(
                             job.SourcePath, 
-                            job.Filters, 
                             job.IncludeSubfolders));
                     }
                     else
@@ -197,13 +196,10 @@ namespace syncer.core
                     
                     if (client.ListFiles(job.Connection, job.SourcePath, out remoteFiles, out error))
                     {
-                        // Apply filters to remote files
+                        // Add all remote files (no filtering)
                         foreach (var file in remoteFiles)
                         {
-                            if (job.Filters == null || job.Filters.ShouldIncludeFile(Path.GetFileName(file)))
-                            {
-                                files.Add(file);
-                            }
+                            files.Add(file);
                         }
                     }
                     else
@@ -352,54 +348,6 @@ namespace syncer.core
             {
                 return Path.GetFileName(fullPath);
             }
-        }
-    }
-
-    // Extension method for FilterSettings
-    public static class FilterSettingsExtensions
-    {
-        public static bool ShouldIncludeFile(this FilterSettings filters, string fileName)
-        {
-            if (filters == null)
-                return true;
-
-            // Check include patterns
-            if (!string.IsNullOrEmpty(filters.IncludePattern))
-            {
-                if (!MatchesPattern(fileName, filters.IncludePattern))
-                    return false;
-            }
-
-            // Check exclude patterns
-            if (!string.IsNullOrEmpty(filters.ExcludePattern))
-            {
-                if (MatchesPattern(fileName, filters.ExcludePattern))
-                    return false;
-            }
-
-            return true;
-        }
-
-        private static bool MatchesPattern(string fileName, string pattern)
-        {
-            // Simple wildcard matching
-            // In production, you might want to use Regex or more sophisticated pattern matching
-            if (string.IsNullOrEmpty(pattern))
-                return true;
-
-            if (pattern == "*")
-                return true;
-
-            if (pattern.Contains("*"))
-            {
-                var parts = pattern.Split('*');
-                if (parts.Length == 2)
-                {
-                    return fileName.StartsWith(parts[0]) && fileName.EndsWith(parts[1]);
-                }
-            }
-
-            return fileName.Equals(pattern, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

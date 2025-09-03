@@ -66,9 +66,6 @@ namespace syncer.ui.Services
         {
             try
             {
-                // Apply current filter settings to the job before creating it
-                ApplyCurrentFilterSettings(job);
-                
                 var coreJob = ConvertUIJobToCoreJob(job);
                 
                 // Generate a unique sequential integer ID
@@ -130,9 +127,6 @@ namespace syncer.ui.Services
         {
             try
             {
-                // Apply current filter settings to the job before updating it
-                ApplyCurrentFilterSettings(job);
-                
                 var coreJob = ConvertUIJobToCoreJob(job);
                 _jobRepository.Save(coreJob);
                 return true;
@@ -223,10 +217,11 @@ namespace syncer.ui.Services
                 IntervalType = MapTimeUnitToString(coreJob.Schedule?.Unit ?? syncer.core.TimeUnit.Minutes),
                 // Convert connection settings
                 SourceConnection = ConvertCoreConnectionToUIConnection(coreJob.Connection),
-                DestinationConnection = ConvertCoreConnectionToUIConnection(coreJob.DestinationConnection),
-                // Convert filter settings
-                FilterSettings = ConvertCoreFilterToUIFilter(coreJob.Filters)
+                DestinationConnection = ConvertCoreConnectionToUIConnection(coreJob.DestinationConnection)
             };
+
+            // Convert filter settings from Core to UI
+            ConvertFilterSettingsToUI(coreJob, uiJob);
 
             return uiJob;
         }
@@ -248,17 +243,17 @@ namespace syncer.ui.Services
                 LastStatus = uiJob.LastStatus,
                 Connection = ConvertUIConnectionToCoreConnection(uiJob.SourceConnection),
                 DestinationConnection = ConvertUIConnectionToCoreConnection(uiJob.DestinationConnection),
-                // Add schedule settings
                 Schedule = new syncer.core.ScheduleSettings
                 {
                     StartTime = uiJob.StartTime,
                     RepeatEvery = uiJob.IntervalValue,
                     Unit = MapStringToTimeUnit(uiJob.IntervalType),
                     IsEnabled = uiJob.IsEnabled
-                },
-                // Convert filter settings
-                Filters = ConvertUIFilterToCoreFilter(uiJob.FilterSettings)
+                }
             };
+
+            // Convert filter settings from UI to Core
+            ConvertFilterSettings(uiJob, coreJob);
 
             return coreJob;
         }
@@ -290,6 +285,99 @@ namespace syncer.ui.Services
                     return syncer.core.TimeUnit.Days;
                 default:
                     return syncer.core.TimeUnit.Minutes;
+            }
+        }
+
+        /// <summary>
+        /// Converts filter settings from UI model to Core model
+        /// </summary>
+        private void ConvertFilterSettings(SyncJob uiJob, syncer.core.SyncJob coreJob)
+        {
+            // Only create and populate filters if they are enabled
+            if (uiJob.EnableFilters)
+            {
+                if (coreJob.Filters == null)
+                    coreJob.Filters = new FilterSettings();
+
+                // Convert include file types from comma-separated string to list
+                coreJob.Filters.IncludeExtensions.Clear();
+                if (!string.IsNullOrEmpty(uiJob.IncludeFileTypes))
+                {
+                    string[] includeTypes = uiJob.IncludeFileTypes.Split(',');
+                    foreach (string type in includeTypes)
+                    {
+                        string cleanType = type.Trim().TrimStart('.');
+                        if (!string.IsNullOrEmpty(cleanType))
+                        {
+                            coreJob.Filters.IncludeExtensions.Add(cleanType);
+                        }
+                    }
+                }
+
+                // Convert exclude file types from comma-separated string to list
+                coreJob.Filters.ExcludeExtensions.Clear();
+                if (!string.IsNullOrEmpty(uiJob.ExcludeFileTypes))
+                {
+                    string[] excludeTypes = uiJob.ExcludeFileTypes.Split(',');
+                    foreach (string type in excludeTypes)
+                    {
+                        string cleanType = type.Trim().TrimStart('.');
+                        if (!string.IsNullOrEmpty(cleanType))
+                        {
+                            coreJob.Filters.ExcludeExtensions.Add(cleanType);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Filters disabled, set to null to indicate no filtering should occur
+                coreJob.Filters = null;
+            }
+        }
+
+        /// <summary>
+        /// Converts filter settings from Core model to UI model
+        /// </summary>
+        private void ConvertFilterSettingsToUI(syncer.core.SyncJob coreJob, SyncJob uiJob)
+        {
+            if (coreJob.Filters != null)
+            {
+                // Check if filters are enabled (if any extensions exist)
+                uiJob.EnableFilters = coreJob.Filters.IncludeExtensions.Count > 0 || coreJob.Filters.ExcludeExtensions.Count > 0;
+
+                // Convert include extensions to comma-separated string
+                if (coreJob.Filters.IncludeExtensions.Count > 0)
+                {
+                    System.Text.StringBuilder includeBuilder = new System.Text.StringBuilder();
+                    foreach (string extension in coreJob.Filters.IncludeExtensions)
+                    {
+                        if (includeBuilder.Length > 0)
+                            includeBuilder.Append(",");
+                        includeBuilder.Append(extension);
+                    }
+                    uiJob.IncludeFileTypes = includeBuilder.ToString();
+                }
+
+                // Convert exclude extensions to comma-separated string
+                if (coreJob.Filters.ExcludeExtensions.Count > 0)
+                {
+                    System.Text.StringBuilder excludeBuilder = new System.Text.StringBuilder();
+                    foreach (string extension in coreJob.Filters.ExcludeExtensions)
+                    {
+                        if (excludeBuilder.Length > 0)
+                            excludeBuilder.Append(",");
+                        excludeBuilder.Append(extension);
+                    }
+                    uiJob.ExcludeFileTypes = excludeBuilder.ToString();
+                }
+            }
+            else
+            {
+                // No filters defined
+                uiJob.EnableFilters = false;
+                uiJob.IncludeFileTypes = string.Empty;
+                uiJob.ExcludeFileTypes = string.Empty;
             }
         }
 
@@ -344,184 +432,6 @@ namespace syncer.ui.Services
             };
 
             return coreConnection;
-        }
-
-        /// <summary>
-        /// Converts Core FilterSettings to UI FilterSettings
-        /// </summary>
-        private FilterSettings ConvertCoreFilterToUIFilter(syncer.core.FilterSettings coreFilter)
-        {
-            if (coreFilter == null)
-            {
-                return new FilterSettings(); // Return default filter
-            }
-
-            var uiFilter = new FilterSettings
-            {
-                FiltersEnabled = coreFilter.IncludeExtensions.Count > 0 || coreFilter.ExcludeExtensions.Count > 0 || 
-                                coreFilter.MinSizeKB > 0 || coreFilter.MaxSizeKB > 0 ||
-                                !string.IsNullOrEmpty(coreFilter.IncludePattern) || !string.IsNullOrEmpty(coreFilter.ExcludePattern),
-                MinFileSize = (decimal)(coreFilter.MinSizeKB / 1024.0), // Convert KB to MB
-                MaxFileSize = (decimal)(coreFilter.MaxSizeKB / 1024.0), // Convert KB to MB
-                ExcludePatterns = coreFilter.ExcludePattern ?? "",
-                IncludeHiddenFiles = coreFilter.IncludeHidden,
-                IncludeSystemFiles = coreFilter.IncludeSystem,
-                IncludeReadOnlyFiles = coreFilter.IncludeReadOnly
-            };
-
-            // Convert include extensions to simple format
-            if (coreFilter.IncludeExtensions.Count > 0)
-            {
-                var extensions = new List<string>();
-                foreach (var ext in coreFilter.IncludeExtensions)
-                {
-                    extensions.Add("*." + ext);
-                }
-                uiFilter.IncludeFileExtensions = string.Join(",", extensions.ToArray());
-            }
-
-            // Convert exclude pattern to simple format
-            uiFilter.ExcludeFilePatterns = coreFilter.ExcludePattern ?? "";
-
-            // Convert include extensions to allowed file types (legacy support)
-            var fileTypes = new List<string>();
-            foreach (var ext in coreFilter.IncludeExtensions)
-            {
-                fileTypes.Add("." + ext + " - " + GetFileTypeDescription(ext));
-            }
-            uiFilter.AllowedFileTypes = fileTypes.ToArray();
-
-            return uiFilter;
-        }
-
-        /// <summary>
-        /// Converts UI FilterSettings to Core FilterSettings
-        /// </summary>
-        private syncer.core.FilterSettings ConvertUIFilterToCoreFilter(FilterSettings uiFilter)
-        {
-            if (uiFilter == null)
-            {
-                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", "UI Filter is null, creating default core filter");
-                return new syncer.core.FilterSettings(); // Return default filter
-            }
-
-            var coreFilter = new syncer.core.FilterSettings
-            {
-                MinSizeKB = (long)(uiFilter.MinFileSize * 1024), // Convert MB to KB
-                MaxSizeKB = (long)(uiFilter.MaxFileSize * 1024), // Convert MB to KB
-                ExcludePattern = uiFilter.ExcludePatterns,
-                IncludeHidden = uiFilter.IncludeHiddenFiles,
-                IncludeSystem = uiFilter.IncludeSystemFiles,
-                IncludeReadOnly = uiFilter.IncludeReadOnlyFiles,
-                RecursiveSearch = true,
-                ValidateAfterTransfer = true
-            };
-
-            // Convert allowed file types to include extensions
-            if (uiFilter.FiltersEnabled && uiFilter.AllowedFileTypes != null)
-            {
-                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", 
-                    string.Format("Converting {0} allowed file types (Filters enabled: {1})", 
-                        uiFilter.AllowedFileTypes.Length, uiFilter.FiltersEnabled));
-                        
-                foreach (var fileType in uiFilter.AllowedFileTypes)
-                {
-                    // Extract extension from format like ".txt - Text files"
-                    if (fileType.StartsWith("."))
-                    {
-                        string ext = fileType.Split(' ')[0].TrimStart('.');
-                        if (!string.IsNullOrEmpty(ext))
-                        {
-                            coreFilter.IncludeExtensions.Add(ext.ToLowerInvariant());
-                            // Also add to FileExtensions for the FileEnumerator
-                            coreFilter.FileExtensions.Add("." + ext.ToLowerInvariant());
-                            
-                            DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", 
-                                string.Format("Added file extension: {0}", ext));
-                        }
-                    }
-                }
-            }
-            // Convert simple include extensions (new feature)
-            else if (uiFilter.FiltersEnabled && !string.IsNullOrEmpty(uiFilter.IncludeFileExtensions))
-            {
-                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", 
-                    string.Format("Converting simple include extensions: {0}", uiFilter.IncludeFileExtensions));
-                    
-                string[] extensions = uiFilter.IncludeFileExtensions.Split(',');
-                foreach (string ext in extensions)
-                {
-                    string cleanExt = ext.Trim().ToLowerInvariant();
-                    if (string.IsNullOrEmpty(cleanExt)) continue;
-                    
-                    // Handle patterns like *.txt, .txt, txt
-                    if (cleanExt.StartsWith("*."))
-                    {
-                        string extension = cleanExt.Substring(2); // Remove *.
-                        coreFilter.IncludeExtensions.Add(extension);
-                        coreFilter.FileExtensions.Add("." + extension);
-                    }
-                    else if (cleanExt.StartsWith("."))
-                    {
-                        string extension = cleanExt.Substring(1); // Remove .
-                        coreFilter.IncludeExtensions.Add(extension);
-                        coreFilter.FileExtensions.Add(cleanExt);
-                    }
-                    else
-                    {
-                        coreFilter.IncludeExtensions.Add(cleanExt);
-                        coreFilter.FileExtensions.Add("." + cleanExt);
-                    }
-                }
-            }
-            
-            // Convert simple exclude patterns (new feature)
-            if (uiFilter.FiltersEnabled && !string.IsNullOrEmpty(uiFilter.ExcludeFilePatterns))
-            {
-                // Use the existing exclude pattern field
-                coreFilter.ExcludePattern = uiFilter.ExcludeFilePatterns;
-            }
-            
-            if (!uiFilter.FiltersEnabled)
-            {
-                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", "Filters are disabled, clearing extension filters");
-                // When filters are disabled, clear any existing filters to allow all files
-                coreFilter.FileExtensions.Clear();
-                coreFilter.IncludeExtensions.Clear();
-            }
-
-            return coreFilter;
-        }
-
-        /// <summary>
-        /// Apply current filter settings from the filter service to a job
-        /// </summary>
-        private void ApplyCurrentFilterSettings(SyncJob job)
-        {
-            try
-            {
-                var filterService = ServiceLocator.FilterService;
-                if (filterService != null)
-                {
-                    var currentFilters = filterService.GetFilterSettings();
-                    if (currentFilters != null)
-                    {
-                        job.FilterSettings = currentFilters;
-                        
-                        // Debug logging
-                        DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", 
-                            string.Format("Applied filter settings to job '{0}': Enabled={1}, FileTypes={2}", 
-                                job.Name, 
-                                currentFilters.FiltersEnabled,
-                                currentFilters.AllowedFileTypes != null ? currentFilters.AllowedFileTypes.Length : 0));
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogError(ex, "ApplyCurrentFilterSettings");
-                // Don't throw - just continue without filters
-            }
         }
 
         /// <summary>

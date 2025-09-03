@@ -369,25 +369,7 @@ namespace syncer.ui.Forms
                 EnableBackup = original.EnableBackup,
                 BackupPath = original.BackupPath,
                 ValidateTransfer = original.ValidateTransfer,
-                ShowTransferProgress = original.ShowTransferProgress,
-                FilterSettings = CloneFilterSettings(original.FilterSettings)
-            };
-        }
-
-        private FilterSettings CloneFilterSettings(FilterSettings original)
-        {
-            if (original == null) return new FilterSettings();
-            
-            return new FilterSettings
-            {
-                FiltersEnabled = original.FiltersEnabled,
-                AllowedFileTypes = original.AllowedFileTypes,
-                MaxFileSize = original.MaxFileSize,
-                MinFileSize = original.MinFileSize,
-                IncludeHiddenFiles = original.IncludeHiddenFiles,
-                IncludeSystemFiles = original.IncludeSystemFiles,
-                IncludeReadOnlyFiles = original.IncludeReadOnlyFiles,
-                ExcludePatterns = original.ExcludePatterns
+                ShowTransferProgress = original.ShowTransferProgress
             };
         }
 

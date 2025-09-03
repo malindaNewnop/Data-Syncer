@@ -44,11 +44,13 @@ namespace syncer.ui
         public TimeSpan LastDuration { get; set; }
         public double LastAverageSpeed { get; set; } // Bytes per second
 
-        // Filter settings
-        public FilterSettings FilterSettings { get; set; }
-        
         // Delete source after transfer setting
         public bool DeleteSourceAfterTransfer { get; set; }
+
+        // File filtering properties
+        public bool EnableFilters { get; set; }
+        public string IncludeFileTypes { get; set; } // Comma-separated file extensions like "pdf,jpg,png"
+        public string ExcludeFileTypes { get; set; } // Comma-separated file extensions like "tmp,bak"
 
         public SyncJob()
         {
@@ -77,11 +79,13 @@ namespace syncer.ui
             LastDuration = TimeSpan.Zero;
             LastAverageSpeed = 0;
             
-            // Initialize filter settings
-            FilterSettings = new FilterSettings();
-            
             // Initialize delete source setting
             DeleteSourceAfterTransfer = false;
+            
+            // Initialize filter settings
+            EnableFilters = false;
+            IncludeFileTypes = "";
+            ExcludeFileTypes = "";
         }
 
         public string GetNextRunTime()
@@ -391,35 +395,6 @@ namespace syncer.ui
                 KeepAlive = this.KeepAlive,
                 OperationTimeout = this.OperationTimeout
             };
-        }
-    }
-
-    /// <summary>
-    /// Represents filter settings
-    /// </summary>
-    public class FilterSettings
-    {
-        public bool FiltersEnabled { get; set; }
-        public string[] AllowedFileTypes { get; set; }
-        public decimal MinFileSize { get; set; }
-        public decimal MaxFileSize { get; set; }
-        public bool IncludeHiddenFiles { get; set; }
-        public bool IncludeSystemFiles { get; set; }
-        public bool IncludeReadOnlyFiles { get; set; }
-        public string ExcludePatterns { get; set; }
-        
-        // Simple filtering properties
-        public string IncludeFileExtensions { get; set; }
-        public string ExcludeFilePatterns { get; set; }
-
-        public FilterSettings()
-        {
-            FiltersEnabled = false;
-            MinFileSize = 0;
-            MaxFileSize = 100;
-            IncludeReadOnlyFiles = true;
-            IncludeFileExtensions = "";
-            ExcludeFilePatterns = "";
         }
     }
 

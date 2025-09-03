@@ -56,14 +56,6 @@ namespace syncer.ui.Forms
                 numPort.Value = conn.Port;
                 chkUseSSL.Checked = conn.UseSSL;
             }
-            
-            // Load filter settings
-            if (_configuration.FilterSettings != null)
-            {
-                txtIncludePatterns.Text = _configuration.FilterSettings.IncludePatterns ?? "";
-                txtExcludePatterns.Text = _configuration.FilterSettings.ExcludePatterns ?? "";
-                chkIncludeSubfolders.Checked = _configuration.FilterSettings.IncludeSubfolders;
-            }
         }
 
         private void btnSave_Click(object sender, EventArgs e)
@@ -153,14 +145,6 @@ namespace syncer.ui.Forms
             conn.Password = txtPassword.Text;
             conn.Port = (int)numPort.Value;
             conn.UseSSL = chkUseSSL.Checked;
-            
-            // Update filter settings
-            if (_configuration.FilterSettings == null)
-                _configuration.FilterSettings = new FilterSettings();
-                
-            _configuration.FilterSettings.IncludePatterns = txtIncludePatterns.Text.Trim();
-            _configuration.FilterSettings.ExcludePatterns = txtExcludePatterns.Text.Trim();
-            _configuration.FilterSettings.IncludeSubfolders = chkIncludeSubfolders.Checked;
             
             // Update modification time
             _configuration.ModifiedDate = DateTime.Now;

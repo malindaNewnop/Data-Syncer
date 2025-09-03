@@ -12,7 +12,6 @@ namespace syncer.ui
     {
         private static ISyncJobService _syncJobService;
         private static IConnectionService _connectionService;
-        private static IFilterService _filterService;
         private static ILogService _logService;
         private static IServiceManager _serviceManager;
         private static IConfigurationService _configurationService;
@@ -53,7 +52,6 @@ namespace syncer.ui
                 }
                 
                 // Keep using UI implementations for these services for now
-                _filterService = new FilterService();
                 _serviceManager = new ServiceManager();
                 _configurationService = new ConfigurationService();
                 
@@ -145,7 +143,6 @@ namespace syncer.ui
             // Initialize with stub implementations
             _syncJobService = new SyncJobService();
             _connectionService = new ConnectionService();
-            _filterService = new FilterService();
             _logService = new LogService();
             _serviceManager = new ServiceManager();
             _configurationService = new ConfigurationService();
@@ -236,11 +233,6 @@ namespace syncer.ui
             get { return _connectionService ?? (_connectionService = new ConnectionService()); }
         }
 
-        public static IFilterService FilterService
-        {
-            get { return _filterService ?? (_filterService = new FilterService()); }
-        }
-
         public static ILogService LogService
         {
             get { return _logService ?? (_logService = new LogService()); }
@@ -268,7 +260,6 @@ namespace syncer.ui
 
         public static void SetSyncJobService(ISyncJobService service) { _syncJobService = service; }
         public static void SetConnectionService(IConnectionService service) { _connectionService = service; }
-        public static void SetFilterService(IFilterService service) { _filterService = service; }
         public static void SetLogService(ILogService service) { _logService = service; }
         public static void SetServiceManager(IServiceManager service) { _serviceManager = service; }
         public static void SetConfigurationService(IConfigurationService service) { _configurationService = service; }

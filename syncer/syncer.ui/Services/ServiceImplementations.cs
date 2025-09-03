@@ -259,19 +259,8 @@ namespace syncer.ui.Services
                 Directory.CreateDirectory(job.DestinationPath);
             }
 
-            // Use the job's own filter settings instead of global settings
-            if (job.FilterSettings == null)
-            {
-                // Fallback to global filter settings if job doesn't have its own
-                var filterService = ServiceLocator.FilterService;
-                if (filterService != null)
-                {
-                    job.FilterSettings = filterService.GetFilterSettings();
-                }
-            }
-
-            // Get files with filtering applied using job-specific settings
-            List<string> files = GetFilteredFiles(job.SourcePath, job.FilterSettings, job.IncludeSubFolders);
+            // Get all files without filtering
+            List<string> files = GetFilteredFiles(job.SourcePath, job.IncludeSubFolders);
             Console.WriteLine("Found " + files.Count + " files after applying job-specific filters");
 
             // If no files found, log it but don't treat as error (empty directory is valid)
@@ -326,222 +315,13 @@ namespace syncer.ui.Services
             }
         }
 
-        private List<string> GetFilteredFiles(string sourcePath, FilterSettings filterSettings, bool includeSubFolders)
+        private List<string> GetFilteredFiles(string sourcePath, bool includeSubFolders)
         {
             var allFiles = Directory.GetFiles(sourcePath, "*", 
                 includeSubFolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
             
-            var filteredFiles = new List<string>();
-            
-            // If filters are disabled, return all files
-            if (filterSettings == null || !filterSettings.FiltersEnabled)
-            {
-                Console.WriteLine("Filters disabled, returning all " + allFiles.Length + " files");
-                filteredFiles.AddRange(allFiles);
-                return filteredFiles;
-            }
-            
-            Console.WriteLine("Applying filters to " + allFiles.Length + " files");
-            
-            foreach (string file in allFiles)
-            {
-                if (ShouldIncludeFile(file, filterSettings))
-                {
-                    filteredFiles.Add(file);
-                }
-                else
-                {
-                    Console.WriteLine("Excluded file: " + Path.GetFileName(file));
-                }
-            }
-            
-            return filteredFiles;
-        }
-
-        private bool ShouldIncludeFile(string filePath, FilterSettings filterSettings)
-        {
-            if (filterSettings == null || !filterSettings.FiltersEnabled)
-                return true;
-            
-            try
-            {
-                var fileInfo = new FileInfo(filePath);
-                
-                // Check file attributes
-                if (!filterSettings.IncludeHiddenFiles && (fileInfo.Attributes & FileAttributes.Hidden) != 0)
-                    return false;
-                
-                if (!filterSettings.IncludeSystemFiles && (fileInfo.Attributes & FileAttributes.System) != 0)
-                    return false;
-                
-                if (!filterSettings.IncludeReadOnlyFiles && (fileInfo.Attributes & FileAttributes.ReadOnly) != 0)
-                    return false;
-                
-                // Check file size (handle different units - assume MB if no unit specified)
-                long fileSizeBytes = fileInfo.Length;
-                long minSizeBytes = (long)(filterSettings.MinFileSize * 1024 * 1024); // Default to MB
-                long maxSizeBytes = (long)(filterSettings.MaxFileSize * 1024 * 1024); // Default to MB
-                
-                if (minSizeBytes > 0 && fileSizeBytes < minSizeBytes)
-                    return false;
-                
-                if (maxSizeBytes > 0 && fileSizeBytes > maxSizeBytes)
-                    return false;
-                
-                // Check file extensions (new simple filtering approach)
-                if (!string.IsNullOrEmpty(filterSettings.IncludeFileExtensions))
-                {
-                    string fileExtension = fileInfo.Extension.ToLower();
-                    string[] includeExtensions = filterSettings.IncludeFileExtensions.Split(',');
-                    bool matchesInclude = false;
-
-                    foreach (string pattern in includeExtensions)
-                    {
-                        string cleanPattern = pattern.Trim().ToLower();
-                        if (string.IsNullOrEmpty(cleanPattern)) continue;
-
-                        // Handle patterns like *.txt, .txt, txt
-                        if (cleanPattern.StartsWith("*."))
-                        {
-                            string ext = cleanPattern.Substring(1); // Remove the *
-                            if (fileExtension == ext)
-                            {
-                                matchesInclude = true;
-                                break;
-                            }
-                        }
-                        else if (cleanPattern.StartsWith("."))
-                        {
-                            if (fileExtension == cleanPattern)
-                            {
-                                matchesInclude = true;
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            string ext = "." + cleanPattern;
-                            if (fileExtension == ext)
-                            {
-                                matchesInclude = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!matchesInclude)
-                    {
-                        Console.WriteLine("File " + Path.GetFileName(filePath) + " extension " + fileExtension + " not in include extensions");
-                        return false;
-                    }
-                }
-                // Check file extensions (legacy approach)
-                else if (filterSettings.AllowedFileTypes != null && filterSettings.AllowedFileTypes.Length > 0)
-                {
-                    string fileExtension = fileInfo.Extension;
-                    bool matchesExtension = false;
-                    
-                    foreach (string allowedType in filterSettings.AllowedFileTypes)
-                    {
-                        // Extract extension from format like ".txt - Text files"
-                        string allowedExt = allowedType.Split(' ')[0].Trim();
-                        if (string.Equals(fileExtension, allowedExt, StringComparison.OrdinalIgnoreCase))
-                        {
-                            matchesExtension = true;
-                            break;
-                        }
-                    }
-                    
-                    if (!matchesExtension)
-                    {
-                        Console.WriteLine("File " + Path.GetFileName(filePath) + " extension " + fileExtension + " not in allowed types");
-                        return false;
-                    }
-                }
-                
-                // Check exclude patterns (new simple filtering approach)
-                if (!string.IsNullOrEmpty(filterSettings.ExcludeFilePatterns))
-                {
-                    string fileName = fileInfo.Name.ToLower();
-                    string[] excludePatterns = filterSettings.ExcludeFilePatterns.Split(',');
-
-                    foreach (string pattern in excludePatterns)
-                    {
-                        string cleanPattern = pattern.Trim().ToLower();
-                        if (string.IsNullOrEmpty(cleanPattern)) continue;
-
-                        // Handle patterns like *.tmp, .tmp, tmp, temp*
-                        if (cleanPattern.StartsWith("*."))
-                        {
-                            string ext = cleanPattern.Substring(1); // Remove the *
-                            if (fileInfo.Extension.ToLower() == ext)
-                                return false;
-                        }
-                        else if (cleanPattern.StartsWith("."))
-                        {
-                            if (fileInfo.Extension.ToLower() == cleanPattern)
-                                return false;
-                        }
-                        else if (cleanPattern.EndsWith("*"))
-                        {
-                            string prefix = cleanPattern.Substring(0, cleanPattern.Length - 1);
-                            if (fileName.StartsWith(prefix))
-                                return false;
-                        }
-                        else if (cleanPattern.Contains("*"))
-                        {
-                            // Simple wildcard matching
-                            string regexPattern = "^" + Regex.Escape(cleanPattern).Replace("\\*", ".*") + "$";
-                            if (Regex.IsMatch(fileName, regexPattern))
-                                return false;
-                        }
-                        else
-                        {
-                            // Exact filename or extension match
-                            string ext = "." + cleanPattern;
-                            if (fileInfo.Extension.ToLower() == ext || fileName == cleanPattern)
-                                return false;
-                        }
-                    }
-                }
-                // Check exclude patterns (legacy approach)
-                else if (!string.IsNullOrEmpty(filterSettings.ExcludePatterns))
-                {
-                    string fileName = fileInfo.Name;
-                    string[] patterns = filterSettings.ExcludePatterns.Split(',', ';');
-                    
-                    foreach (string pattern in patterns)
-                    {
-                        string trimmedPattern = pattern.Trim();
-                        if (!string.IsNullOrEmpty(trimmedPattern))
-                        {
-                            // Simple wildcard matching
-                            if (trimmedPattern.Contains("*"))
-                            {
-                                // Convert to regex pattern
-                                string regexPattern = trimmedPattern.Replace("*", ".*");
-                                if (Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase))
-                                {
-                                    Console.WriteLine("File " + fileName + " matched exclude pattern: " + trimmedPattern);
-                                    return false;
-                                }
-                            }
-                            else if (fileName.IndexOf(trimmedPattern, StringComparison.OrdinalIgnoreCase) >= 0)
-                            {
-                                Console.WriteLine("File " + fileName + " matched exclude pattern: " + trimmedPattern);
-                                return false;
-                            }
-                        }
-                    }
-                }
-                
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error checking file " + filePath + ": " + ex.Message);
-                return false; // Exclude files that can't be analyzed
-            }
+            // Return all files (no filtering)
+            return new List<string>(allFiles);
         }
 
         private void ExecuteUploadTransfer(SyncJob job)
@@ -582,35 +362,17 @@ namespace syncer.ui.Services
                     throw new Exception(string.Format("Connection test failed: {0}", testError));
                 }
                 
-                // Use the job's own filter settings instead of global settings
-                if (job.FilterSettings == null)
-                {
-                    // Fallback to global filter settings if job doesn't have its own
-                    var filterService = ServiceLocator.FilterService;
-                    if (filterService != null)
-                    {
-                        job.FilterSettings = filterService.GetFilterSettings();
-                    }
-                }
-
-                // Get files to upload with filtering applied
+                // Get files to upload (no filtering)
                 List<string> filesToUploadList;
                 if (Directory.Exists(job.SourcePath))
                 {
-                    // Upload directory contents with filtering
-                    filesToUploadList = GetFilteredFiles(job.SourcePath, job.FilterSettings, job.IncludeSubFolders);
+                    // Upload directory contents
+                    filesToUploadList = GetFilteredFiles(job.SourcePath, job.IncludeSubFolders);
                 }
                 else if (File.Exists(job.SourcePath))
                 {
-                    // Upload single file (check if it passes filter)
-                    if (ShouldIncludeFile(job.SourcePath, job.FilterSettings))
-                    {
-                        filesToUploadList = new List<string> { job.SourcePath };
-                    }
-                    else
-                    {
-                        throw new Exception("Source file does not match current filter settings");
-                    }
+                    // Upload single file
+                    filesToUploadList = new List<string> { job.SourcePath };
                 }
                 else
                 {
@@ -1132,170 +894,6 @@ namespace syncer.ui.Services
                 return connections[0].Settings;
             }
             return null;
-        }
-    }
-
-    // Stub implementation of filter service - will be replaced with actual backend implementation
-    public class FilterService : IFilterService
-    {
-        private FilterSettings _settings;
-        private string _configPath;
-
-        public FilterService()
-        {
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string dataSyncerPath = Path.Combine(appDataPath, "DataSyncer");
-            _configPath = Path.Combine(dataSyncerPath, "filter_settings.json");
-            LoadSettings();
-        }
-
-        private void LoadSettings()
-        {
-            try
-            {
-                if (File.Exists(_configPath))
-                {
-                    string json = File.ReadAllText(_configPath);
-                    // Since we don't have Newtonsoft.Json available in .NET 3.5 stub, use simple parsing
-                    _settings = ParseFilterSettings(json);
-                }
-                else
-                {
-                    _settings = new FilterSettings();
-                }
-            }
-            catch
-            {
-                _settings = new FilterSettings();
-            }
-        }
-
-        private void SaveSettings()
-        {
-            try
-            {
-                string directory = Path.GetDirectoryName(_configPath);
-                if (!Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-                
-                string json = SerializeFilterSettings(_settings);
-                File.WriteAllText(_configPath, json);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error saving filter settings: " + ex.Message);
-            }
-        }
-
-        private string SerializeFilterSettings(FilterSettings settings)
-        {
-            // Simple JSON serialization for .NET 3.5 compatibility
-            var json = "{\n";
-            json += "  \"FiltersEnabled\": " + settings.FiltersEnabled.ToString().ToLower() + ",\n";
-            json += "  \"MinFileSize\": " + settings.MinFileSize + ",\n";
-            json += "  \"MaxFileSize\": " + settings.MaxFileSize + ",\n";
-            json += "  \"IncludeHiddenFiles\": " + settings.IncludeHiddenFiles.ToString().ToLower() + ",\n";
-            json += "  \"IncludeSystemFiles\": " + settings.IncludeSystemFiles.ToString().ToLower() + ",\n";
-            json += "  \"IncludeReadOnlyFiles\": " + settings.IncludeReadOnlyFiles.ToString().ToLower() + ",\n";
-            json += "  \"ExcludePatterns\": \"" + (settings.ExcludePatterns ?? "") + "\",\n";
-            json += "  \"AllowedFileTypes\": [";
-            if (settings.AllowedFileTypes != null)
-            {
-                for (int i = 0; i < settings.AllowedFileTypes.Length; i++)
-                {
-                    json += "\"" + settings.AllowedFileTypes[i] + "\"";
-                    if (i < settings.AllowedFileTypes.Length - 1) json += ",";
-                }
-            }
-            json += "]\n";
-            json += "}";
-            return json;
-        }
-
-        private FilterSettings ParseFilterSettings(string json)
-        {
-            var settings = new FilterSettings();
-            
-            try
-            {
-                // Simple JSON parsing for .NET 3.5 compatibility
-                if (json.Contains("\"FiltersEnabled\": true")) settings.FiltersEnabled = true;
-                
-                // Parse numeric values
-                var minSizeMatch = System.Text.RegularExpressions.Regex.Match(json, "\"MinFileSize\":\\s*(\\d+\\.?\\d*)");
-                if (minSizeMatch.Success) settings.MinFileSize = decimal.Parse(minSizeMatch.Groups[1].Value);
-                
-                var maxSizeMatch = System.Text.RegularExpressions.Regex.Match(json, "\"MaxFileSize\":\\s*(\\d+\\.?\\d*)");
-                if (maxSizeMatch.Success) settings.MaxFileSize = decimal.Parse(maxSizeMatch.Groups[1].Value);
-                
-                // Parse boolean values
-                if (json.Contains("\"IncludeHiddenFiles\": true")) settings.IncludeHiddenFiles = true;
-                if (json.Contains("\"IncludeSystemFiles\": true")) settings.IncludeSystemFiles = true;
-                if (json.Contains("\"IncludeReadOnlyFiles\": false")) settings.IncludeReadOnlyFiles = false;
-                else settings.IncludeReadOnlyFiles = true; // default
-                
-                // Parse exclude patterns
-                var excludeMatch = System.Text.RegularExpressions.Regex.Match(json, "\"ExcludePatterns\":\\s*\"([^\"]*)\"");
-                if (excludeMatch.Success) settings.ExcludePatterns = excludeMatch.Groups[1].Value;
-                
-                // Parse allowed file types array
-                var typesMatch = System.Text.RegularExpressions.Regex.Match(json, "\"AllowedFileTypes\":\\s*\\[([^\\]]*)\\]");
-                if (typesMatch.Success)
-                {
-                    string typesStr = typesMatch.Groups[1].Value;
-                    var typeMatches = System.Text.RegularExpressions.Regex.Matches(typesStr, "\"([^\"]*)\"");
-                    var typesList = new List<string>();
-                    foreach (System.Text.RegularExpressions.Match match in typeMatches)
-                    {
-                        typesList.Add(match.Groups[1].Value);
-                    }
-                    settings.AllowedFileTypes = typesList.ToArray();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error parsing filter settings: " + ex.Message);
-            }
-            
-            return settings;
-        }
-
-        public FilterSettings GetFilterSettings()
-        {
-            return _settings;
-        }
-
-        public bool SaveFilterSettings(FilterSettings settings)
-        {
-            _settings = settings;
-            SaveSettings();
-            Console.WriteLine("Filter settings saved - Enabled: " + settings.FiltersEnabled + ", FileTypes: " + (settings.AllowedFileTypes != null ? settings.AllowedFileTypes.Length : 0));
-            return true;
-        }
-
-        public string[] GetDefaultFileTypes()
-        {
-            return new string[]
-            {
-                ".txt - Text files",
-                ".doc, .docx - Word documents",
-                ".xls, .xlsx - Excel files",
-                ".pdf - PDF documents",
-                ".jpg, .jpeg - JPEG images",
-                ".png - PNG images",
-                ".gif - GIF images",
-                ".mp4 - Video files",
-                ".mp3 - Audio files",
-                ".zip, .rar - Archive files",
-                ".exe - Executable files",
-                ".dll - Library files",
-                ".log - Log files",
-                ".csv - CSV files",
-                ".xml - XML files",
-                ".json - JSON files"
-            };
         }
     }
 

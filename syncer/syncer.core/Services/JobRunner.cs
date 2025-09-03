@@ -87,6 +87,18 @@ namespace syncer.core
 
         public void RunJob(SyncJob job)
         {
+            // CRITICAL DEBUG - CHECK IF THIS METHOD IS CALLED AT ALL
+            _logService.LogInfo("DEBUG: JobRunner.RunJob() called for job: " + (job != null ? job.Name ?? "unnamed" : "null"), "JobRunner");
+            if (job != null && job.Filters != null)
+            {
+                _logService.LogInfo("DEBUG: Include extensions count: " + (job.Filters.IncludeExtensions?.Count ?? 0), "JobRunner");
+                _logService.LogInfo("DEBUG: Exclude extensions count: " + (job.Filters.ExcludeExtensions?.Count ?? 0), "JobRunner");
+            }
+            else if (job != null)
+            {
+                _logService.LogInfo("DEBUG: Job has no filters (Filters is null)", "JobRunner");
+            }
+            
             if (IsRunning(job.Id))
             {
                 throw new InvalidOperationException("Job is already running: " + job.Id);
@@ -213,16 +225,35 @@ namespace syncer.core
         private List<string> GetFilesToProcess(SyncJob job)
         {
             var files = new List<string>();
+            
+            _logService.LogInfo("DEBUG: GetFilesToProcess called for source: " + job.SourcePath, "JobRunner");
+            _logService.LogInfo("DEBUG: Job has filters: " + (job.Filters != null), "JobRunner");
 
             if (job.Connection.Protocol == ProtocolType.Local)
             {
                 if (System.IO.File.Exists(job.SourcePath))
                 {
                     files.Add(job.SourcePath);
+                    _logService.LogInfo("DEBUG: Added single file: " + job.SourcePath, "JobRunner");
                 }
                 else if (System.IO.Directory.Exists(job.SourcePath))
                 {
-                    files.AddRange(_fileEnumerator.EnumerateFiles(job.SourcePath, job.Filters, job.IncludeSubfolders));
+                    // Use the filter-aware overload when filters are provided
+                    if (job.Filters != null)
+                    {
+                        _logService.LogInfo("DEBUG: Using FileEnumerator WITH filters", "JobRunner");
+                        var includeList = job.Filters.IncludeExtensions ?? new List<string>();
+                        var excludeList = job.Filters.ExcludeExtensions ?? new List<string>();
+                        _logService.LogInfo("DEBUG: Include extensions: " + string.Join(",", includeList.ToArray()), "JobRunner");
+                        _logService.LogInfo("DEBUG: Exclude extensions: " + string.Join(",", excludeList.ToArray()), "JobRunner");
+                        files.AddRange(_fileEnumerator.EnumerateFiles(job.SourcePath, job.Filters, job.IncludeSubfolders));
+                    }
+                    else
+                    {
+                        _logService.LogInfo("DEBUG: Using FileEnumerator WITHOUT filters", "JobRunner");
+                        files.AddRange(_fileEnumerator.EnumerateFiles(job.SourcePath, job.IncludeSubfolders));
+                    }
+                    _logService.LogInfo("DEBUG: FileEnumerator returned " + files.Count + " files", "JobRunner");
                 }
             }
             else

@@ -63,13 +63,6 @@ namespace syncer.ui.Forms
             this.label11 = new System.Windows.Forms.Label();
             this.label10 = new System.Windows.Forms.Label();
             this.label9 = new System.Windows.Forms.Label();
-            this.tabFilters = new System.Windows.Forms.TabPage();
-            this.chkIncludeSubfolders = new System.Windows.Forms.CheckBox();
-            this.txtExcludePatterns = new System.Windows.Forms.TextBox();
-            this.txtIncludePatterns = new System.Windows.Forms.TextBox();
-            this.label17 = new System.Windows.Forms.Label();
-            this.label16 = new System.Windows.Forms.Label();
-            this.label15 = new System.Windows.Forms.Label();
             this.btnSave = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
             this.tabControl1.SuspendLayout();
@@ -78,7 +71,6 @@ namespace syncer.ui.Forms
             ((System.ComponentModel.ISupportInitialize)(this.numInterval)).BeginInit();
             this.tabConnection.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numPort)).BeginInit();
-            this.tabFilters.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl1
@@ -86,7 +78,6 @@ namespace syncer.ui.Forms
             this.tabControl1.Controls.Add(this.tabGeneral);
             this.tabControl1.Controls.Add(this.tabJob);
             this.tabControl1.Controls.Add(this.tabConnection);
-            this.tabControl1.Controls.Add(this.tabFilters);
             this.tabControl1.Location = new System.Drawing.Point(12, 12);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
@@ -460,78 +451,6 @@ namespace syncer.ui.Forms
             this.label9.TabIndex = 0;
             this.label9.Text = "Connection Type:";
             // 
-            // tabFilters
-            // 
-            this.tabFilters.Controls.Add(this.chkIncludeSubfolders);
-            this.tabFilters.Controls.Add(this.txtExcludePatterns);
-            this.tabFilters.Controls.Add(this.txtIncludePatterns);
-            this.tabFilters.Controls.Add(this.label17);
-            this.tabFilters.Controls.Add(this.label16);
-            this.tabFilters.Controls.Add(this.label15);
-            this.tabFilters.Location = new System.Drawing.Point(4, 22);
-            this.tabFilters.Name = "tabFilters";
-            this.tabFilters.Size = new System.Drawing.Size(552, 394);
-            this.tabFilters.TabIndex = 3;
-            this.tabFilters.Text = "Filters";
-            this.tabFilters.UseVisualStyleBackColor = true;
-            // 
-            // chkIncludeSubfolders
-            // 
-            this.chkIncludeSubfolders.AutoSize = true;
-            this.chkIncludeSubfolders.Checked = true;
-            this.chkIncludeSubfolders.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkIncludeSubfolders.Location = new System.Drawing.Point(20, 280);
-            this.chkIncludeSubfolders.Name = "chkIncludeSubfolders";
-            this.chkIncludeSubfolders.Size = new System.Drawing.Size(115, 17);
-            this.chkIncludeSubfolders.TabIndex = 5;
-            this.chkIncludeSubfolders.Text = "Include Subfolders";
-            this.chkIncludeSubfolders.UseVisualStyleBackColor = true;
-            // 
-            // txtExcludePatterns
-            // 
-            this.txtExcludePatterns.Location = new System.Drawing.Point(20, 180);
-            this.txtExcludePatterns.Multiline = true;
-            this.txtExcludePatterns.Name = "txtExcludePatterns";
-            this.txtExcludePatterns.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtExcludePatterns.Size = new System.Drawing.Size(500, 80);
-            this.txtExcludePatterns.TabIndex = 4;
-            // 
-            // txtIncludePatterns
-            // 
-            this.txtIncludePatterns.Location = new System.Drawing.Point(20, 60);
-            this.txtIncludePatterns.Multiline = true;
-            this.txtIncludePatterns.Name = "txtIncludePatterns";
-            this.txtIncludePatterns.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtIncludePatterns.Size = new System.Drawing.Size(500, 80);
-            this.txtIncludePatterns.TabIndex = 3;
-            // 
-            // label17
-            // 
-            this.label17.AutoSize = true;
-            this.label17.Location = new System.Drawing.Point(20, 260);
-            this.label17.Name = "label17";
-            this.label17.Size = new System.Drawing.Size(51, 13);
-            this.label17.TabIndex = 2;
-            this.label17.Text = "Options:";
-            // 
-            // label16
-            // 
-            this.label16.AutoSize = true;
-            this.label16.Location = new System.Drawing.Point(20, 160);
-            this.label16.Name = "label16";
-            this.label16.Size = new System.Drawing.Size(200, 13);
-            this.label16.TabIndex = 1;
-            this.label16.Text = "Exclude Patterns (one per line):";
-            // 
-            // label15
-            // 
-            this.label15.AutoSize = true;
-            this.label15.Location = new System.Drawing.Point(20, 40);
-            this.label15.Name = "label15";
-            this.label15.Size = new System.Drawing.Size(195, 13);
-            this.label15.TabIndex = 0;
-            this.label15.Text = "Include Patterns (one per line):";
-            // 
             // btnSave
             // 
             this.btnSave.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
@@ -578,8 +497,6 @@ namespace syncer.ui.Forms
             this.tabConnection.ResumeLayout(false);
             this.tabConnection.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numPort)).EndInit();
-            this.tabFilters.ResumeLayout(false);
-            this.tabFilters.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -590,7 +507,6 @@ namespace syncer.ui.Forms
         private System.Windows.Forms.TabPage tabGeneral;
         private System.Windows.Forms.TabPage tabJob;
         private System.Windows.Forms.TabPage tabConnection;
-        private System.Windows.Forms.TabPage tabFilters;
         private System.Windows.Forms.TextBox txtConfigName;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Label label1;
@@ -622,12 +538,6 @@ namespace syncer.ui.Forms
         private System.Windows.Forms.Label label11;
         private System.Windows.Forms.Label label10;
         private System.Windows.Forms.Label label9;
-        private System.Windows.Forms.CheckBox chkIncludeSubfolders;
-        private System.Windows.Forms.TextBox txtExcludePatterns;
-        private System.Windows.Forms.TextBox txtIncludePatterns;
-        private System.Windows.Forms.Label label17;
-        private System.Windows.Forms.Label label16;
-        private System.Windows.Forms.Label label15;
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
     }

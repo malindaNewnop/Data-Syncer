@@ -28,7 +28,7 @@ namespace syncer.ui
         {
             // Allow the form to be resized normally, set minimum size only
             if (width < 900) width = 900;
-            if (height < 580) height = 580;
+            if (height < 650) height = 650;  // Increased to accommodate filter section
             base.SetBoundsCore(x, y, width, height, specified);
         }
         
@@ -54,18 +54,22 @@ namespace syncer.ui
         private bool _isDownloadInProgress = false; // Prevent overlapping downloads
         private DateTime? _downloadStartTime = null; // Track download duration
 
-        // Filter controls - simplified filtering (most advanced filtering features removed)
-        // private GroupBox gbFilters; // Unused - filtering simplified
-        // private CheckBox chkEnableFilters; // Unused - filtering simplified
-        private CheckedListBox clbFileTypes;
-        private NumericUpDown numMinFileSize;
-        private NumericUpDown numMaxFileSize;
-        private ComboBox cmbFileSizeUnit;
+        // Filter controls - rebuilt for file extension filtering
+        private GroupBox gbFilters;
+        private CheckBox chkEnableFilters;
+        private Label lblIncludeTypes;
+        private TextBox txtIncludeFileTypes;
+        private Label lblExcludeTypes;
+        private TextBox txtExcludeFileTypes;
+        private Label lblFilterHint;
+        private CheckedListBox clbFileTypes; // Keep existing for compatibility
+        private NumericUpDown numMinFileSize; // Keep existing for compatibility
+        private NumericUpDown numMaxFileSize; // Keep existing for compatibility
+        private ComboBox cmbFileSizeUnit; // Keep existing for compatibility
         private CheckBox chkIncludeHiddenFiles;
         private CheckBox chkIncludeSystemFiles;
         private CheckBox chkIncludeReadOnlyFiles;
-        private TextBox txtExcludePatterns;
-        private FilterSettings _jobFilterSettings;
+        private TextBox txtExcludePatterns; // Keep existing for compatibility
 
         public FormSchedule() : this(null) { }
 
@@ -433,38 +437,106 @@ namespace syncer.ui
 
         private void InitializeFilterControls()
         {
-            // Initialize simple file filtering controls
-            
-            // Initialize filter settings
-            if (_jobFilterSettings == null)
+            try
             {
-                _jobFilterSettings = new FilterSettings();
-                _jobFilterSettings.FiltersEnabled = false; // Disabled by default for simplicity
-                _jobFilterSettings.IncludeHiddenFiles = false;
-                _jobFilterSettings.IncludeSystemFiles = false; 
-                _jobFilterSettings.IncludeReadOnlyFiles = true;
-                _jobFilterSettings.MinFileSize = 0;
-                _jobFilterSettings.MaxFileSize = 1000; // 1GB default max
-                _jobFilterSettings.IncludeFileExtensions = "";
-                _jobFilterSettings.ExcludeFilePatterns = "";
+                CreateFilterGroupBox();
+                SetupFilterEventHandlers();
+                UpdateFilterControlsVisibility();
             }
+            catch (Exception ex)
+            {
+                // Log error but don't crash the form
+                ServiceLocator.LogService?.LogError("Failed to initialize filter controls: " + ex.Message);
+            }
+        }
 
-            // Initialize filter UI controls
-            if (chkEnableFileFilter != null)
-            {
-                chkEnableFileFilter.Checked = _jobFilterSettings.FiltersEnabled;
-                chkEnableFileFilter_CheckedChanged(chkEnableFileFilter, EventArgs.Empty);
-            }
+        private void CreateFilterGroupBox()
+        {
+            // Create the main filter groupbox
+            gbFilters = new GroupBox();
+            gbFilters.Text = "File Filtering";
+            gbFilters.Location = new Point(15, 330);
+            gbFilters.Size = new Size(870, 120);
+            gbFilters.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            this.Controls.Add(gbFilters);
+
+            // Enable filter checkbox
+            chkEnableFilters = new CheckBox();
+            chkEnableFilters.Text = "Enable file filtering";
+            chkEnableFilters.Location = new Point(10, 20);
+            chkEnableFilters.Size = new Size(130, 20);
+            chkEnableFilters.CheckedChanged += ChkEnableFilters_CheckedChanged;
+            gbFilters.Controls.Add(chkEnableFilters);
+
+            // Include file types
+            lblIncludeTypes = new Label();
+            lblIncludeTypes.Text = "Include only these file types:";
+            lblIncludeTypes.Location = new Point(10, 45);
+            lblIncludeTypes.Size = new Size(160, 15);
+            gbFilters.Controls.Add(lblIncludeTypes);
+
+            txtIncludeFileTypes = new TextBox();
+            txtIncludeFileTypes.Location = new Point(175, 42);
+            txtIncludeFileTypes.Size = new Size(300, 22);
+            // Add tooltip for help since PlaceholderText is not available in .NET 3.5
+            ToolTip toolTip1 = new ToolTip();
+            toolTip1.SetToolTip(txtIncludeFileTypes, "Enter file extensions separated by commas (e.g., pdf,jpg,png)");
+            gbFilters.Controls.Add(txtIncludeFileTypes);
+
+            // Exclude file types - positioned below include
+            lblExcludeTypes = new Label();
+            lblExcludeTypes.Text = "Exclude these file types:";
+            lblExcludeTypes.Location = new Point(10, 70);
+            lblExcludeTypes.Size = new Size(160, 15);
+            gbFilters.Controls.Add(lblExcludeTypes);
+
+            txtExcludeFileTypes = new TextBox();
+            txtExcludeFileTypes.Location = new Point(175, 67);
+            txtExcludeFileTypes.Size = new Size(300, 22);
+            // Add tooltip for help since PlaceholderText is not available in .NET 3.5  
+            ToolTip toolTip2 = new ToolTip();
+            toolTip2.SetToolTip(txtExcludeFileTypes, "Enter file extensions separated by commas (e.g., tmp,bak,log)");
+            gbFilters.Controls.Add(txtExcludeFileTypes);
+
+            // Add help text
+            lblFilterHint = new Label();
+            lblFilterHint.Text = "Tip: Include takes priority. If both are specified, files matching include types will be transferred unless excluded.";
+            lblFilterHint.Location = new Point(10, 95);
+            lblFilterHint.Size = new Size(850, 15);
+            lblFilterHint.ForeColor = Color.Gray;
+            gbFilters.Controls.Add(lblFilterHint);
+        }
+
+        private void SetupFilterEventHandlers()
+        {
+            if (txtIncludeFileTypes != null)
+                txtIncludeFileTypes.TextChanged += FilterSettings_Changed;
             
-            if (txtIncludeExtensions != null)
-            {
-                txtIncludeExtensions.Text = _jobFilterSettings.IncludeFileExtensions ?? "*.txt,*.doc,*.pdf";
-            }
+            if (txtExcludeFileTypes != null)
+                txtExcludeFileTypes.TextChanged += FilterSettings_Changed;
+        }
+
+        private void ChkEnableFilters_CheckedChanged(object sender, EventArgs e)
+        {
+            UpdateFilterControlsVisibility();
+            FilterSettings_Changed(sender, e);
+        }
+
+        private void FilterSettings_Changed(object sender, EventArgs e)
+        {
+            // This will be handled when saving the job
+            // Could add real-time validation here if needed
+        }
+
+        private void UpdateFilterControlsVisibility()
+        {
+            bool enableFiltering = chkEnableFilters?.Checked ?? false;
             
-            if (txtExcludeFiles != null)
-            {
-                txtExcludeFiles.Text = _jobFilterSettings.ExcludeFilePatterns ?? "*.tmp,*.log";
-            }
+            if (lblIncludeTypes != null) lblIncludeTypes.Enabled = enableFiltering;
+            if (txtIncludeFileTypes != null) txtIncludeFileTypes.Enabled = enableFiltering;
+            if (lblExcludeTypes != null) lblExcludeTypes.Enabled = enableFiltering;
+            if (txtExcludeFileTypes != null) txtExcludeFileTypes.Enabled = enableFiltering;
+            if (lblFilterHint != null) lblFilterHint.Enabled = enableFiltering;
         }
 
         private void CreateFileTypesPanel()
@@ -499,52 +571,7 @@ namespace syncer.ui
             return;
         }
 
-        private void chkEnableFileFilter_CheckedChanged(object sender, EventArgs e)
-        {
-            // Enable or disable filter controls based on checkbox state
-            bool enabled = chkEnableFileFilter.Checked;
-            
-            if (txtIncludeExtensions != null)
-                txtIncludeExtensions.Enabled = enabled;
-            if (txtExcludeFiles != null)
-                txtExcludeFiles.Enabled = enabled;
-            if (lblIncludeExtensions != null)
-                lblIncludeExtensions.Enabled = enabled;
-            if (lblExcludeFiles != null)
-                lblExcludeFiles.Enabled = enabled;
-            if (lblFilterHelp != null)
-                lblFilterHelp.Enabled = enabled;
-                
-            // Update filter settings
-            if (_jobFilterSettings != null)
-            {
-                _jobFilterSettings.FiltersEnabled = enabled;
-            }
-        }
 
-        /// <summary>
-        /// Updates the current filter settings from UI controls
-        /// </summary>
-        private void UpdateFilterSettingsFromUI()
-        {
-            if (_jobFilterSettings == null)
-                _jobFilterSettings = new FilterSettings();
-
-            if (chkEnableFileFilter != null)
-            {
-                _jobFilterSettings.FiltersEnabled = chkEnableFileFilter.Checked;
-            }
-
-            if (txtIncludeExtensions != null)
-            {
-                _jobFilterSettings.IncludeFileExtensions = txtIncludeExtensions.Text.Trim();
-            }
-
-            if (txtExcludeFiles != null)
-            {
-                _jobFilterSettings.ExcludeFilePatterns = txtExcludeFiles.Text.Trim();
-            }
-        }
 
         private void UpdateFilterControlStates()
         {
@@ -560,140 +587,9 @@ namespace syncer.ui
                 SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
         }
 
-        private FilterSettings GetCurrentFilterSettings()
-        {
-            FilterSettings settings = new FilterSettings();
-            
-            // Check if filters are enabled via checkbox
-            if (chkEnableFileFilter != null)
-            {
-                settings.FiltersEnabled = chkEnableFileFilter.Checked;
-            }
-            else
-            {
-                settings.FiltersEnabled = false;
-            }
-            
-            // Get filter settings from UI controls
-            if (settings.FiltersEnabled)
-            {
-                if (txtIncludeExtensions != null)
-                {
-                    settings.IncludeFileExtensions = txtIncludeExtensions.Text.Trim();
-                }
-                
-                if (txtExcludeFiles != null)
-                {
-                    settings.ExcludeFilePatterns = txtExcludeFiles.Text.Trim();
-                }
-            }
-            else
-            {
-                settings.IncludeFileExtensions = "";
-                settings.ExcludeFilePatterns = "";
-            }
-            
-            // Set basic defaults for other properties
-            settings.AllowedFileTypes = null; // Not using this approach anymore
-            settings.MinFileSize = 0; // No minimum
-            settings.MaxFileSize = 0; // No maximum
-            settings.IncludeHiddenFiles = false;
-            settings.IncludeSystemFiles = false;
-            settings.IncludeReadOnlyFiles = true;
-            settings.ExcludePatterns = null; // Using ExcludeFilePatterns instead
-            
-            return settings;
-        }
+ 
 
-        private void LoadFilterSettings()
-        {
-            if (_currentJob?.FilterSettings != null)
-            {
-                _jobFilterSettings = _currentJob.FilterSettings;
-                
-                // Load simple filter settings into UI controls
-                if (chkEnableFileFilter != null)
-                {
-                    chkEnableFileFilter.Checked = _jobFilterSettings.FiltersEnabled;
-                }
-                
-                if (txtIncludeExtensions != null)
-                {
-                    txtIncludeExtensions.Text = _jobFilterSettings.IncludeFileExtensions ?? "";
-                }
-                
-                if (txtExcludeFiles != null)
-                {
-                    txtExcludeFiles.Text = _jobFilterSettings.ExcludeFilePatterns ?? "";
-                }
-                
-                // Update UI state based on filter enabled state
-                chkEnableFileFilter_CheckedChanged(chkEnableFileFilter, EventArgs.Empty);
-                
-                // Legacy support for old complex filtering (if any exists)
-                if (clbFileTypes != null && _jobFilterSettings.AllowedFileTypes != null)
-                {
-                    // Clear all selections first
-                    for (int i = 0; i < clbFileTypes.Items.Count; i++)
-                        clbFileTypes.SetItemChecked(i, false);
-                    
-                    // Check the items that match saved settings
-                    foreach (string allowedType in _jobFilterSettings.AllowedFileTypes)
-                    {
-                        int index = clbFileTypes.Items.IndexOf(allowedType);
-                        if (index >= 0)
-                            clbFileTypes.SetItemChecked(index, true);
-                    }
-                }
-                
-                if (numMinFileSize != null)
-                {
-                    // Values are stored in MB, display as MB by default
-                    numMinFileSize.Value = _jobFilterSettings.MinFileSize;
-                }
-                if (numMaxFileSize != null)
-                {
-                    // Values are stored in MB, display as MB by default
-                    numMaxFileSize.Value = _jobFilterSettings.MaxFileSize;
-                }
-                if (cmbFileSizeUnit != null)
-                {
-                    cmbFileSizeUnit.SelectedIndex = 1; // Default to MB since values are stored in MB
-                }
-                
-                if (chkIncludeHiddenFiles != null)
-                    chkIncludeHiddenFiles.Checked = _jobFilterSettings.IncludeHiddenFiles;
-                if (chkIncludeSystemFiles != null)
-                    chkIncludeSystemFiles.Checked = _jobFilterSettings.IncludeSystemFiles;
-                if (chkIncludeReadOnlyFiles != null)
-                    chkIncludeReadOnlyFiles.Checked = _jobFilterSettings.IncludeReadOnlyFiles;
-                
-                if (txtExcludePatterns != null)
-                    txtExcludePatterns.Text = _jobFilterSettings.ExcludePatterns ?? "";
-                
-                UpdateFilterControlStates();
-            }
-            else
-            {
-                // Set default values for new jobs
-                if (chkEnableFileFilter != null)
-                {
-                    chkEnableFileFilter.Checked = false;
-                }
-                
-                if (txtIncludeExtensions != null)
-                {
-                    txtIncludeExtensions.Text = "*.txt,*.doc,*.pdf";
-                }
-                
-                if (txtExcludeFiles != null)
-                {
-                    txtExcludeFiles.Text = "*.tmp,*.log";
-                }
-                
-                chkEnableFileFilter_CheckedChanged(chkEnableFileFilter, EventArgs.Empty);
-            }
-        }
+
 
         private void btnTestFilters_Click(object sender, EventArgs e)
         {
@@ -701,117 +597,7 @@ namespace syncer.ui
                 "Filter Testing Disabled", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        private bool ShouldIncludeFileForTimer(string filePath, FilterSettings filterSettings)
-        {
-            // If filters are disabled, include all files
-            if (filterSettings == null || !filterSettings.FiltersEnabled)
-                return true;
 
-            try
-            {
-                FileInfo fileInfo = new FileInfo(filePath);
-                string fileName = fileInfo.Name;
-                string fileExtension = fileInfo.Extension.ToLower();
-
-                // Check include extensions
-                if (!string.IsNullOrEmpty(filterSettings.IncludeFileExtensions))
-                {
-                    string[] includeExtensions = filterSettings.IncludeFileExtensions.Split(',');
-                    bool matchesInclude = false;
-
-                    foreach (string pattern in includeExtensions)
-                    {
-                        string cleanPattern = pattern.Trim().ToLower();
-                        if (string.IsNullOrEmpty(cleanPattern)) continue;
-
-                        // Handle patterns like *.txt, .txt, txt
-                        if (cleanPattern.StartsWith("*."))
-                        {
-                            string ext = cleanPattern.Substring(1); // Remove the *
-                            if (fileExtension == ext)
-                            {
-                                matchesInclude = true;
-                                break;
-                            }
-                        }
-                        else if (cleanPattern.StartsWith("."))
-                        {
-                            if (fileExtension == cleanPattern)
-                            {
-                                matchesInclude = true;
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            string ext = "." + cleanPattern;
-                            if (fileExtension == ext)
-                            {
-                                matchesInclude = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    // If we have include patterns but file doesn't match any, exclude it
-                    if (!matchesInclude)
-                        return false;
-                }
-
-                // Check exclude patterns
-                if (!string.IsNullOrEmpty(filterSettings.ExcludeFilePatterns))
-                {
-                    string[] excludePatterns = filterSettings.ExcludeFilePatterns.Split(',');
-
-                    foreach (string pattern in excludePatterns)
-                    {
-                        string cleanPattern = pattern.Trim().ToLower();
-                        if (string.IsNullOrEmpty(cleanPattern)) continue;
-
-                        // Handle patterns like *.tmp, .tmp, tmp, temp*
-                        if (cleanPattern.StartsWith("*."))
-                        {
-                            string ext = cleanPattern.Substring(1); // Remove the *
-                            if (fileExtension == ext)
-                                return false;
-                        }
-                        else if (cleanPattern.StartsWith("."))
-                        {
-                            if (fileExtension == cleanPattern)
-                                return false;
-                        }
-                        else if (cleanPattern.EndsWith("*"))
-                        {
-                            string prefix = cleanPattern.Substring(0, cleanPattern.Length - 1);
-                            if (fileName.ToLower().StartsWith(prefix))
-                                return false;
-                        }
-                        else if (cleanPattern.Contains("*"))
-                        {
-                            // Simple wildcard matching
-                            string regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(cleanPattern).Replace("\\*", ".*") + "$";
-                            if (System.Text.RegularExpressions.Regex.IsMatch(fileName.ToLower(), regexPattern))
-                                return false;
-                        }
-                        else
-                        {
-                            // Exact filename or extension match
-                            string ext = "." + cleanPattern;
-                            if (fileExtension == ext || fileName.ToLower() == cleanPattern)
-                                return false;
-                        }
-                    }
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                // Log error but don't exclude file due to error
-                System.Diagnostics.Debug.WriteLine("Filter error for file " + filePath + ": " + ex.Message);
-                return true;
-            }
-        }
 
         private bool ShouldIncludeSubfolders()
         {
@@ -1109,8 +895,7 @@ namespace syncer.ui
                     }
                 }
                 
-                // Load filter settings
-                LoadFilterSettings();
+
                 
                 // Load delete source after transfer setting
                 if (chkDeleteSourceAfterTransfer != null)
@@ -1118,8 +903,43 @@ namespace syncer.ui
                     chkDeleteSourceAfterTransfer.Checked = _currentJob.DeleteSourceAfterTransfer;
                 }
                 
+                // Load filter settings
+                LoadFilterSettings();
+                
                 // Update UI for the loaded transfer mode
                 UpdateUIForTransferMode();
+            }
+        }
+
+        private void LoadFilterSettings()
+        {
+            if (_currentJob != null && chkEnableFilters != null)
+            {
+                // Load filter settings from the current job
+                chkEnableFilters.Checked = _currentJob.EnableFilters;
+                
+                if (txtIncludeFileTypes != null)
+                    txtIncludeFileTypes.Text = _currentJob.IncludeFileTypes ?? "";
+                
+                if (txtExcludeFileTypes != null)
+                    txtExcludeFileTypes.Text = _currentJob.ExcludeFileTypes ?? "";
+                
+                // Update control visibility
+                UpdateFilterControlsVisibility();
+            }
+        }
+
+        private void SaveFilterSettings()
+        {
+            if (_currentJob != null)
+            {
+                // Save filter settings to the current job
+                _currentJob.EnableFilters = chkEnableFilters?.Checked ?? false;
+                _currentJob.IncludeFileTypes = txtIncludeFileTypes?.Text?.Trim() ?? "";
+                _currentJob.ExcludeFileTypes = txtExcludeFileTypes?.Text?.Trim() ?? "";
+                
+                // Add debug logging
+                ServiceLocator.LogService.LogInfo($"FILTER DEBUG: SaveFilterSettings - EnableFilters: {_currentJob.EnableFilters}, Include: '{_currentJob.IncludeFileTypes}', Exclude: '{_currentJob.ExcludeFileTypes}'");
             }
         }
 
@@ -1136,7 +956,7 @@ namespace syncer.ui
                 try
                 {
                     // Update filter settings from UI before saving
-                    UpdateFilterSettingsFromUI();
+                    
                     
                     SaveJob();
                     MessageBox.Show(_isEditMode ? "Job updated successfully!" : "Job created successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1233,11 +1053,13 @@ namespace syncer.ui
                 _currentJob.IntervalType = "Minutes";
             }
             
-            // Save filter settings to the job
-            _currentJob.FilterSettings = GetCurrentFilterSettings();
+
             
             // Save delete source after transfer setting
             _currentJob.DeleteSourceAfterTransfer = chkDeleteSourceAfterTransfer.Checked;
+            
+            // Save filter settings
+            SaveFilterSettings();
             
             // Set connection settings for source and destination based on transfer mode
             var currentConnection = _connectionService.GetConnectionSettings();
@@ -1295,21 +1117,103 @@ namespace syncer.ui
                         
                         if (_isEditMode && timerJobManager.GetRegisteredTimerJobs().Contains(_currentJob.Id))
                         {
-                            // Update existing timer job
+                            // Prepare filter parameters for update
+                            List<string> includeExtensions = new List<string>();
+                            List<string> excludeExtensions = new List<string>();
+                            
+                            if (_currentJob.EnableFilters)
+                            {
+                                // Parse include extensions
+                                if (!string.IsNullOrEmpty(_currentJob.IncludeFileTypes))
+                                {
+                                    string[] includeTypes = _currentJob.IncludeFileTypes.Split(',');
+                                    foreach (string type in includeTypes)
+                                    {
+                                        string cleanType = type.Trim().TrimStart('.');
+                                        if (!string.IsNullOrEmpty(cleanType))
+                                        {
+                                            includeExtensions.Add(cleanType.ToLowerInvariant());
+                                        }
+                                    }
+                                }
+                                
+                                // Parse exclude extensions
+                                if (!string.IsNullOrEmpty(_currentJob.ExcludeFileTypes))
+                                {
+                                    string[] excludeTypes = _currentJob.ExcludeFileTypes.Split(',');
+                                    foreach (string type in excludeTypes)
+                                    {
+                                        string cleanType = type.Trim().TrimStart('.');
+                                        if (!string.IsNullOrEmpty(cleanType))
+                                        {
+                                            excludeExtensions.Add(cleanType.ToLowerInvariant());
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            ServiceLocator.LogService.LogInfo(string.Format("UPDATING TIMER JOB WITH FILTERS: EnableFilters={0}, Include='{1}', Exclude='{2}'", 
+                                _currentJob.EnableFilters, 
+                                string.Join(",", includeExtensions.ToArray()), 
+                                string.Join(",", excludeExtensions.ToArray())));
+                            
+                            // Update existing timer job with filter support
                             bool updated = timerJobManager.UpdateTimerJob(_currentJob.Id, _currentJob.Name,
-                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), _currentJob.DeleteSourceAfterTransfer);
+                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), _currentJob.DeleteSourceAfterTransfer,
+                                _currentJob.EnableFilters, includeExtensions, excludeExtensions);
                             
                             if (updated)
                             {
                                 ServiceLocator.LogService.LogInfo(string.Format(
-                                    "Timer job '{0}' updated successfully", _currentJob.Name));
+                                    "Timer job '{0}' updated successfully with filters", _currentJob.Name));
                             }
                         }
                         else
                         {
-                            // Register new timer job
+                            // Prepare filter parameters
+                            List<string> includeExtensions = new List<string>();
+                            List<string> excludeExtensions = new List<string>();
+                            
+                            if (_currentJob.EnableFilters)
+                            {
+                                // Parse include extensions
+                                if (!string.IsNullOrEmpty(_currentJob.IncludeFileTypes))
+                                {
+                                    string[] includeTypes = _currentJob.IncludeFileTypes.Split(',');
+                                    foreach (string type in includeTypes)
+                                    {
+                                        string cleanType = type.Trim().TrimStart('.');
+                                        if (!string.IsNullOrEmpty(cleanType))
+                                        {
+                                            includeExtensions.Add(cleanType.ToLowerInvariant());
+                                        }
+                                    }
+                                }
+                                
+                                // Parse exclude extensions
+                                if (!string.IsNullOrEmpty(_currentJob.ExcludeFileTypes))
+                                {
+                                    string[] excludeTypes = _currentJob.ExcludeFileTypes.Split(',');
+                                    foreach (string type in excludeTypes)
+                                    {
+                                        string cleanType = type.Trim().TrimStart('.');
+                                        if (!string.IsNullOrEmpty(cleanType))
+                                        {
+                                            excludeExtensions.Add(cleanType.ToLowerInvariant());
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            ServiceLocator.LogService.LogInfo(string.Format("REGISTERING TIMER JOB WITH FILTERS: EnableFilters={0}, Include='{1}', Exclude='{2}'", 
+                                _currentJob.EnableFilters, 
+                                string.Join(",", includeExtensions.ToArray()), 
+                                string.Join(",", excludeExtensions.ToArray())));
+                            
+                            // Register new timer job with filter support
                             bool registered = timerJobManager.RegisterTimerJob(_currentJob.Id, _currentJob.Name,
-                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), _currentJob.DeleteSourceAfterTransfer);
+                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), _currentJob.DeleteSourceAfterTransfer,
+                                _currentJob.EnableFilters, includeExtensions, excludeExtensions);
                             
                             bool isTimerCurrentlyRunning = (_currentTransferMode == "Upload" && _isTimerRunning) ||
                                                          (_currentTransferMode == "Download" && _isDownloadTimerRunning);
@@ -1425,24 +1329,8 @@ namespace syncer.ui
                     // Get files based on subfolder inclusion checkbox
                     string[] allFiles = Directory.GetFiles(folderPath, "*", GetSearchOption());
                     
-                    // Apply filters to get realistic count
-                    List<string> filteredFiles = new List<string>();
-                    FilterSettings currentFilters = GetCurrentFilterSettings();
-                    
-                    if (currentFilters != null && currentFilters.FiltersEnabled)
-                    {
-                        foreach (string file in allFiles)
-                        {
-                            if (ShouldIncludeFileForTimer(file, currentFilters))
-                            {
-                                filteredFiles.Add(file);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        filteredFiles.AddRange(allFiles);
-                    }
+                    // Use all files (no filtering)
+                    List<string> filteredFiles = new List<string>(allFiles);
                     
                     _selectedFilesForTimer = filteredFiles.ToArray();
                     
@@ -1452,28 +1340,24 @@ namespace syncer.ui
                     // Update the label to show selected folder and file count
                     if (lblNoFilesSelected != null)
                     {
-                        string filterInfo = (currentFilters != null && currentFilters.FiltersEnabled) ? " (filtered)" : "";
                         string subfolderInfo = chkIncludeSubfolders.Checked ? " + subfolders" : " (top level only)";
                         
                         if (filteredFiles.Count == 0)
                         {
-                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (empty/no matching files - will monitor for new files)" + subfolderInfo + filterInfo;
+                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (empty/no matching files - will monitor for new files)" + subfolderInfo;
                         }
                         else if (filteredFiles.Count == 1)
                         {
-                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (1 file, including new files added later)" + subfolderInfo + filterInfo;
+                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (1 file, including new files added later)" + subfolderInfo;
                         }
                         else
                         {
-                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (" + filteredFiles.Count + " files, including new files added later)" + subfolderInfo + filterInfo;
+                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (" + filteredFiles.Count + " files, including new files added later)" + subfolderInfo;
                         }
                     }
                     
-                    string filterMessage = (currentFilters != null && currentFilters.FiltersEnabled) ? 
-                        string.Format(" ({0} files after applying filters)", filteredFiles.Count) : "";
-                    
-                    ServiceLocator.LogService.LogInfo(string.Format("Selected local folder '{0}' with {1} files{2} for timer upload (will also include newly added files)", 
-                        folderPath, allFiles.Length, filterMessage));
+                    ServiceLocator.LogService.LogInfo(string.Format("Selected local folder '{0}' with {1} files for timer upload (will also include newly added files)", 
+                        folderPath, allFiles.Length));
                     
                     // Ask for upload destination for timer uploads
                     AskForTimerUploadDestination();
@@ -1859,8 +1743,7 @@ namespace syncer.ui
 
             try
             {
-                // Update filter settings from UI before starting timer
-                UpdateFilterSettingsFromUI();
+
                 
                 // Calculate interval in milliseconds
                 double intervalMs = CalculateTimerInterval();
@@ -2194,34 +2077,123 @@ namespace syncer.ui
         {
             try
             {
+                ServiceLocator.LogService.LogInfo("=== FILTER DEBUG: PerformAutomaticUpload started ===");
+                
+                // Log current job filter settings
+                if (_currentJob != null)
+                {
+                    ServiceLocator.LogService.LogInfo($"FILTER DEBUG: Current job exists - EnableFilters: {_currentJob.EnableFilters}");
+                    ServiceLocator.LogService.LogInfo($"FILTER DEBUG: Current job - Include: '{_currentJob.IncludeFileTypes}', Exclude: '{_currentJob.ExcludeFileTypes}'");
+                }
+                else
+                {
+                    ServiceLocator.LogService.LogInfo("FILTER DEBUG: Current job is NULL!");
+                }
+                
                 if (string.IsNullOrEmpty(_selectedFolderForTimer))
                 {
                     ServiceLocator.LogService.LogWarning("No folder selected for automatic upload");
                     return;
                 }
                 
-                // Get files based on subfolder inclusion checkbox setting
+                // Get all files based on subfolder inclusion checkbox setting
                 string[] allFiles = Directory.GetFiles(_selectedFolderForTimer, "*", GetSearchOption());
                 
-                // Apply filters if they are configured
-                List<string> filteredFiles = new List<string>();
-                FilterSettings currentFilters = GetCurrentFilterSettings();
-                
-                if (currentFilters != null && currentFilters.FiltersEnabled)
+                // Apply file filtering if enabled
+                List<string> filteredFiles;
+                if (_currentJob != null && _currentJob.EnableFilters)
                 {
+                    ServiceLocator.LogService.LogInfo($"FILTER DEBUG: Starting file filtering - EnableFilters: {_currentJob.EnableFilters}");
+                    ServiceLocator.LogService.LogInfo($"FILTER DEBUG: Include types: '{_currentJob.IncludeFileTypes}', Exclude types: '{_currentJob.ExcludeFileTypes}'");
+                    ServiceLocator.LogService.LogInfo($"FILTER DEBUG: Total files found: {allFiles.Length}");
+                    
+                    filteredFiles = new List<string>();
+                    ServiceLocator.LogService.LogInfo("Applying file filters for automatic upload");
+                    
+                    // Parse include and exclude extensions
+                    List<string> includeExtensions = new List<string>();
+                    List<string> excludeExtensions = new List<string>();
+                    
+                    ServiceLocator.LogService.LogInfo($"FILTER DEBUG AUTO-UPLOAD: Include types: '{_currentJob.IncludeFileTypes}', Exclude types: '{_currentJob.ExcludeFileTypes}'");
+                    
+                    if (!string.IsNullOrEmpty(_currentJob.IncludeFileTypes))
+                    {
+                        foreach (string ext in _currentJob.IncludeFileTypes.Split(','))
+                        {
+                            string cleanExt = ext.Trim();
+                            if (!string.IsNullOrEmpty(cleanExt))
+                            {
+                                if (!cleanExt.StartsWith("."))
+                                    cleanExt = "." + cleanExt;
+                                includeExtensions.Add(cleanExt.ToLowerInvariant());
+                                ServiceLocator.LogService.LogInfo($"FILTER DEBUG AUTO-UPLOAD: Added include extension: '{cleanExt.ToLowerInvariant()}'");
+                            }
+                        }
+                    }
+                    
+                    if (!string.IsNullOrEmpty(_currentJob.ExcludeFileTypes))
+                    {
+                        foreach (string ext in _currentJob.ExcludeFileTypes.Split(','))
+                        {
+                            string cleanExt = ext.Trim();
+                            if (!string.IsNullOrEmpty(cleanExt))
+                            {
+                                if (!cleanExt.StartsWith("."))
+                                    cleanExt = "." + cleanExt;
+                                excludeExtensions.Add(cleanExt.ToLowerInvariant());
+                                ServiceLocator.LogService.LogInfo($"FILTER DEBUG AUTO-UPLOAD: Added exclude extension: '{cleanExt.ToLowerInvariant()}'");
+                            }
+                        }
+                    }
+                    
+                    // Filter files
                     foreach (string file in allFiles)
                     {
-                        // Use the same filtering logic as the service
-                        if (ShouldIncludeFileForTimer(file, currentFilters))
+                        string fileExt = Path.GetExtension(file).ToLowerInvariant();
+                        string fileName = Path.GetFileName(file);
+                        bool shouldInclude = false;
+                        
+                        ServiceLocator.LogService.LogInfo($"FILTER DEBUG AUTO-UPLOAD: Checking file '{fileName}' with extension '{fileExt}'");
+                        
+                        // If no include filters specified, include all by default
+                        if (includeExtensions.Count == 0)
+                        {
+                            shouldInclude = true;
+                            ServiceLocator.LogService.LogInfo($"FILTER DEBUG AUTO-UPLOAD: No include filters - including by default");
+                        }
+                        else
+                        {
+                            // Check if file matches include filters
+                            shouldInclude = includeExtensions.Contains(fileExt);
+                            ServiceLocator.LogService.LogInfo($"FILTER DEBUG AUTO-UPLOAD: Include check result: {shouldInclude}");
+                        }
+                        
+                        // Apply exclude filters (exclude takes precedence)
+                        if (shouldInclude && excludeExtensions.Count > 0)
+                        {
+                            if (excludeExtensions.Contains(fileExt))
+                            {
+                                shouldInclude = false;
+                                ServiceLocator.LogService.LogInfo($"FILTER DEBUG AUTO-UPLOAD: File excluded by exclude filter");
+                            }
+                        }
+                        
+                        ServiceLocator.LogService.LogInfo($"FILTER DEBUG AUTO-UPLOAD: Final decision for '{fileName}': {(shouldInclude ? "INCLUDE" : "EXCLUDE")}");
+                        
+                        if (shouldInclude)
                         {
                             filteredFiles.Add(file);
                         }
                     }
+                    
+                    ServiceLocator.LogService.LogInfo(string.Format("Filter results: {0} files out of {1} total files match the filter criteria", 
+                        filteredFiles.Count, allFiles.Length));
                 }
                 else
                 {
-                    // No filters, include all files
-                    filteredFiles.AddRange(allFiles);
+                    // No filtering enabled - include all files
+                    filteredFiles = new List<string>(allFiles);
+                    ServiceLocator.LogService.LogInfo("No file filtering applied - including all files");
                 }
                 
                 string[] currentFiles = filteredFiles.ToArray();
@@ -2235,7 +2207,7 @@ namespace syncer.ui
                 ServiceLocator.LogService.LogInfo(string.Format("Starting automatic upload of folder '{0}' with {1} files (including any newly added)", 
                     _selectedFolderForTimer, currentFiles.Length));
                 
-                // Upload all files including newly added ones
+                // Upload all filtered files including newly added ones
                 PerformFolderUpload(_selectedFolderForTimer, currentFiles, _timerUploadDestination);
                 
                 // Update last upload time
@@ -2388,10 +2360,97 @@ namespace syncer.ui
                     return;
                 }
                 
-                ServiceLocator.LogService.LogInfo($"Found {remoteFiles.Count} files in remote folder for download");
+                // Apply file filtering if enabled
+                List<string> filteredFiles;
+                if (_currentJob != null && _currentJob.EnableFilters)
+                {
+                    filteredFiles = new List<string>();
+                    ServiceLocator.LogService.LogInfo("Applying file filters for automatic download");
+                    
+                    // Parse include and exclude extensions
+                    List<string> includeExtensions = new List<string>();
+                    List<string> excludeExtensions = new List<string>();
+                    
+                    if (!string.IsNullOrEmpty(_currentJob.IncludeFileTypes))
+                    {
+                        foreach (string ext in _currentJob.IncludeFileTypes.Split(','))
+                        {
+                            string cleanExt = ext.Trim();
+                            if (!string.IsNullOrEmpty(cleanExt))
+                            {
+                                if (!cleanExt.StartsWith("."))
+                                    cleanExt = "." + cleanExt;
+                                includeExtensions.Add(cleanExt.ToLowerInvariant());
+                            }
+                        }
+                    }
+                    
+                    if (!string.IsNullOrEmpty(_currentJob.ExcludeFileTypes))
+                    {
+                        foreach (string ext in _currentJob.ExcludeFileTypes.Split(','))
+                        {
+                            string cleanExt = ext.Trim();
+                            if (!string.IsNullOrEmpty(cleanExt))
+                            {
+                                if (!cleanExt.StartsWith("."))
+                                    cleanExt = "." + cleanExt;
+                                excludeExtensions.Add(cleanExt.ToLowerInvariant());
+                            }
+                        }
+                    }
+                    
+                    // Filter files
+                    foreach (string file in remoteFiles)
+                    {
+                        string fileExt = Path.GetExtension(file).ToLowerInvariant();
+                        bool shouldInclude = false;
+                        
+                        // If no include filters specified, include all by default
+                        if (includeExtensions.Count == 0)
+                        {
+                            shouldInclude = true;
+                        }
+                        else
+                        {
+                            // Check if file matches include filters
+                            shouldInclude = includeExtensions.Contains(fileExt);
+                        }
+                        
+                        // Apply exclude filters (exclude takes precedence)
+                        if (shouldInclude && excludeExtensions.Count > 0)
+                        {
+                            if (excludeExtensions.Contains(fileExt))
+                            {
+                                shouldInclude = false;
+                            }
+                        }
+                        
+                        if (shouldInclude)
+                        {
+                            filteredFiles.Add(file);
+                        }
+                    }
+                    
+                    ServiceLocator.LogService.LogInfo(string.Format("Filter results: {0} files out of {1} total files match the filter criteria", 
+                        filteredFiles.Count, remoteFiles.Count));
+                }
+                else
+                {
+                    // No filtering enabled - include all files
+                    filteredFiles = new List<string>(remoteFiles);
+                    ServiceLocator.LogService.LogInfo("No file filtering applied - including all files");
+                }
                 
-                // Download all files
-                PerformFolderDownload(remoteFiles.ToArray(), _selectedRemoteFolderForTimer, _timerDownloadDestination);
+                if (filteredFiles.Count == 0)
+                {
+                    ServiceLocator.LogService.LogInfo("No files found (after filtering) in remote folder for automatic download - will retry on next timer interval");
+                    return;
+                }
+                
+                ServiceLocator.LogService.LogInfo($"Found {filteredFiles.Count} filtered files in remote folder for download");
+                
+                // Download all filtered files
+                PerformFolderDownload(filteredFiles.ToArray(), _selectedRemoteFolderForTimer, _timerDownloadDestination);
             }
             catch (Exception ex)
             {
@@ -2455,8 +2514,7 @@ namespace syncer.ui
             
             try
             {
-                // Update filter settings from UI before saving
-                UpdateFilterSettingsFromUI();
+
                 
                 // Save the job using traditional method
                 SaveJob();
@@ -2548,12 +2606,10 @@ namespace syncer.ui
                 RetryDelaySeconds = 5
             };
             
-            // Get current filter settings from the UI controls
-            job.FilterSettings = GetCurrentFilterSettings();
+
+        
             
-            // Save filter settings to member variable for consistency
-            _jobFilterSettings = job.FilterSettings;
-            
+
             return job;
         }
 
@@ -2620,11 +2676,7 @@ namespace syncer.ui
                         numTimerInterval.Value = Math.Max(1, Math.Min((decimal)numTimerInterval.Maximum, minutes));
                     }
                     
-                    // Apply filter settings if available
-                    if (config.JobSettings.FilterSettings != null)
-                    {
-                        _jobFilterSettings = config.JobSettings.FilterSettings;
-                    }
+
                 }
                 
                 // Apply connection settings

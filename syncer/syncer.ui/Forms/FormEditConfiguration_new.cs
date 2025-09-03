@@ -61,14 +61,6 @@ namespace syncer.ui.Forms
                 numPort.Value = Math.Max(1, conn.Port);
                 chkUseSSL.Checked = conn.EnableSsl;
             }
-
-            // Filter settings
-            if (_configuration.JobSettings?.FilterSettings != null)
-            {
-                var filters = _configuration.JobSettings.FilterSettings;
-                txtExcludePatterns.Text = filters.ExcludePatterns ?? "";
-                chkIncludeSubfolders.Checked = _configuration.JobSettings.IncludeSubFolders;
-            }
         }
 
         private void SaveConfigurationData()

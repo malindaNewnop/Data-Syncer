@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Timers;
 using System.Collections.Generic;
 using System.IO;
@@ -19,6 +19,7 @@ namespace syncer.ui.Services
         private IConnectionService _connectionService;
         private ILogService _logService;
         
+        
         /// <summary>
         /// Represents a timer job with its settings and state
         /// </summary>
@@ -38,6 +39,12 @@ namespace syncer.ui.Services
             public DateTime? UploadStartTime { get; set; } // Track upload duration
             public bool IncludeSubfolders { get; set; } // Whether to include subfolders in file enumeration
             public bool DeleteSourceAfterTransfer { get; set; } // Whether to delete source files after successful transfer
+            
+            // Filter settings for file filtering
+            public bool EnableFilters { get; set; } // Whether file filtering is enabled
+            public List<string> IncludeExtensions { get; set; } // Extensions to include (takes priority)
+            public List<string> ExcludeExtensions { get; set; } // Extensions to exclude
+            
         }
         
         public TimerJobManager()
@@ -45,6 +52,7 @@ namespace syncer.ui.Services
             _timerJobs = new Dictionary<long, TimerJobInfo>();
             _connectionService = ServiceLocator.ConnectionService;
             _logService = ServiceLocator.LogService;
+             
         }
         
         public bool RegisterTimerJob(long jobId, string folderPath, string remotePath, double intervalMs)
@@ -64,8 +72,16 @@ namespace syncer.ui.Services
         
         public bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer)
         {
+            return RegisterTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, includeSubfolders, deleteSourceAfterTransfer, false, null, null);
+        }
+
+        public bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer, bool enableFilters, List<string> includeExtensions, List<string> excludeExtensions)
+        {
             try
             {
+                // Debug logging
+                _logService.LogInfo(string.Format("=== REGISTERING TIMER JOB {0} ===", jobId));
+                
                 // Check if the job already exists
                 if (_timerJobs.ContainsKey(jobId))
                 {
@@ -77,6 +93,16 @@ namespace syncer.ui.Services
                     job.IntervalMs = intervalMs;
                     job.IncludeSubfolders = includeSubfolders; // Update subfolder setting
                     job.DeleteSourceAfterTransfer = deleteSourceAfterTransfer; // Update delete setting
+                    
+                    // Update filter settings
+                    job.EnableFilters = enableFilters;
+                    job.IncludeExtensions = includeExtensions != null ? new List<string>(includeExtensions) : new List<string>();
+                    job.ExcludeExtensions = excludeExtensions != null ? new List<string>(excludeExtensions) : new List<string>();
+                    
+                    _logService.LogInfo(string.Format("Updated existing timer job {0} with FilterSettings - EnableFilters: {1}, Include: {2}, Exclude: {3}", 
+                        jobId, enableFilters, 
+                        includeExtensions != null ? string.Join(",", includeExtensions.ToArray()) : "none",
+                        excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"));
                     
                     // Initialize new properties if they don't exist
                     if (!job.IsUploadInProgress) job.IsUploadInProgress = false;
@@ -135,11 +161,18 @@ namespace syncer.ui.Services
                     IsUploadInProgress = false,
                     UploadStartTime = null,
                     IncludeSubfolders = includeSubfolders,
-                    DeleteSourceAfterTransfer = deleteSourceAfterTransfer
+                    DeleteSourceAfterTransfer = deleteSourceAfterTransfer,
+                    EnableFilters = enableFilters,
+                    IncludeExtensions = includeExtensions != null ? new List<string>(includeExtensions) : new List<string>(),
+                    ExcludeExtensions = excludeExtensions != null ? new List<string>(excludeExtensions) : new List<string>(),
                 };
                 
                 _timerJobs.Add(jobId, newJob);
                 
+                _logService.LogInfo(string.Format("Created NEW timer job {0} with FilterSettings - EnableFilters: {1}, Include: {2}, Exclude: {3}", 
+                    jobId, enableFilters, 
+                    includeExtensions != null ? string.Join(",", includeExtensions.ToArray()) : "none",
+                    excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"));
                 _logService.LogInfo(string.Format("Registered timer job {0} ({1}) for folder {2}", jobId, jobName, folderPath));
                 return true;
             }
@@ -352,8 +385,16 @@ namespace syncer.ui.Services
         
         public bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer)
         {
+            return UpdateTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, includeSubfolders, deleteSourceAfterTransfer, false, null, null);
+        }
+
+        public bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer, bool enableFilters, List<string> includeExtensions, List<string> excludeExtensions)
+        {
             try
             {
+                // Debug logging
+                _logService.LogInfo(string.Format("=== UPDATING TIMER JOB {0} ===", jobId));
+                
                 if (!_timerJobs.ContainsKey(jobId))
                 {
                     _logService.LogError(string.Format("Cannot update timer job {0}: Job not found", jobId));
@@ -376,6 +417,16 @@ namespace syncer.ui.Services
                 job.IntervalMs = intervalMs;
                 job.IncludeSubfolders = includeSubfolders;
                 job.DeleteSourceAfterTransfer = deleteSourceAfterTransfer;
+                
+                // Update filter settings
+                job.EnableFilters = enableFilters;
+                job.IncludeExtensions = includeExtensions != null ? new List<string>(includeExtensions) : new List<string>();
+                job.ExcludeExtensions = excludeExtensions != null ? new List<string>(excludeExtensions) : new List<string>();
+                
+                _logService.LogInfo(string.Format("Updated timer job {0} with filters - EnableFilters: {1}, Include: {2}, Exclude: {3}", 
+                    jobId, enableFilters, 
+                    includeExtensions != null ? string.Join(",", includeExtensions.ToArray()) : "none",
+                    excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"));
                 
                 // Update timer interval if the timer exists
                 if (job.Timer != null)
@@ -425,7 +476,76 @@ namespace syncer.ui.Services
                 
                 // Get files based on subfolder inclusion setting
                 SearchOption searchOption = job.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-                string[] currentFiles = Directory.GetFiles(job.FolderPath, "*", searchOption);
+                string[] allFiles = Directory.GetFiles(job.FolderPath, "*", searchOption);
+                
+                // Apply filtering if enabled
+                string[] currentFiles;
+                if (job.EnableFilters && (job.IncludeExtensions.Count > 0 || job.ExcludeExtensions.Count > 0))
+                {
+                    _logService.LogInfo(string.Format("TIMER JOB FILTER DEBUG: Applying filters - Include: {0}, Exclude: {1}", 
+                        string.Join(",", job.IncludeExtensions.ToArray()), 
+                        string.Join(",", job.ExcludeExtensions.ToArray())));
+                    
+                    var filteredFiles = new List<string>();
+                    
+                    foreach (string file in allFiles)
+                    {
+                        string fileName = Path.GetFileName(file);
+                        string fileExt = Path.GetExtension(file);
+                        if (!string.IsNullOrEmpty(fileExt))
+                        {
+                            fileExt = fileExt.TrimStart('.').ToLowerInvariant();
+                        }
+                        
+                        bool shouldInclude = true;
+                        
+                        // Apply include filter (if any)
+                        if (job.IncludeExtensions.Count > 0)
+                        {
+                            shouldInclude = false; // Default to exclude if include list exists
+                            foreach (string includeExt in job.IncludeExtensions)
+                            {
+                                if (string.Equals(fileExt, includeExt.TrimStart('.').ToLowerInvariant(), StringComparison.OrdinalIgnoreCase))
+                                {
+                                    shouldInclude = true;
+                                    break;
+                                }
+                            }
+                            _logService.LogInfo(string.Format("TIMER FILTER DEBUG: File '{0}' include check: {1}", fileName, shouldInclude));
+                        }
+                        
+                        // Apply exclude filter (only if not already excluded by include filter)
+                        if (shouldInclude && job.ExcludeExtensions.Count > 0)
+                        {
+                            foreach (string excludeExt in job.ExcludeExtensions)
+                            {
+                                if (string.Equals(fileExt, excludeExt.TrimStart('.').ToLowerInvariant(), StringComparison.OrdinalIgnoreCase))
+                                {
+                                    shouldInclude = false;
+                                    break;
+                                }
+                            }
+                            _logService.LogInfo(string.Format("TIMER FILTER DEBUG: File '{0}' exclude check: {1}", fileName, shouldInclude));
+                        }
+                        
+                        _logService.LogInfo(string.Format("TIMER FILTER DEBUG: Final decision for '{0}': {1}", fileName, shouldInclude ? "INCLUDE" : "EXCLUDE"));
+                        
+                        if (shouldInclude)
+                        {
+                            filteredFiles.Add(file);
+                        }
+                    }
+                    
+                    currentFiles = filteredFiles.ToArray();
+                    _logService.LogInfo(string.Format("TIMER JOB FILTER RESULT: {0} files out of {1} total files match the filter criteria", 
+                        currentFiles.Length, allFiles.Length));
+                }
+                else
+                {
+                    // No filtering enabled - use all files
+                    currentFiles = allFiles;
+                    _logService.LogInfo("TIMER JOB: No file filtering applied - including all files");
+                }
                 
                 // Also ensure empty directories are created on remote (only if including subfolders)
                 string[] allDirectories = job.IncludeSubfolders ? 

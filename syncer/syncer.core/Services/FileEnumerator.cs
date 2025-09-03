@@ -6,6 +6,11 @@ namespace syncer.core
 {
     public class FileEnumerator : IFileEnumerator
     {
+        public List<string> EnumerateFiles(string rootPath, bool includeSubfolders)
+        {
+            return EnumerateFiles(rootPath, null, includeSubfolders);
+        }
+
         public List<string> EnumerateFiles(string rootPath, FilterSettings filters, bool includeSubfolders)
         {
             var results = new List<string>();
@@ -17,30 +22,6 @@ namespace syncer.core
                     return results;
                 }
 
-                // Debug logging
-                if (filters != null && filters.FileExtensions != null && filters.FileExtensions.Count > 0)
-                {
-                    Console.WriteLine("FileEnumerator: Filtering enabled with " + filters.FileExtensions.Count + " extensions");
-                    foreach (var ext in filters.FileExtensions)
-                    {
-                        Console.WriteLine("FileEnumerator: Allowed extension: " + ext);
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("FileEnumerator: No file extension filters active");
-                }
-
-                // If the filter settings have include or exclude patterns, use the pattern-based enumeration
-                if (filters != null && (!string.IsNullOrEmpty(filters.IncludePattern) || !string.IsNullOrEmpty(filters.ExcludePattern)))
-                {
-                    return EnumerateFilesWithPattern(
-                        rootPath, 
-                        filters.IncludePattern, 
-                        filters.ExcludePattern, 
-                        includeSubfolders);
-                }
-
                 var searchOption = includeSubfolders 
                     ? SearchOption.AllDirectories 
                     : SearchOption.TopDirectoryOnly;
@@ -48,23 +29,28 @@ namespace syncer.core
                 string[] files = Directory.GetFiles(rootPath, "*", searchOption);
                 Console.WriteLine("FileEnumerator: Found " + files.Length + " total files before filtering");
 
-                foreach (string filePath in files)
+                // Convert to list for easier processing
+                var allFiles = new List<string>(files);
+
+                // Apply filters if provided
+                if (filters != null)
                 {
-                    try
+                    results = ApplyFileFilters(allFiles, filters);
+                    Console.WriteLine("FileEnumerator: Applied filters, {0} files remain", results.Count);
+                }
+                else
+                {
+                    // No filters, include all files
+                    foreach (string filePath in files)
                     {
-                        bool shouldInclude = ShouldIncludeFile(filePath, filters);
-                        if (shouldInclude)
+                        try
                         {
                             results.Add(filePath);
                         }
-                        else
+                        catch (Exception)
                         {
-                            Console.WriteLine("FileEnumerator: Excluded file: " + Path.GetFileName(filePath));
+                            // Log individual file errors but continue processing
                         }
-                    }
-                    catch (Exception)
-                    {
-                        // Log individual file errors but continue processing
                     }
                 }
                 
@@ -78,7 +64,7 @@ namespace syncer.core
             return results;
         }
 
-        public List<string> EnumerateDirectories(string rootPath, FilterSettings filters, bool includeSubfolders)
+        public List<string> EnumerateDirectories(string rootPath, bool includeSubfolders)
         {
             var results = new List<string>();
             
@@ -99,10 +85,7 @@ namespace syncer.core
                 {
                     try
                     {
-                        if (ShouldIncludeDirectory(dirPath, filters))
-                        {
-                            results.Add(dirPath);
-                        }
+                        results.Add(dirPath);
                     }
                     catch (Exception)
                     {
@@ -118,247 +101,72 @@ namespace syncer.core
             return results;
         }
 
-        /// <summary>
-        /// Enumerates files with more robust pattern matching support
-        /// </summary>
-        /// <param name="rootPath">Root directory to start search from</param>
-        /// <param name="includePattern">Pattern to include files (semicolon-separated)</param>
-        /// <param name="excludePattern">Pattern to exclude files (semicolon-separated)</param>
-        /// <param name="includeSubfolders">Whether to include subdirectories in search</param>
-        /// <returns>List of file paths matching the criteria</returns>
-        public List<string> EnumerateFilesWithPattern(string rootPath, string includePattern, string excludePattern, bool includeSubfolders)
+        private List<string> ApplyFileFilters(List<string> files, FilterSettings filters)
         {
-            List<string> files = new List<string>();
-            
-            try
-            {
-                if (File.Exists(rootPath))
-                {
-                    // It's a single file - check if it matches our patterns
-                    if (ShouldIncludeFileByPattern(Path.GetFileName(rootPath), includePattern, excludePattern))
-                        files.Add(rootPath);
-                }
-                else if (Directory.Exists(rootPath))
-                {
-                    // Process all files in current directory
-                    foreach (string file in Directory.GetFiles(rootPath))
-                    {
-                        if (ShouldIncludeFileByPattern(Path.GetFileName(file), includePattern, excludePattern))
-                            files.Add(file);
-                    }
-                    
-                    // Recursively process subdirectories if requested
-                    if (includeSubfolders)
-                    {
-                        foreach (string subDir in Directory.GetDirectories(rootPath))
-                        {
-                            files.AddRange(EnumerateFilesWithPattern(subDir, includePattern, excludePattern, true));
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Log error but continue with partial results
-                Console.WriteLine($"Error enumerating files in {rootPath}: {ex.Message}");
-            }
-            
-            return files;
-        }
+            if (files == null || files.Count == 0 || filters == null)
+                return files ?? new List<string>();
 
-        /// <summary>
-        /// Determines if a file should be included based on pattern matching
-        /// </summary>
-        private bool ShouldIncludeFileByPattern(string fileName, string includePattern, string excludePattern)
-        {
-            // First check exclude pattern - if file matches an exclude pattern, skip it
-            if (!string.IsNullOrEmpty(excludePattern))
+            var result = new List<string>();
+
+            // Apply include/exclude extensions (Include takes precedence)
+            if (filters.IncludeExtensions != null && filters.IncludeExtensions.Count > 0)
             {
-                foreach (string pattern in excludePattern.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                // Convert include extensions to lowercase and normalize
+                var normalizedIncludes = new List<string>();
+                foreach (var ext in filters.IncludeExtensions)
                 {
-                    if (IsWildcardMatch(fileName, pattern.Trim()))
-                        return false;
+                    if (!string.IsNullOrEmpty(ext))
+                    {
+                        normalizedIncludes.Add(ext.TrimStart('.').ToLowerInvariant());
+                    }
                 }
-            }
-            
-            // If include pattern is empty or null, include all files that weren't excluded
-            if (string.IsNullOrEmpty(includePattern))
-                return true;
+
+                // Filter files to include only specified extensions
+                foreach (string file in files)
+                {
+                    var fileExt = Path.GetExtension(file);
+                    if (!string.IsNullOrEmpty(fileExt) && normalizedIncludes.Contains(fileExt.TrimStart('.').ToLowerInvariant()))
+                    {
+                        result.Add(file);
+                    }
+                }
                 
-            // Check if file matches any include pattern
-            foreach (string pattern in includePattern.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                if (IsWildcardMatch(fileName, pattern.Trim()))
-                    return true;
+                Console.WriteLine("Applied include filter: {0} files match included extensions [{1}]", 
+                    result.Count, string.Join(", ", normalizedIncludes.ToArray()));
             }
-            
-            return false;
-        }
+            // If no include filter, apply exclude filter
+            else if (filters.ExcludeExtensions != null && filters.ExcludeExtensions.Count > 0)
+            {
+                // Convert exclude extensions to lowercase and normalize
+                var normalizedExcludes = new List<string>();
+                foreach (var ext in filters.ExcludeExtensions)
+                {
+                    if (!string.IsNullOrEmpty(ext))
+                    {
+                        normalizedExcludes.Add(ext.TrimStart('.').ToLowerInvariant());
+                    }
+                }
 
-        /// <summary>
-        /// Improved wildcard matching for file patterns
-        /// </summary>
-        private bool IsWildcardMatch(string text, string pattern)
-        {
-            // Simple wildcard matching for *, ? style patterns
-            if (pattern == "*") return true;
-            
-            if (pattern.StartsWith("*") && pattern.EndsWith("*") && pattern.Length > 2)
-            {
-                string middle = pattern.Substring(1, pattern.Length - 2);
-                return text.IndexOf(middle, StringComparison.OrdinalIgnoreCase) >= 0;
-            }
-            else if (pattern.StartsWith("*") && pattern.Length > 1)
-            {
-                string end = pattern.Substring(1);
-                return text.EndsWith(end, StringComparison.OrdinalIgnoreCase);
-            }
-            else if (pattern.EndsWith("*") && pattern.Length > 1)
-            {
-                string start = pattern.Substring(0, pattern.Length - 1);
-                return text.StartsWith(start, StringComparison.OrdinalIgnoreCase);
-            }
-            else if (pattern.Contains("?"))
-            {
-                // Process ? wildcards (single character)
-                return MatchWithQuestionMark(text, pattern);
+                // Filter files to exclude specified extensions
+                foreach (string file in files)
+                {
+                    var fileExt = Path.GetExtension(file);
+                    if (string.IsNullOrEmpty(fileExt) || !normalizedExcludes.Contains(fileExt.TrimStart('.').ToLowerInvariant()))
+                    {
+                        result.Add(file);
+                    }
+                }
+                
+                Console.WriteLine("Applied exclude filter: {0} files remain after excluding extensions [{1}]", 
+                    result.Count, string.Join(", ", normalizedExcludes.ToArray()));
             }
             else
             {
-                return string.Equals(text, pattern, StringComparison.OrdinalIgnoreCase);
+                // No filtering, return all files
+                result.AddRange(files);
             }
-        }
 
-        /// <summary>
-        /// Handles pattern matching with question mark wildcards
-        /// </summary>
-        private bool MatchWithQuestionMark(string text, string pattern)
-        {
-            if (text.Length != pattern.Length)
-                return false;
-                
-            for (int i = 0; i < text.Length; i++)
-            {
-                if (pattern[i] != '?' && !char.Equals(char.ToUpperInvariant(text[i]), char.ToUpperInvariant(pattern[i])))
-                    return false;
-            }
-            
-            return true;
-        }
-
-        private bool ShouldIncludeFile(string filePath, FilterSettings filters)
-        {
-            if (filters == null) return true;
-
-            try
-            {
-                var fileInfo = new FileInfo(filePath);
-
-                // Check file attributes
-                if (!filters.IncludeHidden && HasAttribute(fileInfo, FileAttributes.Hidden))
-                    return false;
-                
-                if (!filters.IncludeSystem && HasAttribute(fileInfo, FileAttributes.System))
-                    return false;
-                
-                if (!filters.IncludeReadOnly && HasAttribute(fileInfo, FileAttributes.ReadOnly))
-                    return false;
-
-                // Check file size
-                if (filters.MinSizeBytes >= 0 && fileInfo.Length < filters.MinSizeBytes)
-                    return false;
-                
-                if (filters.MaxSizeBytes >= 0 && fileInfo.Length > filters.MaxSizeBytes)
-                    return false;
-
-                // Check modification date
-                if (filters.ModifiedAfter.HasValue && fileInfo.LastWriteTime < filters.ModifiedAfter.Value)
-                    return false;
-                
-                if (filters.ModifiedBefore.HasValue && fileInfo.LastWriteTime > filters.ModifiedBefore.Value)
-                    return false;
-
-                // Check file extensions
-                if (filters.FileExtensions != null && filters.FileExtensions.Count > 0)
-                {
-                    string extension = fileInfo.Extension;
-                    bool matchesExtension = false;
-                    
-                    foreach (string allowedExt in filters.FileExtensions)
-                    {
-                        if (string.Equals(extension, allowedExt, StringComparison.OrdinalIgnoreCase))
-                        {
-                            matchesExtension = true;
-                            break;
-                        }
-                    }
-                    
-                    if (!matchesExtension) return false;
-                }
-
-                // Check exclude patterns
-                if (filters.ExcludePatterns != null && filters.ExcludePatterns.Count > 0)
-                {
-                    string fileName = fileInfo.Name;
-                    string fullPath = fileInfo.FullName;
-                    
-                    foreach (string pattern in filters.ExcludePatterns)
-                    {
-                        if (string.IsNullOrEmpty(pattern)) continue;
-                        
-                        if (MatchesPattern(fileName, pattern) || MatchesPattern(fullPath, pattern))
-                        {
-                            return false;
-                        }
-                    }
-                }
-
-                return true;
-            }
-            catch
-            {
-                return false; // Exclude files that can't be analyzed
-            }
-        }
-
-        private bool ShouldIncludeDirectory(string dirPath, FilterSettings filters)
-        {
-            if (filters == null) return true;
-
-            try
-            {
-                var dirInfo = new DirectoryInfo(dirPath);
-
-                // Check directory attributes
-                if (!filters.IncludeHidden && HasAttribute(dirInfo, FileAttributes.Hidden))
-                    return false;
-                
-                if (!filters.IncludeSystem && HasAttribute(dirInfo, FileAttributes.System))
-                    return false;
-
-                // Check exclude patterns
-                if (filters.ExcludePatterns != null && filters.ExcludePatterns.Count > 0)
-                {
-                    string dirName = dirInfo.Name;
-                    string fullPath = dirInfo.FullName;
-                    
-                    foreach (string pattern in filters.ExcludePatterns)
-                    {
-                        if (string.IsNullOrEmpty(pattern)) continue;
-                        
-                        if (MatchesPattern(dirName, pattern) || MatchesPattern(fullPath, pattern))
-                        {
-                            return false;
-                        }
-                    }
-                }
-
-                return true;
-            }
-            catch
-            {
-                return false; // Exclude directories that can't be analyzed
-            }
+            return result;
         }
 
         private static bool HasAttribute(FileSystemInfo info, FileAttributes attribute)

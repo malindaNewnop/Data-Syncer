@@ -17,7 +17,6 @@ namespace syncer.core.Services
         private readonly ITransferClientFactory _clientFactory;
         private readonly ILogService _logService;
         private readonly EnhancedSettingsService _settingsService;
-        private readonly IFileFilterService _fileFilterService;
         private readonly Dictionary<string, TransferJob> _activeJobs;
         private readonly object _jobLock = new object();
         private volatile bool _disposed = false;
@@ -27,12 +26,11 @@ namespace syncer.core.Services
         public event EventHandler<TransferStartedEventArgs> TransferStarted;
 
         public TransferEngine(ITransferClientFactory clientFactory, ILogService logService, 
-                         EnhancedSettingsService settingsService, IFileFilterService fileFilterService)
+                         EnhancedSettingsService settingsService)
         {
             _clientFactory = clientFactory ?? throw new ArgumentNullException("clientFactory");
             _logService = logService ?? throw new ArgumentNullException("logService");
             _settingsService = settingsService ?? throw new ArgumentNullException("settingsService");
-            _fileFilterService = fileFilterService ?? throw new ArgumentNullException("fileFilterService");
             _activeJobs = new Dictionary<string, TransferJob>();
         }
 
@@ -392,12 +390,7 @@ namespace syncer.core.Services
                     }
                 }
 
-                // Apply filters if configured
-                if (job.Filters != null)
-                {
-                    files = _fileFilterService.ApplyFilters(files, job.Filters);
-                    _logService.LogJobProgress(job, $"Applied filters: {files.Count} files remain after filtering");
-                }
+                _logService.LogJobProgress(job, string.Format("Found {0} files to process", files.Count));
             }
             catch (Exception ex)
             {

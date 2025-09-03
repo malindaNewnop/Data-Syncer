@@ -5,7 +5,7 @@ namespace syncer.core
 {
     public static class Paths
     {
-        public static readonly string AppDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DataSyncer");
+        public static readonly string AppDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DataSyncer");
         public static readonly string JobsFile = Path.Combine(AppDataFolder, "jobs.xml");
         public static readonly string LogsFile = Path.Combine(AppDataFolder, "logs.csv");
         public static readonly string SettingsFile = Path.Combine(AppDataFolder, "settings.json");

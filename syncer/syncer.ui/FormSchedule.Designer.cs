@@ -46,13 +46,6 @@ namespace syncer.ui
             this.chkEnableTimer = new System.Windows.Forms.CheckBox();
             this.chkIncludeSubfolders = new System.Windows.Forms.CheckBox();
             this.chkDeleteSourceAfterTransfer = new System.Windows.Forms.CheckBox();
-            this.gbFileFilters = new System.Windows.Forms.GroupBox();
-            this.chkEnableFileFilter = new System.Windows.Forms.CheckBox();
-            this.lblIncludeExtensions = new System.Windows.Forms.Label();
-            this.txtIncludeExtensions = new System.Windows.Forms.TextBox();
-            this.lblExcludeFiles = new System.Windows.Forms.Label();
-            this.txtExcludeFiles = new System.Windows.Forms.TextBox();
-            this.lblFilterHelp = new System.Windows.Forms.Label();
             this.gbFileManager = new System.Windows.Forms.GroupBox();
             this.btnDownloadFile = new System.Windows.Forms.Button();
             this.btnUploadFiles = new System.Windows.Forms.Button();
@@ -71,7 +64,6 @@ namespace syncer.ui
             this.gbTransfer.SuspendLayout();
             this.gbTimerSettings.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numTimerInterval)).BeginInit();
-            this.gbFileFilters.SuspendLayout();
             this.gbFileManager.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -314,88 +306,6 @@ namespace syncer.ui
             this.chkEnableTimer.UseVisualStyleBackColor = true;
             this.chkEnableTimer.CheckedChanged += new System.EventHandler(this.chkEnableTimer_CheckedChanged);
             // 
-            // gbFileFilters
-            // 
-            this.gbFileFilters.Controls.Add(this.lblFilterHelp);
-            this.gbFileFilters.Controls.Add(this.txtExcludeFiles);
-            this.gbFileFilters.Controls.Add(this.lblExcludeFiles);
-            this.gbFileFilters.Controls.Add(this.txtIncludeExtensions);
-            this.gbFileFilters.Controls.Add(this.lblIncludeExtensions);
-            this.gbFileFilters.Controls.Add(this.chkEnableFileFilter);
-            this.gbFileFilters.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
-            this.gbFileFilters.Location = new System.Drawing.Point(15, 330);
-            this.gbFileFilters.Name = "gbFileFilters";
-            this.gbFileFilters.Padding = new System.Windows.Forms.Padding(15, 10, 15, 15);
-            this.gbFileFilters.Size = new System.Drawing.Size(400, 120);
-            this.gbFileFilters.TabIndex = 3;
-            this.gbFileFilters.TabStop = false;
-            this.gbFileFilters.Text = "File Filters";
-            // 
-            // chkEnableFileFilter
-            // 
-            this.chkEnableFileFilter.AutoSize = true;
-            this.chkEnableFileFilter.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.chkEnableFileFilter.Location = new System.Drawing.Point(20, 30);
-            this.chkEnableFileFilter.Name = "chkEnableFileFilter";
-            this.chkEnableFileFilter.Size = new System.Drawing.Size(104, 19);
-            this.chkEnableFileFilter.TabIndex = 0;
-            this.chkEnableFileFilter.Text = "Enable Filters";
-            this.chkEnableFileFilter.UseVisualStyleBackColor = true;
-            this.chkEnableFileFilter.CheckedChanged += new System.EventHandler(this.chkEnableFileFilter_CheckedChanged);
-            // 
-            // lblIncludeExtensions
-            // 
-            this.lblIncludeExtensions.AutoSize = true;
-            this.lblIncludeExtensions.Enabled = false;
-            this.lblIncludeExtensions.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
-            this.lblIncludeExtensions.Location = new System.Drawing.Point(20, 60);
-            this.lblIncludeExtensions.Name = "lblIncludeExtensions";
-            this.lblIncludeExtensions.Size = new System.Drawing.Size(73, 13);
-            this.lblIncludeExtensions.TabIndex = 1;
-            this.lblIncludeExtensions.Text = "Include Types:";
-            // 
-            // txtIncludeExtensions
-            // 
-            this.txtIncludeExtensions.Enabled = false;
-            this.txtIncludeExtensions.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
-            this.txtIncludeExtensions.Location = new System.Drawing.Point(100, 57);
-            this.txtIncludeExtensions.Name = "txtIncludeExtensions";
-            this.txtIncludeExtensions.Size = new System.Drawing.Size(150, 20);
-            this.txtIncludeExtensions.TabIndex = 2;
-            this.txtIncludeExtensions.Text = "*.txt,*.doc,*.pdf";
-            // 
-            // lblExcludeFiles
-            // 
-            this.lblExcludeFiles.AutoSize = true;
-            this.lblExcludeFiles.Enabled = false;
-            this.lblExcludeFiles.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
-            this.lblExcludeFiles.Location = new System.Drawing.Point(20, 87);
-            this.lblExcludeFiles.Name = "lblExcludeFiles";
-            this.lblExcludeFiles.Size = new System.Drawing.Size(70, 13);
-            this.lblExcludeFiles.TabIndex = 3;
-            this.lblExcludeFiles.Text = "Exclude Files:";
-            // 
-            // txtExcludeFiles
-            // 
-            this.txtExcludeFiles.Enabled = false;
-            this.txtExcludeFiles.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F);
-            this.txtExcludeFiles.Location = new System.Drawing.Point(100, 84);
-            this.txtExcludeFiles.Name = "txtExcludeFiles";
-            this.txtExcludeFiles.Size = new System.Drawing.Size(150, 20);
-            this.txtExcludeFiles.TabIndex = 4;
-            this.txtExcludeFiles.Text = "*.tmp,*.log";
-            // 
-            // lblFilterHelp
-            // 
-            this.lblFilterHelp.Enabled = false;
-            this.lblFilterHelp.Font = new System.Drawing.Font("Microsoft Sans Serif", 7F, System.Drawing.FontStyle.Italic);
-            this.lblFilterHelp.ForeColor = System.Drawing.Color.Gray;
-            this.lblFilterHelp.Location = new System.Drawing.Point(260, 55);
-            this.lblFilterHelp.Name = "lblFilterHelp";
-            this.lblFilterHelp.Size = new System.Drawing.Size(125, 50);
-            this.lblFilterHelp.TabIndex = 5;
-            this.lblFilterHelp.Text = "Use commas to separate multiple types/patterns";
-            // 
             // gbFileManager
             // 
             this.gbFileManager.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
@@ -528,7 +438,7 @@ namespace syncer.ui
             // 
             this.btnSaveTimerJob.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.btnSaveTimerJob.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnSaveTimerJob.Location = new System.Drawing.Point(15, 500);
+            this.btnSaveTimerJob.Location = new System.Drawing.Point(15, 570);
             this.btnSaveTimerJob.Name = "btnSaveTimerJob";
             this.btnSaveTimerJob.Size = new System.Drawing.Size(160, 40);
             this.btnSaveTimerJob.TabIndex = 5;
@@ -540,7 +450,7 @@ namespace syncer.ui
             // 
             this.btnLoadConfiguration.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.btnLoadConfiguration.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnLoadConfiguration.Location = new System.Drawing.Point(185, 500);
+            this.btnLoadConfiguration.Location = new System.Drawing.Point(185, 570);
             this.btnLoadConfiguration.Name = "btnLoadConfiguration";
             this.btnLoadConfiguration.Size = new System.Drawing.Size(140, 40);
             this.btnLoadConfiguration.TabIndex = 6;
@@ -552,7 +462,7 @@ namespace syncer.ui
             // 
             this.btnSave.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnSave.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnSave.Location = new System.Drawing.Point(685, 500);
+            this.btnSave.Location = new System.Drawing.Point(685, 570);
             this.btnSave.Name = "btnSave";
             this.btnSave.Size = new System.Drawing.Size(90, 40);
             this.btnSave.TabIndex = 7;
@@ -564,7 +474,7 @@ namespace syncer.ui
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnCancel.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnCancel.Location = new System.Drawing.Point(785, 500);
+            this.btnCancel.Location = new System.Drawing.Point(785, 570);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(90, 40);
             this.btnCancel.TabIndex = 8;
@@ -576,13 +486,12 @@ namespace syncer.ui
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(900, 580);
+            this.ClientSize = new System.Drawing.Size(900, 650);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnSave);
             this.Controls.Add(this.btnLoadConfiguration);
             this.Controls.Add(this.btnSaveTimerJob);
             this.Controls.Add(this.gbFileManager);
-            this.Controls.Add(this.gbFileFilters);
             this.Controls.Add(this.gbTimerSettings);
             this.Controls.Add(this.gbTransfer);
             this.Controls.Add(this.gbJobDetails);
@@ -603,8 +512,6 @@ namespace syncer.ui
             this.gbTimerSettings.ResumeLayout(false);
             this.gbTimerSettings.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numTimerInterval)).EndInit();
-            this.gbFileFilters.ResumeLayout(false);
-            this.gbFileFilters.PerformLayout();
             this.gbFileManager.ResumeLayout(false);
             this.gbFileManager.PerformLayout();
             this.ResumeLayout(false);
@@ -647,12 +554,5 @@ namespace syncer.ui
         private System.Windows.Forms.Button btnLoadConfiguration;
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
-        private System.Windows.Forms.GroupBox gbFileFilters;
-        private System.Windows.Forms.CheckBox chkEnableFileFilter;
-        private System.Windows.Forms.Label lblIncludeExtensions;
-        private System.Windows.Forms.TextBox txtIncludeExtensions;
-        private System.Windows.Forms.Label lblExcludeFiles;
-        private System.Windows.Forms.TextBox txtExcludeFiles;
-        private System.Windows.Forms.Label lblFilterHelp;
     }
 }

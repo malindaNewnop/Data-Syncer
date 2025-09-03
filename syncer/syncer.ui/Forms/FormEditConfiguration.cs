@@ -62,13 +62,7 @@ namespace syncer.ui.Forms
                 chkUseSSL.Checked = conn.EnableSsl;
             }
 
-            // Filter settings
-            if (_configuration.JobSettings?.FilterSettings != null)
-            {
-                var filters = _configuration.JobSettings.FilterSettings;
-                txtExcludePatterns.Text = filters.ExcludePatterns ?? "";
-                chkIncludeSubfolders.Checked = _configuration.JobSettings.IncludeSubFolders;
-            }
+
         }
 
         private void SaveConfigurationData()
@@ -143,12 +137,6 @@ namespace syncer.ui.Forms
                 conn.Port = (int)numPort.Value;
                 conn.EnableSsl = chkUseSSL.Checked;
 
-                // Update filter settings
-                if (_configuration.JobSettings.FilterSettings == null)
-                    _configuration.JobSettings.FilterSettings = new FilterSettings();
-
-                _configuration.JobSettings.FilterSettings.ExcludePatterns = txtExcludePatterns.Text.Trim();
-                _configuration.JobSettings.IncludeSubFolders = chkIncludeSubfolders.Checked;
 
                 // Update timestamp
                 _configuration.LastUsed = DateTime.Now;

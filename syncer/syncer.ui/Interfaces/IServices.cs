@@ -42,16 +42,6 @@ namespace syncer.ui
     }
 
     /// <summary>
-    /// Interface for managing filter settings
-    /// </summary>
-    public interface IFilterService
-    {
-        FilterSettings GetFilterSettings();
-        bool SaveFilterSettings(FilterSettings settings);
-        string[] GetDefaultFileTypes();
-    }
-
-    /// <summary>
     /// Interface for log management
     /// </summary>
     public interface ILogService

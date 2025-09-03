@@ -33,17 +33,6 @@ namespace syncer.core
         void Delete(string id);
     }
 
-    // File Filter Interface
-    public interface IFileFilterService
-    {
-        List<string> ApplyFilters(List<string> files, FilterSettings filters);
-        bool ValidateFile(string sourcePath, string destinationPath, ValidationOptions options);
-        bool EnsureDirectoryExists(string path, bool isLocal);
-        bool RelocateFile(string sourceFilePath, RelocationOptions options);
-    }
-    
-    // Using FilterSettings from Models.cs
-    
     // Scheduler Interface
     public interface ISchedulerService
     {
@@ -114,8 +103,9 @@ namespace syncer.core
     // File Operations Interface
     public interface IFileEnumerator
     {
+        List<string> EnumerateFiles(string rootPath, bool includeSubfolders);
         List<string> EnumerateFiles(string rootPath, FilterSettings filters, bool includeSubfolders);
-        List<string> EnumerateDirectories(string rootPath, FilterSettings filters, bool includeSubfolders);
+        List<string> EnumerateDirectories(string rootPath, bool includeSubfolders);
     }
 
     // Preview Service Interface

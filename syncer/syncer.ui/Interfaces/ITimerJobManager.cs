@@ -56,6 +56,22 @@ namespace syncer.ui.Interfaces
         bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer);
         
         /// <summary>
+        /// Registers a timer job with complete filter support
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <param name="jobName">The name of the job</param>
+        /// <param name="folderPath">The path to the folder to monitor</param>
+        /// <param name="remotePath">The remote path to upload to</param>
+        /// <param name="intervalMs">The interval in milliseconds</param>
+        /// <param name="includeSubfolders">Whether to include subfolders</param>
+        /// <param name="deleteSourceAfterTransfer">Whether to delete source files after transfer</param>
+        /// <param name="enableFilters">Whether to enable file filtering</param>
+        /// <param name="includeExtensions">List of file extensions to include</param>
+        /// <param name="excludeExtensions">List of file extensions to exclude</param>
+        /// <returns>True if the job was registered successfully</returns>
+        bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer, bool enableFilters, List<string> includeExtensions, List<string> excludeExtensions);
+        
+        /// <summary>
         /// Starts a timer job
         /// </summary>
         /// <param name="jobId">The ID of the job to start</param>
@@ -159,6 +175,22 @@ namespace syncer.ui.Interfaces
         /// <param name="deleteSourceAfterTransfer">Whether to delete source files after successful transfer</param>
         /// <returns>True if the job was updated successfully</returns>
         bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer);
+        
+        /// <summary>
+        /// Updates a timer job with complete filter support
+        /// </summary>
+        /// <param name="jobId">The ID of the job to update</param>
+        /// <param name="jobName">The name of the job</param>
+        /// <param name="folderPath">The path to the folder to monitor</param>
+        /// <param name="remotePath">The remote path to upload to</param>
+        /// <param name="intervalMs">The interval in milliseconds</param>
+        /// <param name="includeSubfolders">Whether to include subfolders</param>
+        /// <param name="deleteSourceAfterTransfer">Whether to delete source files after transfer</param>
+        /// <param name="enableFilters">Whether to enable file filtering</param>
+        /// <param name="includeExtensions">List of file extensions to include</param>
+        /// <param name="excludeExtensions">List of file extensions to exclude</param>
+        /// <returns>True if the job was updated successfully</returns>
+        bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer, bool enableFilters, List<string> includeExtensions, List<string> excludeExtensions);
         
         /// <summary>
         /// Gets all running timer jobs
