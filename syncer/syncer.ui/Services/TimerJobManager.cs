@@ -37,6 +37,7 @@ namespace syncer.ui.Services
             public bool IsUploadInProgress { get; set; } // Prevent overlapping uploads
             public DateTime? UploadStartTime { get; set; } // Track upload duration
             public bool IncludeSubfolders { get; set; } // Whether to include subfolders in file enumeration
+            public bool DeleteSourceAfterTransfer { get; set; } // Whether to delete source files after successful transfer
         }
         
         public TimerJobManager()
@@ -48,15 +49,20 @@ namespace syncer.ui.Services
         
         public bool RegisterTimerJob(long jobId, string folderPath, string remotePath, double intervalMs)
         {
-            return RegisterTimerJob(jobId, "Timer Job " + jobId, folderPath, remotePath, intervalMs, true); // Default to include subfolders
+            return RegisterTimerJob(jobId, "Timer Job " + jobId, folderPath, remotePath, intervalMs, true, false); // Default to include subfolders, no delete
         }
         
         public bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs)
         {
-            return RegisterTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, true); // Default to include subfolders
+            return RegisterTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, true, false); // Default to include subfolders, no delete
         }
         
         public bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders)
+        {
+            return RegisterTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, includeSubfolders, false); // No delete by default
+        }
+        
+        public bool RegisterTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer)
         {
             try
             {
@@ -70,6 +76,7 @@ namespace syncer.ui.Services
                     job.RemotePath = remotePath;
                     job.IntervalMs = intervalMs;
                     job.IncludeSubfolders = includeSubfolders; // Update subfolder setting
+                    job.DeleteSourceAfterTransfer = deleteSourceAfterTransfer; // Update delete setting
                     
                     // Initialize new properties if they don't exist
                     if (!job.IsUploadInProgress) job.IsUploadInProgress = false;
@@ -127,7 +134,8 @@ namespace syncer.ui.Services
                     ConnectionSettings = coreSettings,
                     IsUploadInProgress = false,
                     UploadStartTime = null,
-                    IncludeSubfolders = includeSubfolders
+                    IncludeSubfolders = includeSubfolders,
+                    DeleteSourceAfterTransfer = deleteSourceAfterTransfer
                 };
                 
                 _timerJobs.Add(jobId, newJob);
@@ -334,10 +342,15 @@ namespace syncer.ui.Services
         
         public bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs)
         {
-            return UpdateTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, true); // Default to include subfolders for backward compatibility
+            return UpdateTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, true, false); // Default to include subfolders, no delete
         }
         
         public bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders)
+        {
+            return UpdateTimerJob(jobId, jobName, folderPath, remotePath, intervalMs, includeSubfolders, false); // No delete by default
+        }
+        
+        public bool UpdateTimerJob(long jobId, string jobName, string folderPath, string remotePath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer)
         {
             try
             {
@@ -362,6 +375,7 @@ namespace syncer.ui.Services
                 job.RemotePath = remotePath;
                 job.IntervalMs = intervalMs;
                 job.IncludeSubfolders = includeSubfolders;
+                job.DeleteSourceAfterTransfer = deleteSourceAfterTransfer;
                 
                 // Update timer interval if the timer exists
                 if (job.Timer != null)
@@ -643,6 +657,20 @@ namespace syncer.ui.Services
                             {
                                 _logService.LogInfo(string.Format("Successfully uploaded: {0} ({1} bytes)", fileName, fileInfo.Length));
                                 successfulUploads++;
+                                
+                                // Check if we should delete source file after successful upload
+                                if (job.DeleteSourceAfterTransfer)
+                                {
+                                    try
+                                    {
+                                        File.Delete(localFile);
+                                        _logService.LogInfo(string.Format("Source file deleted after successful upload: {0}", localFile));
+                                    }
+                                    catch (Exception deleteEx)
+                                    {
+                                        _logService.LogError(string.Format("Failed to delete source file {0} after upload: {1}", localFile, deleteEx.Message));
+                                    }
+                                }
                                 
                                 // Verify upload by checking if file exists remotely (optional)
                                 try

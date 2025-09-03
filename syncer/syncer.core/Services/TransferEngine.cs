@@ -321,6 +321,31 @@ namespace syncer.core.Services
                     }
                 }
 
+                // Delete source file after successful transfer if requested
+                if (ShouldDeleteSourceAfterTransfer(job))
+                {
+                    try
+                    {
+                        string deleteError;
+                        bool deleteSuccess = sourceClient.DeleteFile(job.SourceConnection, sourceFile, out deleteError);
+                        
+                        if (deleteSuccess)
+                        {
+                            _logService.LogJobProgress(job, $"Source file deleted after successful transfer: {fileName}");
+                        }
+                        else
+                        {
+                            result.Warnings.Add($"Failed to delete source file {fileName} after transfer: {deleteError ?? "Unknown error"}");
+                            _logService.LogJobError(job, $"Failed to delete source file {fileName}: {deleteError ?? "Unknown error"}", null);
+                        }
+                    }
+                    catch (Exception deleteEx)
+                    {
+                        result.Warnings.Add($"Failed to delete source file {fileName} after transfer: {deleteEx.Message}");
+                        _logService.LogJobError(job, $"Failed to delete source file {fileName}: {deleteEx.Message}", deleteEx);
+                    }
+                }
+
                 return true;
             }
             catch (Exception ex)
@@ -433,6 +458,39 @@ namespace syncer.core.Services
         protected virtual void OnTransferCompleted(TransferCompletedEventArgs e)
         {
             TransferCompleted?.Invoke(this, e);
+        }
+
+        /// <summary>
+        /// Check if source files should be deleted after successful transfer
+        /// Handles both UI SyncJob (DeleteSourceAfterTransfer) and Core SyncJob (PostProcess.DeleteSourceAfterTransfer)
+        /// </summary>
+        private bool ShouldDeleteSourceAfterTransfer(SyncJob job)
+        {
+            // Check if job has the UI model property
+            var uiJobType = job.GetType();
+            var deleteProperty = uiJobType.GetProperty("DeleteSourceAfterTransfer");
+            if (deleteProperty != null)
+            {
+                return (bool)deleteProperty.GetValue(job, null);
+            }
+            
+            // Check if job has core model's PostProcess property
+            var postProcessProperty = uiJobType.GetProperty("PostProcess");
+            if (postProcessProperty != null)
+            {
+                var postProcess = postProcessProperty.GetValue(job, null);
+                if (postProcess != null)
+                {
+                    var postProcessType = postProcess.GetType();
+                    var deleteAfterTransferProperty = postProcessType.GetProperty("DeleteSourceAfterTransfer");
+                    if (deleteAfterTransferProperty != null)
+                    {
+                        return (bool)deleteAfterTransferProperty.GetValue(postProcess, null);
+                    }
+                }
+            }
+            
+            return false;
         }
 
         public void Dispose()

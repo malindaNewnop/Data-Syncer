@@ -287,6 +287,30 @@ namespace syncer.core
                 // Use a generic log method for transfer, or add LogTransfer to ILogService if needed
                 _logService.LogJobProgress(job, $"Transferred file: {System.IO.Path.GetFileName(sourceFile)}");
 
+                // Delete source file after successful transfer if requested
+                if (ShouldDeleteSourceAfterTransfer(job))
+                {
+                    try
+                    {
+                        string deleteError;
+                        bool deleteSuccess = sourceClient.DeleteFile(job.Connection, sourceFile, out deleteError);
+                        
+                        if (deleteSuccess)
+                        {
+                            _logService.LogJobProgress(job, $"Source file deleted after successful transfer: {System.IO.Path.GetFileName(sourceFile)}");
+                        }
+                        else
+                        {
+                            _logService.LogJobError(job, $"Failed to delete source file {System.IO.Path.GetFileName(sourceFile)} after transfer: {deleteError ?? "Unknown error"}", null);
+                        }
+                    }
+                    catch (Exception deleteEx)
+                    {
+                        _logService.LogJobError(job, $"Failed to delete source file {System.IO.Path.GetFileName(sourceFile)} after transfer: {deleteEx.Message}", deleteEx);
+                        // Don't fail the entire transfer just because delete failed
+                    }
+                }
+
                 OnFileTransferCompleted(new FileTransferEventArgs
                 {
                     SourcePath = sourceFile,
@@ -340,6 +364,39 @@ namespace syncer.core
         protected virtual void OnJobStatusChanged(JobStatusEventArgs e)
         {
             if (JobStatusChanged != null) JobStatusChanged(this, e);
+        }
+
+        /// <summary>
+        /// Check if source files should be deleted after successful transfer
+        /// Handles both UI SyncJob (DeleteSourceAfterTransfer) and Core SyncJob (PostProcess.DeleteSourceAfterTransfer)
+        /// </summary>
+        private bool ShouldDeleteSourceAfterTransfer(SyncJob job)
+        {
+            // Check if job has the UI model property
+            var uiJobType = job.GetType();
+            var deleteProperty = uiJobType.GetProperty("DeleteSourceAfterTransfer");
+            if (deleteProperty != null)
+            {
+                return (bool)deleteProperty.GetValue(job, null);
+            }
+            
+            // Check if job has core model's PostProcess property
+            var postProcessProperty = uiJobType.GetProperty("PostProcess");
+            if (postProcessProperty != null)
+            {
+                var postProcess = postProcessProperty.GetValue(job, null);
+                if (postProcess != null)
+                {
+                    var postProcessType = postProcess.GetType();
+                    var deleteAfterTransferProperty = postProcessType.GetProperty("DeleteSourceAfterTransfer");
+                    if (deleteAfterTransferProperty != null)
+                    {
+                        return (bool)deleteAfterTransferProperty.GetValue(postProcess, null);
+                    }
+                }
+            }
+            
+            return false;
         }
         
         #region IDisposable Implementation

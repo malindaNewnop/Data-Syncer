@@ -207,6 +207,30 @@ namespace syncer.core
                 // Log successful transfer with proper details
                 LogTransferWithDetails(job.Name, fileName, fileSize, transferDuration, sourceFile, destinationFile, true, null);
 
+                // Delete source file after successful transfer if requested
+                if (ShouldDeleteSourceAfterTransfer(job))
+                {
+                    try
+                    {
+                        string deleteError;
+                        bool deleteSuccess = sourceClient.DeleteFile(job.Connection, sourceFile, out deleteError);
+                        
+                        if (deleteSuccess)
+                        {
+                            _logService.LogInfo($"Source file deleted after successful transfer: {fileName}");
+                        }
+                        else
+                        {
+                            _logService.LogError($"Failed to delete source file {fileName} after transfer: {deleteError ?? "Unknown error"}");
+                        }
+                    }
+                    catch (Exception deleteEx)
+                    {
+                        _logService.LogError($"Failed to delete source file {fileName} after transfer: {deleteEx.Message}");
+                        // Don't fail the entire transfer just because delete failed
+                    }
+                }
+
                 OnFileTransferCompleted(new FileTransferEventArgs 
                 { 
                     SourcePath = sourceFile, 
@@ -271,6 +295,39 @@ namespace syncer.core
         protected virtual void OnFileTransferCompleted(FileTransferEventArgs e)
         {
             if (FileTransferCompleted != null) FileTransferCompleted(this, e);
+        }
+
+        /// <summary>
+        /// Check if source files should be deleted after successful transfer
+        /// Handles both UI SyncJob (DeleteSourceAfterTransfer) and Core SyncJob (PostProcess.DeleteSourceAfterTransfer)
+        /// </summary>
+        private bool ShouldDeleteSourceAfterTransfer(SyncJob job)
+        {
+            // Check if job has the UI model property
+            var uiJobType = job.GetType();
+            var deleteProperty = uiJobType.GetProperty("DeleteSourceAfterTransfer");
+            if (deleteProperty != null)
+            {
+                return (bool)deleteProperty.GetValue(job, null);
+            }
+            
+            // Check if job has core model's PostProcess property
+            var postProcessProperty = uiJobType.GetProperty("PostProcess");
+            if (postProcessProperty != null)
+            {
+                var postProcess = postProcessProperty.GetValue(job, null);
+                if (postProcess != null)
+                {
+                    var postProcessType = postProcess.GetType();
+                    var deleteAfterTransferProperty = postProcessType.GetProperty("DeleteSourceAfterTransfer");
+                    if (deleteAfterTransferProperty != null)
+                    {
+                        return (bool)deleteAfterTransferProperty.GetValue(postProcess, null);
+                    }
+                }
+            }
+            
+            return false;
         }
 
         /// <summary>

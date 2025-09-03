@@ -1297,7 +1297,7 @@ namespace syncer.ui
                         {
                             // Update existing timer job
                             bool updated = timerJobManager.UpdateTimerJob(_currentJob.Id, _currentJob.Name,
-                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders());
+                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), _currentJob.DeleteSourceAfterTransfer);
                             
                             if (updated)
                             {
@@ -1309,7 +1309,7 @@ namespace syncer.ui
                         {
                             // Register new timer job
                             bool registered = timerJobManager.RegisterTimerJob(_currentJob.Id, _currentJob.Name,
-                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders());
+                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), _currentJob.DeleteSourceAfterTransfer);
                             
                             bool isTimerCurrentlyRunning = (_currentTransferMode == "Upload" && _isTimerRunning) ||
                                                          (_currentTransferMode == "Download" && _isDownloadTimerRunning);

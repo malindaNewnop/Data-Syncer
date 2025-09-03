@@ -298,6 +298,21 @@ namespace syncer.ui.Services
                     {
                         File.Copy(sourceFile, destFile, true);
                         ServiceLocator.LogService.LogInfo(string.Format("Copied: {0} -> {1}", sourceFile, destFile));
+                        
+                        // Delete source file after successful transfer if requested
+                        if (job.DeleteSourceAfterTransfer)
+                        {
+                            try
+                            {
+                                File.Delete(sourceFile);
+                                ServiceLocator.LogService.LogInfo(string.Format("Source file deleted after successful transfer: {0}", sourceFile));
+                            }
+                            catch (Exception deleteEx)
+                            {
+                                ServiceLocator.LogService.LogError(string.Format("Failed to delete source file {0} after transfer: {1}", sourceFile, deleteEx.Message));
+                                // Don't fail the entire transfer just because delete failed
+                            }
+                        }
                     }
                     else
                     {

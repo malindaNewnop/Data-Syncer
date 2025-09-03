@@ -1220,7 +1220,9 @@ namespace syncer.ui
                         config.JobSettings.Name,
                         config.JobSettings.SourcePath,
                         config.JobSettings.DestinationPath,
-                        intervalMs))
+                        intervalMs,
+                        true, // Include subfolders (default)
+                        false)) // Don't delete source files (default for config-based jobs)
                     {
                         if (timerJobManager.StartTimerJob(jobId))
                         {
