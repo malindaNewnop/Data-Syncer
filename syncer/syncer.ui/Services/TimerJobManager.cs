@@ -1328,5 +1328,15 @@ namespace syncer.ui.Services
             
             return _timerJobs[jobId].DownloadStartTime;
         }
+        
+        public bool IsTimerJobDownloadJob(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return false;
+            }
+            
+            return _timerJobs[jobId].IsDownloadJob;
+        }
     }
 }

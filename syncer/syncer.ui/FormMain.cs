@@ -802,8 +802,8 @@ namespace syncer.ui
             dgvTimerJobs.Columns.Add("JobName", "Job Name");
             dgvTimerJobs.Columns.Add("FolderPath", "Folder Path");
             dgvTimerJobs.Columns.Add("RemotePath", "Remote Path");
-            dgvTimerJobs.Columns.Add("Interval", "Upload Interval");
-            dgvTimerJobs.Columns.Add("LastUpload", "Last Upload");
+            dgvTimerJobs.Columns.Add("Interval", "Interval");
+            dgvTimerJobs.Columns.Add("LastUpload", "Last Transfer");
             dgvTimerJobs.Columns.Add("Status", "Status");
             
             dgvTimerJobs.Columns["JobId"].Width = 40;
@@ -853,7 +853,9 @@ namespace syncer.ui
                 {
                     // Get job status and details from TimerJobManager
                     bool isRunning = timerJobManager.IsTimerJobRunning(jobId);
+                    bool isDownloadJob = timerJobManager.IsTimerJobDownloadJob(jobId);
                     DateTime? lastUpload = timerJobManager.GetLastUploadTime(jobId);
+                    DateTime? lastDownload = timerJobManager.GetLastDownloadTime(jobId);
                     string folderPath = timerJobManager.GetTimerJobFolderPath(jobId);
                     string remotePath = timerJobManager.GetTimerJobRemotePath(jobId);
                     string jobName = timerJobManager.GetTimerJobName(jobId);
@@ -885,23 +887,49 @@ namespace syncer.ui
                     row.Cells["FolderPath"].Value = folderPath;
                     row.Cells["RemotePath"].Value = remotePath;
                     row.Cells["Interval"].Value = interval;
-                    row.Cells["LastUpload"].Value = lastUpload.HasValue ? lastUpload.Value.ToString("yyyy-MM-dd HH:mm:ss") : "Never";
                     
-                    // Check if currently uploading
+                    // Show appropriate last transfer time based on job type
+                    if (isDownloadJob)
+                    {
+                        row.Cells["LastUpload"].Value = lastDownload.HasValue ? lastDownload.Value.ToString("yyyy-MM-dd HH:mm:ss") : "Never";
+                    }
+                    else
+                    {
+                        row.Cells["LastUpload"].Value = lastUpload.HasValue ? lastUpload.Value.ToString("yyyy-MM-dd HH:mm:ss") : "Never";
+                    }
+                    
+                    // Check if currently transferring and show appropriate status
                     bool isUploading = timerJobManager.IsTimerJobUploading(jobId);
+                    bool isDownloading = timerJobManager.IsTimerJobDownloading(jobId);
                     DateTime? uploadStartTime = timerJobManager.GetTimerJobUploadStartTime(jobId);
+                    DateTime? downloadStartTime = timerJobManager.GetTimerJobDownloadStartTime(jobId);
                     
                     string status = "Stopped";
                     if (isRunning)
                     {
-                        if (isUploading && uploadStartTime.HasValue)
+                        if (isDownloadJob)
                         {
-                            TimeSpan uploadDuration = DateTime.Now - uploadStartTime.Value;
-                            status = string.Format("Uploading ({0:mm\\:ss})", uploadDuration);
+                            if (isDownloading && downloadStartTime.HasValue)
+                            {
+                                TimeSpan downloadDuration = DateTime.Now - downloadStartTime.Value;
+                                status = string.Format("Downloading ({0:mm\\:ss})", downloadDuration);
+                            }
+                            else
+                            {
+                                status = "Running";
+                            }
                         }
                         else
                         {
-                            status = "Running";
+                            if (isUploading && uploadStartTime.HasValue)
+                            {
+                                TimeSpan uploadDuration = DateTime.Now - uploadStartTime.Value;
+                                status = string.Format("Uploading ({0:mm\\:ss})", uploadDuration);
+                            }
+                            else
+                            {
+                                status = "Running";
+                            }
                         }
                     }
                     
@@ -911,6 +939,10 @@ namespace syncer.ui
                     if (isUploading)
                     {
                         row.DefaultCellStyle.BackColor = Color.LightBlue; // Blue for uploading
+                    }
+                    else if (isDownloading)
+                    {
+                        row.DefaultCellStyle.BackColor = Color.LightCyan; // Light cyan for downloading
                     }
                     else
                     {

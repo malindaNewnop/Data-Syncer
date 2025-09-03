@@ -256,5 +256,12 @@ namespace syncer.ui.Interfaces
         /// <param name="jobId">The ID of the job</param>
         /// <returns>DateTime when the current download started, or null if not downloading</returns>
         DateTime? GetTimerJobDownloadStartTime(long jobId);
+        
+        /// <summary>
+        /// Checks if a timer job is a download job (remote to local)
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>True if the job is a download job</returns>
+        bool IsTimerJobDownloadJob(long jobId);
     }
 }
