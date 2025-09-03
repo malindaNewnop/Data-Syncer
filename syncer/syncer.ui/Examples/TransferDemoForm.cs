@@ -85,7 +85,8 @@ namespace syncer.ui.Examples
             _settingsService = new EnhancedSettingsService();
             _logService = new FileLogService();
             var clientFactory = new EnhancedTransferClientFactory(useProductionClients: true);
-            _transferEngine = new TransferEngine(clientFactory, _logService, _settingsService);
+            var fileFilterService = new FileFilterService(_logService);
+            _transferEngine = new TransferEngine(clientFactory, _logService, _settingsService, fileFilterService);
         }
 
         private void InitializeComponent()

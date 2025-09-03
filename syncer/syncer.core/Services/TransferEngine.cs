@@ -17,6 +17,7 @@ namespace syncer.core.Services
         private readonly ITransferClientFactory _clientFactory;
         private readonly ILogService _logService;
         private readonly EnhancedSettingsService _settingsService;
+        private readonly IFileFilterService _fileFilterService;
         private readonly Dictionary<string, TransferJob> _activeJobs;
         private readonly object _jobLock = new object();
         private volatile bool _disposed = false;
@@ -26,11 +27,12 @@ namespace syncer.core.Services
         public event EventHandler<TransferStartedEventArgs> TransferStarted;
 
         public TransferEngine(ITransferClientFactory clientFactory, ILogService logService, 
-                         EnhancedSettingsService settingsService)
+                         EnhancedSettingsService settingsService, IFileFilterService fileFilterService)
         {
             _clientFactory = clientFactory ?? throw new ArgumentNullException("clientFactory");
             _logService = logService ?? throw new ArgumentNullException("logService");
             _settingsService = settingsService ?? throw new ArgumentNullException("settingsService");
+            _fileFilterService = fileFilterService ?? throw new ArgumentNullException("fileFilterService");
             _activeJobs = new Dictionary<string, TransferJob>();
         }
 
@@ -231,29 +233,96 @@ namespace syncer.core.Services
         {
             try
             {
-                var fileName = Path.GetFileName(sourceFile);
-                var destinationFile = Path.Combine(job.DestinationPath, fileName);
+                // Validate destination path
+                if (string.IsNullOrEmpty(job.DestinationPath))
+                {
+                    result.Errors.Add($"Destination path is empty or null for file {sourceFile}");
+                    return false;
+                }
+
+                string destinationFile;
+                string fileName;
+
+                // Handle path construction for local source only
+                if (job.SourceConnection.Protocol == ProtocolType.Local)
+                {
+                    // Local source: standard path handling
+                    fileName = Path.GetFileName(sourceFile);
+                    
+                    if (job.IncludeSubFolders && sourceFile.StartsWith(job.SourcePath))
+                    {
+                        // Preserve directory structure
+                        var relativePath = sourceFile.Substring(job.SourcePath.Length).TrimStart('\\', '/');
+                        destinationFile = Path.Combine(job.DestinationPath, relativePath);
+                    }
+                    else
+                    {
+                        destinationFile = Path.Combine(job.DestinationPath, fileName);
+                    }
+                }
+                else
+                {
+                    // Remote source file - support Remote to Local transfers
+                    fileName = GetFileNameFromPath(sourceFile);
+                    
+                    if (job.IncludeSubFolders && sourceFile.StartsWith(job.SourcePath))
+                    {
+                        // Preserve directory structure for remote to local
+                        var normalizedSourcePath = job.SourcePath.Replace('\\', '/');
+                        var normalizedSourceFile = sourceFile.Replace('\\', '/');
+                        
+                        if (normalizedSourceFile.StartsWith(normalizedSourcePath))
+                        {
+                            var relativePath = normalizedSourceFile.Substring(normalizedSourcePath.Length).TrimStart('/');
+                            relativePath = relativePath.Replace('/', '\\'); // Convert to Windows path for local storage
+                            destinationFile = Path.Combine(job.DestinationPath, relativePath);
+                        }
+                        else
+                        {
+                            destinationFile = Path.Combine(job.DestinationPath, fileName);
+                        }
+                    }
+                    else
+                    {
+                        destinationFile = Path.Combine(job.DestinationPath, fileName);
+                    }
+                }
 
                 string error;
 
-                // For different protocol combinations, we need different approaches
+                // Only support Local to Remote and Local to Local transfers
                 if (job.SourceConnection.Protocol == ProtocolType.Local && job.DestinationConnection.Protocol != ProtocolType.Local)
                 {
                     // Local to Remote: Upload
-                    var success = destClient.UploadFile(job.DestinationConnection, sourceFile, destinationFile, job.OverwriteExisting, out error);
+                    // For remote destinations, construct Unix-style path
+                    string remoteDestinationFile;
+                    if (job.DestinationConnection.Protocol != ProtocolType.Local)
+                    {
+                        var normalizedDestBase = job.DestinationPath.Replace('\\', '/');
+                        if (!normalizedDestBase.EndsWith("/"))
+                            normalizedDestBase += "/";
+                        
+                        if (job.IncludeSubFolders && sourceFile.StartsWith(job.SourcePath))
+                        {
+                            // Preserve directory structure to remote
+                            var relativePath = sourceFile.Substring(job.SourcePath.Length).TrimStart('\\', '/');
+                            relativePath = relativePath.Replace('\\', '/'); // Convert to Unix path
+                            remoteDestinationFile = normalizedDestBase + relativePath;
+                        }
+                        else
+                        {
+                            remoteDestinationFile = normalizedDestBase + fileName;
+                        }
+                    }
+                    else
+                    {
+                        remoteDestinationFile = destinationFile;
+                    }
+                    
+                    var success = destClient.UploadFile(job.DestinationConnection, sourceFile, remoteDestinationFile, job.OverwriteExisting, out error);
                     if (!success)
                     {
                         result.Errors.Add($"Upload failed for {sourceFile}: {error}");
-                        return false;
-                    }
-                }
-                else if (job.SourceConnection.Protocol != ProtocolType.Local && job.DestinationConnection.Protocol == ProtocolType.Local)
-                {
-                    // Remote to Local: Download
-                    var success = sourceClient.DownloadFile(job.SourceConnection, sourceFile, destinationFile, job.OverwriteExisting, out error);
-                    if (!success)
-                    {
-                        result.Errors.Add($"Download failed for {sourceFile}: {error}");
                         return false;
                     }
                 }
@@ -269,43 +338,44 @@ namespace syncer.core.Services
 
                     File.Copy(sourceFile, destinationFile, job.OverwriteExisting);
                 }
+                else if (job.SourceConnection.Protocol != ProtocolType.Local && job.DestinationConnection.Protocol == ProtocolType.Local)
+                {
+                    // Remote to Local: Download
+                    var success = sourceClient.DownloadFile(job.SourceConnection, sourceFile, destinationFile, job.OverwriteExisting, out error);
+                    if (!success)
+                    {
+                        result.Errors.Add($"Download failed for {sourceFile}: {error}");
+                        return false;
+                    }
+                }
                 else
                 {
-                    // Remote to Remote: Download then Upload (not efficient, but works)
-                    var tempFile = Path.GetTempFileName();
-                    try
-                    {
-                        // Download to temp
-                        var downloadSuccess = sourceClient.DownloadFile(job.SourceConnection, sourceFile, tempFile, true, out error);
-                        if (!downloadSuccess)
-                        {
-                            result.Errors.Add($"Download to temp failed for {sourceFile}: {error}");
-                            return false;
-                        }
-
-                        // Upload from temp
-                        var uploadSuccess = destClient.UploadFile(job.DestinationConnection, tempFile, destinationFile, job.OverwriteExisting, out error);
-                        if (!uploadSuccess)
-                        {
-                            result.Errors.Add($"Upload from temp failed for {sourceFile}: {error}");
-                            return false;
-                        }
-                    }
-                    finally
-                    {
-                        if (File.Exists(tempFile))
-                        {
-                            try { File.Delete(tempFile); } catch { }
-                        }
-                    }
+                    // Remote to Remote transfers are not supported yet
+                    result.Errors.Add($"Remote to Remote transfers are not currently supported: {sourceFile}");
+                    return false;
                 }
 
                 // Update byte statistics
-                var fileInfo = new FileInfo(sourceFile);
-                result.TransferredBytes += fileInfo.Length;
-                result.TotalBytes += fileInfo.Length;
+                long fileSize = 0;
+                if (job.SourceConnection.Protocol == ProtocolType.Local)
+                {
+                    var fileInfo = new FileInfo(sourceFile);
+                    fileSize = fileInfo.Length;
+                }
+                else if (job.DestinationConnection.Protocol == ProtocolType.Local)
+                {
+                    // For remote to local transfers, get size from destination file after transfer
+                    var destFileInfo = new FileInfo(destinationFile);
+                    if (destFileInfo.Exists)
+                    {
+                        fileSize = destFileInfo.Length;
+                    }
+                }
 
-                // Basic file validation if local files
+                result.TransferredBytes += fileSize;
+                result.TotalBytes += fileSize;
+
+                // Basic file validation if local destination
                 if (job.DestinationConnection.Protocol == ProtocolType.Local)
                 {
                     var destFileInfo = new FileInfo(destinationFile);
@@ -313,9 +383,10 @@ namespace syncer.core.Services
                     {
                         result.Warnings.Add($"Transferred file not found at destination: {destinationFile}");
                     }
-                    else if (fileInfo.Length != destFileInfo.Length)
+                    else if (job.SourceConnection.Protocol == ProtocolType.Local && fileSize > 0 && fileSize != destFileInfo.Length)
                     {
-                        result.Warnings.Add($"File size mismatch for {fileName}: Source={fileInfo.Length}, Dest={destFileInfo.Length}");
+                        // Only compare sizes for local to remote/local transfers where we can get source size
+                        result.Warnings.Add($"File size mismatch for {fileName}: Source={fileSize}, Dest={destFileInfo.Length}");
                     }
                 }
 
@@ -362,6 +433,10 @@ namespace syncer.core.Services
 
             try
             {
+                // Debug logging to diagnose path handling issue
+                _logService.LogJobProgress(job, $"DEBUG: Source protocol = {job.SourceConnection.Protocol}");
+                _logService.LogJobProgress(job, $"DEBUG: Source path = {job.SourcePath}");
+                
                 if (job.SourceConnection.Protocol == ProtocolType.Local) // Local
                 {
                     if (File.Exists(job.SourcePath))
@@ -373,6 +448,10 @@ namespace syncer.core.Services
                         var searchOption = job.IncludeSubFolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
                         files.AddRange(Directory.GetFiles(job.SourcePath, "*.*", searchOption));
                     }
+                    else
+                    {
+                        _logService.LogJobError(job, $"Local source path does not exist: {job.SourcePath}", null);
+                    }
                 }
                 else // Remote
                 {
@@ -380,14 +459,30 @@ namespace syncer.core.Services
                     List<string> remoteFiles;
                     string error;
                     
+                    _logService.LogJobProgress(job, $"Listing remote files from: {job.SourcePath}");
+                    
                     if (sourceClient.ListFiles(job.SourceConnection, job.SourcePath, out remoteFiles, out error))
                     {
                         files.AddRange(remoteFiles);
+                        _logService.LogJobProgress(job, $"Found {remoteFiles.Count} remote files");
                     }
                     else
                     {
                         _logService.LogJobError(job, $"Failed to list remote files: {error}", null);
+                        return files; // Return empty list on error
                     }
+                }
+
+                // Apply file filtering if enabled
+                if (ShouldApplyFilters(job))
+                {
+                    var filterSettings = CreateFilterSettings(job);
+                    var filteredFiles = _fileFilterService.ApplyFilters(files, filterSettings);
+                    
+                    _logService.LogJobProgress(job, string.Format("Filtering applied: {0} files reduced to {1} files", 
+                        files.Count, filteredFiles.Count));
+                    
+                    files = filteredFiles;
                 }
 
                 _logService.LogJobProgress(job, string.Format("Found {0} files to process", files.Count));
@@ -398,6 +493,72 @@ namespace syncer.core.Services
             }
 
             return files;
+        }
+
+        /// <summary>
+        /// Check if filters should be applied to this job
+        /// </summary>
+        private bool ShouldApplyFilters(SyncJob job)
+        {
+            // Check if job has the UI model property for EnableFilters
+            var uiJobType = job.GetType();
+            var enableFiltersProperty = uiJobType.GetProperty("EnableFilters");
+            if (enableFiltersProperty != null)
+            {
+                return (bool)enableFiltersProperty.GetValue(job, null);
+            }
+            
+            return false;
+        }
+
+        /// <summary>
+        /// Create FilterSettings from job configuration
+        /// </summary>
+        private FilterSettings CreateFilterSettings(SyncJob job)
+        {
+            var filterSettings = new FilterSettings();
+            
+            var uiJobType = job.GetType();
+            
+            // Get include file types
+            var includeProperty = uiJobType.GetProperty("IncludeFileTypes");
+            if (includeProperty != null)
+            {
+                var includeTypes = (string)includeProperty.GetValue(job, null);
+                if (!string.IsNullOrEmpty(includeTypes))
+                {
+                    var extensions = includeTypes.Split(new char[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var ext in extensions)
+                    {
+                        var cleanExt = ext.Trim();
+                        if (!string.IsNullOrEmpty(cleanExt))
+                        {
+                            filterSettings.IncludeExtensions.Add(cleanExt);
+                        }
+                    }
+                }
+            }
+            
+            // Get exclude file types
+            var excludeProperty = uiJobType.GetProperty("ExcludeFileTypes");
+            if (excludeProperty != null)
+            {
+                var excludeTypes = (string)excludeProperty.GetValue(job, null);
+                if (!string.IsNullOrEmpty(excludeTypes))
+                {
+                    var extensions = excludeTypes.Split(new char[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var ext in extensions)
+                    {
+                        var cleanExt = ext.Trim();
+                        if (!string.IsNullOrEmpty(cleanExt))
+                        {
+                            filterSettings.ExcludeExtensions.Add(cleanExt);
+                        }
+                    }
+                }
+            }
+            
+            return filterSettings;
         }
 
         /// <summary>
@@ -484,6 +645,19 @@ namespace syncer.core.Services
             }
             
             return false;
+        }
+
+        /// <summary>
+        /// Extract filename from a remote path (handles both Unix and Windows paths)
+        /// </summary>
+        private string GetFileNameFromPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return string.Empty;
+            
+            // Handle both forward and backward slashes
+            var lastSlashIndex = Math.Max(path.LastIndexOf('/'), path.LastIndexOf('\\'));
+            return lastSlashIndex >= 0 ? path.Substring(lastSlashIndex + 1) : path;
         }
 
         public void Dispose()

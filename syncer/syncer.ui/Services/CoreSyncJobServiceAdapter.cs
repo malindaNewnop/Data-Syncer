@@ -228,6 +228,22 @@ namespace syncer.ui.Services
 
         private syncer.core.SyncJob ConvertUIJobToCoreJob(SyncJob uiJob)
         {
+            // Debug logging to diagnose connection conversion issue
+            DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", 
+                string.Format("DEBUG: Converting UI job '{0}' - SourceConnection is {1}", 
+                    uiJob.Name ?? "unnamed", 
+                    uiJob.SourceConnection == null ? "NULL" : uiJob.SourceConnection.ProtocolType.ToString()));
+            
+            if (uiJob.DestinationConnection != null)
+            {
+                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", 
+                    string.Format("DEBUG: DestinationConnection protocol: {0}", uiJob.DestinationConnection.ProtocolType));
+            }
+            else
+            {
+                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", "DEBUG: DestinationConnection is NULL");
+            }
+        
             syncer.core.SyncJob coreJob = new syncer.core.SyncJob
             {
                 Id = uiJob.Id.ToString(),
@@ -241,7 +257,8 @@ namespace syncer.ui.Services
                 CreatedDate = uiJob.CreatedDate,
                 LastRun = uiJob.LastRun.HasValue ? uiJob.LastRun.Value : DateTime.MinValue,
                 LastStatus = uiJob.LastStatus,
-                Connection = ConvertUIConnectionToCoreConnection(uiJob.SourceConnection),
+                Connection = ConvertUIConnectionToCoreConnection(uiJob.SourceConnection), // Legacy field for compatibility
+                SourceConnection = ConvertUIConnectionToCoreConnection(uiJob.SourceConnection),
                 DestinationConnection = ConvertUIConnectionToCoreConnection(uiJob.DestinationConnection),
                 Schedule = new syncer.core.ScheduleSettings
                 {

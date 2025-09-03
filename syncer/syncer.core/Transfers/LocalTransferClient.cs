@@ -106,14 +106,14 @@ namespace syncer.core
                     return false;
                 }
 
-                // Ensure destination directory exists
-                var destDir = Path.GetDirectoryName(localPath);
-                if (!string.IsNullOrEmpty(destDir) && !Directory.Exists(destDir))
+                // Ensure local directory exists
+                var localDir = Path.GetDirectoryName(localPath);
+                if (!string.IsNullOrEmpty(localDir) && !Directory.Exists(localDir))
                 {
-                    Directory.CreateDirectory(destDir);
+                    Directory.CreateDirectory(localDir);
                 }
 
-                // Copy with progress reporting for large files
+                // Copy with progress reporting for large files (remote to local in local transfer means file copy)
                 CopyFileWithProgress(remotePath, localPath, overwrite);
                 
                 return true;

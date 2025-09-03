@@ -115,6 +115,12 @@ namespace syncer.core
         bool ValidateJob(SyncJob job, out List<string> validationErrors);
     }
 
+    // File Filter Service Interface
+    public interface IFileFilterService
+    {
+        List<string> ApplyFilters(List<string> files, FilterSettings filters);
+    }
+
     // Job Runner Interface
     public interface IJobRunner : IDisposable
     {

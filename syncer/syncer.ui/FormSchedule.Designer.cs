@@ -33,7 +33,6 @@ namespace syncer.ui
             this.lblJobName = new System.Windows.Forms.Label();
             this.txtJobName = new System.Windows.Forms.TextBox();
             this.gbTransfer = new System.Windows.Forms.GroupBox();
-            this.rbDownload = new System.Windows.Forms.RadioButton();
             this.rbUpload = new System.Windows.Forms.RadioButton();
             this.gbTimerSettings = new System.Windows.Forms.GroupBox();
             this.lblLastUpload = new System.Windows.Forms.Label();
@@ -47,7 +46,6 @@ namespace syncer.ui
             this.chkIncludeSubfolders = new System.Windows.Forms.CheckBox();
             this.chkDeleteSourceAfterTransfer = new System.Windows.Forms.CheckBox();
             this.gbFileManager = new System.Windows.Forms.GroupBox();
-            this.btnDownloadFile = new System.Windows.Forms.Button();
             this.btnUploadFiles = new System.Windows.Forms.Button();
             this.lblManualOperations = new System.Windows.Forms.Label();
             this.lblNoFilesSelected = new System.Windows.Forms.Label();
@@ -119,7 +117,6 @@ namespace syncer.ui
             // 
             // gbTransfer
             // 
-            this.gbTransfer.Controls.Add(this.rbDownload);
             this.gbTransfer.Controls.Add(this.rbUpload);
             this.gbTransfer.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
             this.gbTransfer.Location = new System.Drawing.Point(15, 95);
@@ -129,18 +126,6 @@ namespace syncer.ui
             this.gbTransfer.TabIndex = 1;
             this.gbTransfer.TabStop = false;
             this.gbTransfer.Text = "Transfer Mode";
-            // 
-            // rbDownload
-            // 
-            this.rbDownload.AutoSize = true;
-            this.rbDownload.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.rbDownload.Location = new System.Drawing.Point(220, 30);
-            this.rbDownload.Name = "rbDownload";
-            this.rbDownload.Size = new System.Drawing.Size(144, 19);
-            this.rbDownload.TabIndex = 1;
-            this.rbDownload.Text = "Download (Remote →)";
-            this.rbDownload.UseVisualStyleBackColor = true;
-            this.rbDownload.CheckedChanged += new System.EventHandler(this.RbDownload_CheckedChanged);
             // 
             // rbUpload
             // 
@@ -311,7 +296,6 @@ namespace syncer.ui
             this.gbFileManager.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.gbFileManager.Controls.Add(this.btnDownloadFile);
             this.gbFileManager.Controls.Add(this.btnUploadFiles);
             this.gbFileManager.Controls.Add(this.lblManualOperations);
             this.gbFileManager.Controls.Add(this.lblNoFilesSelected);
@@ -328,18 +312,6 @@ namespace syncer.ui
             this.gbFileManager.TabIndex = 4;
             this.gbFileManager.TabStop = false;
             this.gbFileManager.Text = "File Manager (Local → Remote)";
-            // 
-            // btnDownloadFile
-            // 
-            this.btnDownloadFile.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnDownloadFile.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnDownloadFile.Location = new System.Drawing.Point(150, 300);
-            this.btnDownloadFile.Name = "btnDownloadFile";
-            this.btnDownloadFile.Size = new System.Drawing.Size(120, 40);
-            this.btnDownloadFile.TabIndex = 5;
-            this.btnDownloadFile.Text = "Download";
-            this.btnDownloadFile.UseVisualStyleBackColor = true;
-            this.btnDownloadFile.Click += new System.EventHandler(this.btnDirectDownload_Click);
             // 
             // btnUploadFiles
             // 
@@ -526,7 +498,6 @@ namespace syncer.ui
         private System.Windows.Forms.CheckBox chkEnableJob;
         private System.Windows.Forms.GroupBox gbTransfer;
         private System.Windows.Forms.RadioButton rbUpload;
-        private System.Windows.Forms.RadioButton rbDownload;
         private System.Windows.Forms.GroupBox gbTimerSettings;
         private System.Windows.Forms.CheckBox chkEnableTimer;
         private System.Windows.Forms.Label lblUploadEvery;
@@ -544,7 +515,6 @@ namespace syncer.ui
         private System.Windows.Forms.Label lblNoFilesSelected;
         private System.Windows.Forms.Label lblManualOperations;
         private System.Windows.Forms.Button btnUploadFiles;
-        private System.Windows.Forms.Button btnDownloadFile;
         
         // Download mode specific controls
         private System.Windows.Forms.Label lblRemotePath;

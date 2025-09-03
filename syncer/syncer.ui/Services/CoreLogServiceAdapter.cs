@@ -168,7 +168,7 @@ namespace syncer.ui.Services
                     FileInfo fileInfo = new FileInfo(csvFilePath);
                     if (fileInfo.Length == 0)
                     {
-                        _realTimeCsvWriter.WriteLine("Timestamp,Level,Job,Source,Message,JobId,Exception,FileName,FileSize,Duration,RemotePath,LocalPath");
+                        _realTimeCsvWriter.WriteLine("Timestamp,Level,Job,Source,Message,JobId,Exception,FileName,FileSize,Duration");
                     }
                     
                     DebugLogger.LogServiceActivity("CoreLogServiceAdapter", "Real-time logging enabled to: " + csvFilePath);
@@ -215,7 +215,7 @@ namespace syncer.ui.Services
             return _realTimeLogPath;
         }
 
-        private void WriteToRealTimeLog(string level, string message, string jobName = "UI", string source = "core", Exception ex = null, string fileName = "", long fileSize = 0, double duration = 0, string remotePath = "", string localPath = "")
+        private void WriteToRealTimeLog(string level, string message, string jobName = "UI", string source = "core", Exception ex = null, string fileName = "", long fileSize = 0, double duration = 0)
         {
             if (!_realTimeLoggingEnabled || _realTimeCsvWriter == null) return;
 
@@ -224,7 +224,7 @@ namespace syncer.ui.Services
                 try
                 {
                     string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                    string csvLine = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}",
+                    string csvLine = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9}",
                         EscapeCsvField(timestamp),
                         EscapeCsvField(level),
                         EscapeCsvField(jobName),
@@ -234,9 +234,7 @@ namespace syncer.ui.Services
                         EscapeCsvField(ex != null ? ex.Message : ""),
                         EscapeCsvField(fileName),
                         fileSize.ToString(),
-                        duration.ToString("F2"),
-                        EscapeCsvField(remotePath),
-                        EscapeCsvField(localPath));
+                        duration.ToString("F2"));
                     
                     _realTimeCsvWriter.WriteLine(csvLine);
                     _realTimeCsvWriter.Flush();
@@ -355,7 +353,7 @@ namespace syncer.ui.Services
         /// Enhanced file transfer logging with detailed metrics
         /// </summary>
         public void LogTransferDetailed(string jobName, string fileName, long fileSize, TimeSpan duration, 
-            string remotePath, string localPath, bool success, string error)
+            bool success, string error)
         {
             string level = success ? "INFO" : "ERROR";
             string message = success 
@@ -363,7 +361,7 @@ namespace syncer.ui.Services
                 : string.Format("Transfer failed: {0} - {1}", fileName, error);
                 
             WriteToRealTimeLog(level, message, jobName, "Transfer", success ? null : new Exception(error), 
-                fileName, fileSize, duration.TotalSeconds, remotePath, localPath);
+                fileName, fileSize, duration.TotalSeconds);
         }
 
         #endregion

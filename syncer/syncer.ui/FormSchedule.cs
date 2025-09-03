@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Linq;
 using syncer.core;
 using syncer.core.Configuration;
+using syncer.core.Services;
 using syncer.ui.Forms;
 using syncer.ui.Interfaces;
 
@@ -43,16 +44,18 @@ namespace syncer.ui
         private DateTime? _uploadStartTime = null; // Track upload duration
         private bool _includeSubfoldersForTimer = true; // Include subfolders in timer uploads (default: true)
 
-        // Timer-based download functionality
-        private System.Timers.Timer _downloadTimer;
-        private bool _isDownloadTimerRunning = false;
-        private DateTime _lastDownloadTime;
-        private string _selectedRemoteFolderForTimer; // Remote folder path for download monitoring
-        private string _selectedRemoteFileForTimer; // Specific remote file for download (if any)
-        private string _timerDownloadDestination; // Local destination path for downloads
-        private string _currentTransferMode = "Upload"; // "Upload" or "Download"
+        // Download mode fields
+        private bool _isDownloadTimerRunning = false; // Track download timer state
+        private System.Timers.Timer _downloadTimer; // Timer for automatic downloads
+        private string _selectedRemoteFolderForTimer; // Remote folder selected for timer downloads
+        private string _selectedRemoteFileForTimer; // Remote file selected for timer downloads  
+        private string _timerDownloadDestination; // Local destination for timer downloads
         private bool _isDownloadInProgress = false; // Prevent overlapping downloads
         private DateTime? _downloadStartTime = null; // Track download duration
+        private DateTime? _lastDownloadTime = null; // Track last download time
+
+        // Both upload and download modes are supported
+        private string _currentTransferMode = "Upload"; // Default to "Upload" mode
 
         // Filter controls - rebuilt for file extension filtering
         private GroupBox gbFilters;
@@ -88,7 +91,7 @@ namespace syncer.ui
         private void FormSchedule_FormClosing(object sender, FormClosingEventArgs e)
         {
             // If a timer is running and no job has been saved, warn the user
-            if ((_isTimerRunning || _isDownloadTimerRunning) && _currentJob?.Id == null)
+            if (_isTimerRunning && _currentJob?.Id == null)
             {
                 string timerType = _isTimerRunning ? "upload" : "download";
                 DialogResult result = MessageBox.Show(
@@ -155,22 +158,6 @@ namespace syncer.ui
                     ServiceLocator.LogService.LogError("Error stopping upload timer during form closing: " + ex.Message);
                 }
             }
-            
-            if (_downloadTimer != null)
-            {
-                try
-                {
-                    _downloadTimer.Stop();
-                    _downloadTimer.Elapsed -= OnDownloadTimerElapsed;
-                    _downloadTimer.Dispose();
-                    _isDownloadTimerRunning = false;
-                    ServiceLocator.LogService.LogInfo("Download timer stopped and disposed during form closing");
-                }
-                catch (Exception ex)
-                {
-                    ServiceLocator.LogService.LogError("Error stopping download timer during form closing: " + ex.Message);
-                }
-            }
         }
 
         private void InitializeServices()
@@ -192,6 +179,9 @@ namespace syncer.ui
             // Don't reorganize layout - let the designer layout remain
             // ReorganizeFormLayout();
             
+            // Add download radio button to existing transfer mode group
+            AddDownloadRadioButtonToTransferGroup();
+            
             SetDefaultValues();
             if (_isEditMode) LoadJobSettings();
             InitializeTransferClient();
@@ -202,6 +192,7 @@ namespace syncer.ui
             UpdateUIForTransferMode();
         }
 
+        /*
         private void ReorganizeFormLayout()
         {
             // Add a header section
@@ -232,6 +223,7 @@ namespace syncer.ui
                 AdjustFileManagerLayout();
             }
         }
+        */
 
         private void AdjustFileManagerLayout()
         {
@@ -368,45 +360,45 @@ namespace syncer.ui
             this.Controls.Add(headerPanel);
         }
 
-        private void CreateTransferModeSection()
+        private void AddDownloadRadioButtonToTransferGroup()
         {
-            // Create transfer mode panel
-            Panel transferModePanel = new Panel();
-            transferModePanel.Location = new Point(12, 75);
-            transferModePanel.Size = new Size(756, 45);
-            transferModePanel.BackColor = Color.FromArgb(250, 250, 250);
-            transferModePanel.BorderStyle = BorderStyle.FixedSingle;
+            // Find the existing gbTransfer GroupBox and rbUpload radio button
+            GroupBox gbTransfer = this.Controls.OfType<GroupBox>().FirstOrDefault(gb => gb.Name == "gbTransfer");
+            RadioButton rbUpload = this.Controls.OfType<RadioButton>().FirstOrDefault(rb => rb.Name == "rbUpload");
+            
+            if (gbTransfer == null)
+            {
+                ServiceLocator.LogService.LogWarning("gbTransfer GroupBox not found");
+                return;
+            }
 
-            // Transfer mode label
-            Label lblTransferMode = new Label();
-            lblTransferMode.Text = "Transfer Mode:";
-            lblTransferMode.Location = new Point(10, 15);
-            lblTransferMode.Size = new Size(100, 20);
-            lblTransferMode.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Bold);
+            // Expand the transfer group to accommodate both radio buttons
+            gbTransfer.Size = new Size(870, 65); // Make it wider to fit both options
+            gbTransfer.Text = "Transfer Mode";
+            
+            // Adjust existing Upload radio button position and text
+            if (rbUpload != null)
+            {
+                rbUpload.Text = "Upload (Local → Remote)";
+                rbUpload.Location = new Point(20, 25);
+                rbUpload.Size = new Size(200, 25);
+                rbUpload.CheckedChanged += RbUpload_CheckedChanged;
+            }
 
-            // Upload radio button
-            RadioButton rbUpload = new RadioButton();
-            rbUpload.Text = "Upload (Local → Remote)";
-            rbUpload.Location = new Point(120, 12);
-            rbUpload.Size = new Size(180, 25);
-            rbUpload.Checked = true; // Default selection
-            rbUpload.Font = new Font("Microsoft Sans Serif", 9F);
-            rbUpload.CheckedChanged += RbUpload_CheckedChanged;
-            rbUpload.Name = "rbUpload";
-
-            // Download radio button  
+            // Create Download radio button  
             RadioButton rbDownload = new RadioButton();
             rbDownload.Text = "Download (Remote → Local)";
-            rbDownload.Location = new Point(320, 12);
-            rbDownload.Size = new Size(200, 25);
+            rbDownload.Location = new Point(240, 25);
+            rbDownload.Size = new Size(220, 25);
+            rbDownload.Checked = false;
             rbDownload.Font = new Font("Microsoft Sans Serif", 9F);
             rbDownload.CheckedChanged += RbDownload_CheckedChanged;
             rbDownload.Name = "rbDownload";
-
-            transferModePanel.Controls.Add(lblTransferMode);
-            transferModePanel.Controls.Add(rbUpload);
-            transferModePanel.Controls.Add(rbDownload);
-            this.Controls.Add(transferModePanel);
+            
+            // Add the download radio button to the existing transfer group
+            gbTransfer.Controls.Add(rbDownload);
+            
+            ServiceLocator.LogService.LogInfo("Added Download radio button to existing Transfer Mode group");
         }
 
         private void InitializeTimerControls()
@@ -653,7 +645,7 @@ namespace syncer.ui
                 }
             }
         }
-
+        
         private void RbDownload_CheckedChanged(object sender, EventArgs e)
         {
             RadioButton rb = sender as RadioButton;
@@ -662,9 +654,9 @@ namespace syncer.ui
                 _currentTransferMode = "Download";
                 
                 // Clear upload-specific selections when switching to download mode
-                _selectedFilesForTimer = null;
                 _selectedFolderForTimer = null;
-                _timerUploadDestination = "/";
+                _selectedFilesForTimer = null;
+                _timerUploadDestination = null;
                 
                 UpdateUIForTransferMode();
                 
@@ -673,8 +665,8 @@ namespace syncer.ui
                 // Show helpful message to user about what to do next
                 if (lblNoFilesSelected != null)
                 {
-                    lblNoFilesSelected.Text = "Click 'Browse Remote Folder' to select files from server";
-                    lblNoFilesSelected.ForeColor = System.Drawing.Color.Blue;
+                    lblNoFilesSelected.Text = "Click 'Browse Remote Folder' to select files to download";
+                    lblNoFilesSelected.ForeColor = System.Drawing.Color.Green;
                 }
             }
         }
@@ -784,6 +776,29 @@ namespace syncer.ui
 
         #endregion
 
+        private RadioButton FindDownloadRadioButton()
+        {
+            // Look for the download radio button in the form controls
+            foreach (Control control in this.Controls)
+            {
+                if (control is RadioButton && ((RadioButton)control).Name == "rbDownload")
+                {
+                    return (RadioButton)control;
+                }
+                else if (control is Panel)
+                {
+                    foreach (Control innerControl in control.Controls)
+                    {
+                        if (innerControl is RadioButton && ((RadioButton)innerControl).Name == "rbDownload")
+                        {
+                            return (RadioButton)innerControl;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
         private void SetDefaultValues()
         {
             if (chkEnableJob != null) chkEnableJob.Checked = true;
@@ -805,18 +820,21 @@ namespace syncer.ui
                 if (txtJobName != null) txtJobName.Text = _currentJob.Name;
                 if (chkEnableJob != null) chkEnableJob.Checked = _currentJob.IsEnabled;
                 
-                // Set transfer mode based on job data
-                if (_currentJob.TransferMode == "Download")
+                // Set transfer mode - both upload and download are supported
+                _currentTransferMode = _currentJob.TransferMode ?? "Upload";
+                ServiceLocator.LogService.LogInfo(string.Format("Loaded job with transfer mode: {0}", _currentTransferMode));
+                
+                // Set radio button state based on transfer mode
+                if (rbUpload != null)
                 {
-                    _currentTransferMode = "Download";
-                    if (rbDownload != null) rbDownload.Checked = true;
-                    if (rbUpload != null) rbUpload.Checked = false;
+                    rbUpload.Checked = (_currentTransferMode == "Upload");
                 }
-                else
+                
+                // Find and set download radio button if it exists
+                RadioButton rbDownload = FindDownloadRadioButton();
+                if (rbDownload != null)
                 {
-                    _currentTransferMode = "Upload";
-                    if (rbUpload != null) rbUpload.Checked = true;
-                    if (rbDownload != null) rbDownload.Checked = false;
+                    rbDownload.Checked = (_currentTransferMode == "Download");
                 }
                 
                 // Load timer settings (from job data for timer jobs)
@@ -1022,7 +1040,16 @@ namespace syncer.ui
                 }
                 
                 _currentJob.SourcePath = remotePath;
-                _currentJob.DestinationPath = _timerDownloadDestination ?? "";
+                
+                // Validate that download destination is set
+                if (string.IsNullOrEmpty(_timerDownloadDestination))
+                {
+                    MessageBox.Show("Please select a local destination folder for downloads.", "Download Destination Required", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return; // Exit early if validation fails
+                }
+                
+                _currentJob.DestinationPath = _timerDownloadDestination;
                 _currentJob.TransferMode = "Download"; // Timer-based downloads
                 
                 // Also update the internal variable for consistency
@@ -1057,6 +1084,7 @@ namespace syncer.ui
             
             // Set connection settings for source and destination based on transfer mode
             var currentConnection = _connectionService.GetConnectionSettings();
+            
             if (currentConnection != null && currentConnection.IsRemoteConnection)
             {
                 if (_currentTransferMode == "Upload")
@@ -1161,10 +1189,22 @@ namespace syncer.ui
                                 string.Join(",", includeExtensions.ToArray()), 
                                 string.Join(",", excludeExtensions.ToArray())));
                             
-                            // Update existing timer job with filter support
-                            bool updated = timerJobManager.UpdateTimerJob(_currentJob.Id, _currentJob.Name,
-                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), _currentJob.DeleteSourceAfterTransfer,
-                                _currentJob.EnableFilters, includeExtensions, excludeExtensions);
+                            // Update existing timer job based on transfer mode
+                            bool updated;
+                            if (_currentTransferMode == "Download")
+                            {
+                                // For downloads: remote source, local destination
+                                updated = timerJobManager.RegisterDownloadTimerJob(_currentJob.Id, _currentJob.Name,
+                                    sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), _currentJob.DeleteSourceAfterTransfer,
+                                    _currentJob.EnableFilters, includeExtensions, excludeExtensions);
+                            }
+                            else
+                            {
+                                // For uploads: local source, remote destination
+                                updated = timerJobManager.UpdateTimerJob(_currentJob.Id, _currentJob.Name,
+                                    sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), _currentJob.DeleteSourceAfterTransfer,
+                                    _currentJob.EnableFilters, includeExtensions, excludeExtensions);
+                            }
                             
                             if (updated)
                             {
@@ -1214,10 +1254,22 @@ namespace syncer.ui
                                 string.Join(",", includeExtensions.ToArray()), 
                                 string.Join(",", excludeExtensions.ToArray())));
                             
-                            // Register new timer job with filter support
-                            bool registered = timerJobManager.RegisterTimerJob(_currentJob.Id, _currentJob.Name,
-                                sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), _currentJob.DeleteSourceAfterTransfer,
-                                _currentJob.EnableFilters, includeExtensions, excludeExtensions);
+                            // Register new timer job based on transfer mode
+                            bool registered;
+                            if (_currentTransferMode == "Download")
+                            {
+                                // For downloads: remote source, local destination
+                                registered = timerJobManager.RegisterDownloadTimerJob(_currentJob.Id, _currentJob.Name,
+                                    sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), _currentJob.DeleteSourceAfterTransfer,
+                                    _currentJob.EnableFilters, includeExtensions, excludeExtensions);
+                            }
+                            else
+                            {
+                                // For uploads: local source, remote destination
+                                registered = timerJobManager.RegisterTimerJob(_currentJob.Id, _currentJob.Name,
+                                    sourcePath, destPath, intervalMs, ShouldIncludeSubfolders(), _currentJob.DeleteSourceAfterTransfer,
+                                    _currentJob.EnableFilters, includeExtensions, excludeExtensions);
+                            }
                             
                             bool isTimerCurrentlyRunning = (_currentTransferMode == "Upload" && _isTimerRunning) ||
                                                          (_currentTransferMode == "Download" && _isDownloadTimerRunning);
@@ -2051,6 +2103,7 @@ namespace syncer.ui
                 {
                     try
                     {
+                        // Perform automatic download
                         PerformAutomaticDownload();
                         
                         TimeSpan totalDuration = DateTime.Now - _downloadStartTime.Value;
@@ -2228,6 +2281,19 @@ namespace syncer.ui
         {
             try
             {
+                ServiceLocator.LogService.LogInfo("=== DOWNLOAD DEBUG: PerformAutomaticDownload started ===");
+                
+                // Log current job filter settings for downloads
+                if (_currentJob != null)
+                {
+                    ServiceLocator.LogService.LogInfo($"DOWNLOAD DEBUG: Current job exists - EnableFilters: {_currentJob.EnableFilters}");
+                    ServiceLocator.LogService.LogInfo($"DOWNLOAD DEBUG: Current job - Include: '{_currentJob.IncludeFileTypes}', Exclude: '{_currentJob.ExcludeFileTypes}'");
+                }
+                else
+                {
+                    ServiceLocator.LogService.LogInfo("DOWNLOAD DEBUG: Current job is NULL!");
+                }
+                
                 if (string.IsNullOrEmpty(_selectedRemoteFolderForTimer))
                 {
                     ServiceLocator.LogService.LogWarning("No remote folder selected for automatic download");
@@ -2240,135 +2306,26 @@ namespace syncer.ui
                     return;
                 }
                 
-                ServiceLocator.LogService.LogInfo($"Starting automatic download from remote location '{_selectedRemoteFolderForTimer}' to local folder '{_timerDownloadDestination}'");
+                ServiceLocator.LogService.LogInfo($"Starting automatic download from remote folder '{_selectedRemoteFolderForTimer}' to local destination '{_timerDownloadDestination}'");
                 
-                // Check if we're monitoring a specific file
-                bool isSpecificFile = !string.IsNullOrEmpty(_selectedRemoteFileForTimer) ||
-                    (lblNoFilesSelected != null && lblNoFilesSelected.Text.StartsWith("Remote File:"));
-                
-                if (isSpecificFile)
+                // Get all remote files
+                List<string> remoteFilesList;
+                string listError;
+                if (!_currentTransferClient.ListFiles(_coreConnectionSettings, _selectedRemoteFolderForTimer, out remoteFilesList, out listError))
                 {
-                    // Download specific file
-                    PerformSpecificFileDownload();
-                }
-                else
-                {
-                    // Monitor and download from folder
-                    PerformFolderMonitoringDownload();
-                }
-                
-                // Update last download time
-                _lastDownloadTime = DateTime.Now;
-            }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogError("Automatic download error: " + ex.Message);
-            }
-        }
-        
-        private void PerformSpecificFileDownload()
-        {
-            try
-            {
-                // Use stored filename if available, otherwise extract from label
-                string fileName = _selectedRemoteFileForTimer;
-                
-                if (string.IsNullOrEmpty(fileName) && lblNoFilesSelected != null && lblNoFilesSelected.Text.StartsWith("Remote File:"))
-                {
-                    // Extract filename from label: "Remote File: filename.ext (will download periodically)"
-                    string labelText = lblNoFilesSelected.Text;
-                    int start = labelText.IndexOf(": ") + 2;
-                    int end = labelText.IndexOf(" (will download");
-                    if (start > 1 && end > start)
-                    {
-                        fileName = labelText.Substring(start, end - start);
-                    }
-                }
-                
-                if (string.IsNullOrEmpty(fileName))
-                {
-                    ServiceLocator.LogService.LogError("Could not determine specific file name for download");
+                    ServiceLocator.LogService.LogError($"Failed to list remote files for automatic download: {listError}");
                     return;
                 }
                 
-                // Construct full remote file path
-                string remoteFilePath = _selectedRemoteFolderForTimer.EndsWith("/") ? 
-                    _selectedRemoteFolderForTimer + fileName : 
-                    _selectedRemoteFolderForTimer + "/" + fileName;
+                ServiceLocator.LogService.LogInfo($"Found {remoteFilesList.Count} remote files");
                 
-                // Construct local file path
-                string localFilePath = Path.Combine(_timerDownloadDestination, fileName);
-                
-                ServiceLocator.LogService.LogInfo($"Downloading specific file '{remoteFilePath}' to '{localFilePath}'");
-                
-                // Download the specific file
-                string error;
-                bool success = _currentTransferClient.DownloadFile(_coreConnectionSettings, remoteFilePath, localFilePath, false, out error);
-                
-                if (success)
-                {
-                    ServiceLocator.LogService.LogInfo($"Successfully downloaded file '{fileName}'");
-                    
-                    // Delete source file from remote if checkbox is checked
-                    if (chkDeleteSourceAfterTransfer.Checked)
-                    {
-                        try
-                        {
-                            string deleteError;
-                            bool deleteSuccess = _currentTransferClient.DeleteFile(_coreConnectionSettings, remoteFilePath, out deleteError);
-                            
-                            if (deleteSuccess)
-                            {
-                                ServiceLocator.LogService.LogInfo($"Source file deleted from remote after successful download: {fileName}");
-                            }
-                            else
-                            {
-                                ServiceLocator.LogService.LogWarning($"Failed to delete remote source file {fileName}: {deleteError ?? "Unknown error"}");
-                            }
-                        }
-                        catch (Exception deleteEx)
-                        {
-                            ServiceLocator.LogService.LogWarning($"Failed to delete remote source file {fileName}: {deleteEx.Message}");
-                        }
-                    }
-                }
-                else
-                {
-                    ServiceLocator.LogService.LogError($"Failed to download file '{fileName}': {error}");
-                }
-            }
-            catch (Exception ex)
-            {
-                ServiceLocator.LogService.LogError($"Error downloading specific file: {ex.Message}");
-            }
-        }
-        
-        private void PerformFolderMonitoringDownload()
-        {
-            try
-            {
-                // Get list of files from remote directory
-                List<string> remoteFiles;
-                string error;
-                bool success = _currentTransferClient.ListFiles(_coreConnectionSettings, _selectedRemoteFolderForTimer, out remoteFiles, out error);
-                
-                if (!success)
-                {
-                    ServiceLocator.LogService.LogError($"Failed to list remote files: {error}");
-                    return;
-                }
-                
-                if (remoteFiles == null || remoteFiles.Count == 0)
-                {
-                    ServiceLocator.LogService.LogInfo("No files found in remote folder for automatic download - will retry on next timer interval");
-                    return;
-                }
+                // Convert to array for compatibility
+                string[] remoteFiles = remoteFilesList.ToArray();
                 
                 // Apply file filtering if enabled
-                List<string> filteredFiles;
+                List<string> filteredFiles = new List<string>();
                 if (_currentJob != null && _currentJob.EnableFilters)
                 {
-                    filteredFiles = new List<string>();
                     ServiceLocator.LogService.LogInfo("Applying file filters for automatic download");
                     
                     // Parse include and exclude extensions
@@ -2404,9 +2361,10 @@ namespace syncer.ui
                     }
                     
                     // Filter files
-                    foreach (string file in remoteFiles)
+                    foreach (string remoteFile in remoteFiles)
                     {
-                        string fileExt = Path.GetExtension(file).ToLowerInvariant();
+                        string fileName = Path.GetFileName(remoteFile);
+                        string fileExt = Path.GetExtension(fileName).ToLowerInvariant();
                         bool shouldInclude = false;
                         
                         // If no include filters specified, include all by default
@@ -2429,36 +2387,42 @@ namespace syncer.ui
                             }
                         }
                         
+                        ServiceLocator.LogService.LogInfo($"DOWNLOAD FILTER: Final decision for '{fileName}': {(shouldInclude ? "INCLUDE" : "EXCLUDE")}");
+                        
                         if (shouldInclude)
                         {
-                            filteredFiles.Add(file);
+                            filteredFiles.Add(remoteFile);
                         }
                     }
                     
-                    ServiceLocator.LogService.LogInfo(string.Format("Filter results: {0} files out of {1} total files match the filter criteria", 
-                        filteredFiles.Count, remoteFiles.Count));
+                    ServiceLocator.LogService.LogInfo($"Filter results: {filteredFiles.Count} files out of {remoteFiles.Length} total files match the filter criteria");
                 }
                 else
                 {
                     // No filtering enabled - include all files
                     filteredFiles = new List<string>(remoteFiles);
-                    ServiceLocator.LogService.LogInfo("No file filtering applied - including all files");
+                    ServiceLocator.LogService.LogInfo("No file filtering applied - including all remote files");
                 }
                 
-                if (filteredFiles.Count == 0)
+                string[] currentFiles = filteredFiles.ToArray();
+                
+                if (currentFiles.Length == 0)
                 {
-                    ServiceLocator.LogService.LogInfo("No files found (after filtering) in remote folder for automatic download - will retry on next timer interval");
+                    ServiceLocator.LogService.LogInfo("No remote files found (after filtering) for automatic download - will retry on next timer interval");
                     return;
                 }
                 
-                ServiceLocator.LogService.LogInfo($"Found {filteredFiles.Count} filtered files in remote folder for download");
+                ServiceLocator.LogService.LogInfo($"Starting automatic download of {currentFiles.Length} files from '{_selectedRemoteFolderForTimer}' to '{_timerDownloadDestination}'");
                 
-                // Download all filtered files
-                PerformFolderDownload(filteredFiles.ToArray(), _selectedRemoteFolderForTimer, _timerDownloadDestination);
+                // Download all filtered files using the individual file download method
+                PerformDownload(currentFiles, _timerDownloadDestination);
+                
+                // Update last download time
+                _lastDownloadTime = DateTime.Now;
             }
             catch (Exception ex)
             {
-                ServiceLocator.LogService.LogError($"Error in folder monitoring download: {ex.Message}");
+                ServiceLocator.LogService.LogError("Automatic download error: " + ex.Message);
             }
         }
 
@@ -3008,44 +2972,6 @@ namespace syncer.ui
             }
         }
 
-        private void btnDownloadFile_Click(object sender, EventArgs e)
-        {
-            if (!ValidateConnection()) return;
-
-            // Open file manager in download mode
-            try
-            {
-                using (FormSimpleDirectoryBrowser fileManager = new FormSimpleDirectoryBrowser(_coreConnectionSettings))
-                {
-                    fileManager.IsUploadMode = false;
-                    fileManager.Text = "Download Files from Remote Server";
-                    
-                    if (fileManager.ShowDialog() == DialogResult.OK)
-                    {
-                        if (!string.IsNullOrEmpty(fileManager.SelectedRemotePath))
-                        {
-                            // Ask user for local download location
-                            using (FolderBrowserDialog localDialog = new FolderBrowserDialog())
-                            {
-                                localDialog.Description = "Select local folder to download files to";
-                                localDialog.ShowNewFolderButton = true;
-                                
-                                if (localDialog.ShowDialog() == DialogResult.OK)
-                                {
-                                    DownloadFile(fileManager.SelectedRemotePath, localDialog.SelectedPath);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error opening download dialog: " + ex.Message, "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
         private void btnOpenFileManager_Click(object sender, EventArgs e)
         {
             if (!ValidateConnection()) return;
@@ -3284,133 +3210,6 @@ namespace syncer.ui
             worker.RunWorkerAsync();
         }
 
-        private void PerformFolderDownload(string[] remoteFilePaths, string baseRemotePath, string localDestinationPath)
-        {
-            BackgroundWorker worker = new BackgroundWorker();
-            worker.WorkerReportsProgress = true;
-            worker.DoWork += (sender, e) =>
-            {
-                try
-                {
-                    ServiceLocator.LogService.LogInfo($"Starting download of {remoteFilePaths.Length} files from {baseRemotePath} to {localDestinationPath}");
-                    ServiceLocator.LogService.LogInfo($"Connection: {_coreConnectionSettings.Username}@{_coreConnectionSettings.Host}:{_coreConnectionSettings.Port}");
-                    
-                    // Ensure local destination directory exists
-                    if (!Directory.Exists(localDestinationPath))
-                    {
-                        Directory.CreateDirectory(localDestinationPath);
-                        ServiceLocator.LogService.LogInfo($"Created local destination directory: {localDestinationPath}");
-                    }
-                    
-                    int successCount = 0;
-                    int failureCount = 0;
-                    long totalBytes = 0;
-                    
-                    for (int i = 0; i < remoteFilePaths.Length; i++)
-                    {
-                        string remoteFile = remoteFilePaths[i];
-                        string fileName = Path.GetFileName(remoteFile);
-                        
-                        // Calculate local file path
-                        string localFile = Path.Combine(localDestinationPath, fileName);
-                        
-                        worker.ReportProgress((i * 100) / remoteFilePaths.Length, 
-                            $"Downloading {fileName}...");
-                        
-                        ServiceLocator.LogService.LogInfo($"Downloading: {remoteFile} -> {localFile}");
-                        
-                        try
-                        {
-                            string downloadError;
-                            bool success = _currentTransferClient.DownloadFile(_coreConnectionSettings, remoteFile, localFile, true, out downloadError);
-                            
-                            if (!success)
-                            {
-                                string errorMsg = $"Failed to download {fileName}: {downloadError ?? "Unknown error"}";
-                                ServiceLocator.LogService.LogError(errorMsg);
-                                failureCount++;
-                            }
-                            else
-                            {
-                                ServiceLocator.LogService.LogInfo($"Successfully downloaded: {fileName}");
-                                successCount++;
-                                
-                                // Get file size for statistics
-                                if (File.Exists(localFile))
-                                {
-                                    FileInfo fileInfo = new FileInfo(localFile);
-                                    totalBytes += fileInfo.Length;
-                                }
-                                
-                                // Delete source file from remote if checkbox is checked
-                                if (chkDeleteSourceAfterTransfer.Checked)
-                                {
-                                    try
-                                    {
-                                        string deleteError;
-                                        bool deleteSuccess = _currentTransferClient.DeleteFile(_coreConnectionSettings, remoteFile, out deleteError);
-                                        
-                                        if (deleteSuccess)
-                                        {
-                                            ServiceLocator.LogService.LogInfo($"Source file deleted from remote after successful download: {fileName}");
-                                        }
-                                        else
-                                        {
-                                            ServiceLocator.LogService.LogWarning($"Failed to delete remote source file {fileName}: {deleteError ?? "Unknown error"}");
-                                            // Don't count as failure - download was successful
-                                        }
-                                    }
-                                    catch (Exception deleteEx)
-                                    {
-                                        ServiceLocator.LogService.LogWarning($"Failed to delete remote source file {fileName}: {deleteEx.Message}");
-                                        // Don't count as failure - download was successful
-                                    }
-                                }
-                            }
-                        }
-                        catch (Exception fileEx)
-                        {
-                            ServiceLocator.LogService.LogError($"Error downloading {fileName}: {fileEx.Message}");
-                            failureCount++;
-                        }
-                    }
-                    
-                    worker.ReportProgress(100, "Download completed");
-                    ServiceLocator.LogService.LogInfo($"Folder download completed. Success: {successCount}, Failed: {failureCount}, Total bytes: {totalBytes}");
-                }
-                catch (Exception ex)
-                {
-                    ServiceLocator.LogService.LogError("Error during folder download: " + ex.Message);
-                    e.Result = ex;
-                }
-            };
-            
-            worker.ProgressChanged += (sender, e) =>
-            {
-                if (e.UserState != null)
-                {
-                    ServiceLocator.LogService.LogInfo(e.UserState.ToString());
-                }
-            };
-            
-            worker.RunWorkerCompleted += (sender, e) =>
-            {
-                if (e.Result is Exception)
-                {
-                    Exception ex = (Exception)e.Result;
-                    MessageBox.Show("Download failed: " + ex.Message, "Download Error", 
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-                else
-                {
-                    MessageBox.Show("Folder downloaded successfully!", "Download Complete", 
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-            };
-            
-            worker.RunWorkerAsync();
-        }
-
         private void PerformUpload(string[] localFilePaths, string remotePath)
         {
             BackgroundWorker worker = new BackgroundWorker();
@@ -3539,66 +3338,263 @@ namespace syncer.ui
             worker.RunWorkerAsync();
         }
 
-        private void DownloadFile(string remotePath, string localFolderPath)
+        #endregion
+
+        #region Direct Transfer Methods
+
+        private void btnDirectUpload_Click(object sender, EventArgs e)
         {
+            // Same functionality as btnUploadFile_Click
+            btnUploadFile_Click(sender, e);
+        }
+
+        private void btnDownloadFile_Click(object sender, EventArgs e)
+        {
+            if (!ValidateConnection()) return;
+
+            // Ask user if they want to download files or a folder
+            DialogResult choice = MessageBox.Show(
+                "Do you want to download:\n\n" +
+                "YES = Individual files from remote server\n" +
+                "NO = Entire remote folder\n" +
+                "CANCEL = Cancel operation",
+                "Download Type Selection",
+                MessageBoxButtons.YesNoCancel,
+                MessageBoxIcon.Question);
+
+            if (choice == DialogResult.Cancel)
+                return;
+
+            if (choice == DialogResult.Yes)
+            {
+                // Download individual files - ask for remote path first
+                DownloadIndividualFiles();
+            }
+            else if (choice == DialogResult.No)
+            {
+                // Download entire folder
+                DownloadEntireFolder();
+            }
+        }
+
+        private void DownloadIndividualFiles()
+        {
+            // Ask user for remote file paths
+            using (Form inputForm = new Form())
+            {
+                inputForm.Text = "Remote File Download";
+                inputForm.Size = new Size(500, 250);
+                inputForm.StartPosition = FormStartPosition.CenterParent;
+                inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                inputForm.MaximizeBox = false;
+                inputForm.MinimizeBox = false;
+                
+                Label lblInfo = new Label(); 
+                lblInfo.Left = 10; 
+                lblInfo.Top = 20; 
+                lblInfo.Text = "Enter remote file paths (one per line):"; 
+                lblInfo.AutoSize = true;
+                
+                TextBox txtRemoteFiles = new TextBox(); 
+                txtRemoteFiles.Left = 10; 
+                txtRemoteFiles.Top = 50; 
+                txtRemoteFiles.Width = 450;
+                txtRemoteFiles.Height = 100;
+                txtRemoteFiles.Multiline = true;
+                txtRemoteFiles.ScrollBars = ScrollBars.Both;
+                txtRemoteFiles.Text = "/path/to/file1.txt\r\n/path/to/file2.txt";
+                
+                Button buttonOk = new Button(); 
+                buttonOk.Text = "Download"; 
+                buttonOk.Left = 280; 
+                buttonOk.Top = 170; 
+                buttonOk.DialogResult = DialogResult.OK;
+                
+                Button buttonCancel = new Button(); 
+                buttonCancel.Text = "Cancel"; 
+                buttonCancel.Left = 370; 
+                buttonCancel.Top = 170; 
+                buttonCancel.DialogResult = DialogResult.Cancel;
+                
+                inputForm.Controls.Add(lblInfo);
+                inputForm.Controls.Add(txtRemoteFiles);
+                inputForm.Controls.Add(buttonOk);
+                inputForm.Controls.Add(buttonCancel);
+                inputForm.AcceptButton = buttonOk;
+                inputForm.CancelButton = buttonCancel;
+                
+                if (inputForm.ShowDialog() == DialogResult.OK)
+                {
+                    string[] remoteFiles = txtRemoteFiles.Text.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (remoteFiles.Length > 0)
+                    {
+                        // Ask for local download destination
+                        using (FolderBrowserDialog folderDialog = new FolderBrowserDialog())
+                        {
+                            folderDialog.Description = "Select local folder to save downloaded files";
+                            folderDialog.ShowNewFolderButton = true;
+                            
+                            if (folderDialog.ShowDialog() == DialogResult.OK)
+                            {
+                                PerformDownload(remoteFiles, folderDialog.SelectedPath);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void DownloadEntireFolder()
+        {
+            // Ask user for remote folder path
+            using (Form inputForm = new Form())
+            {
+                inputForm.Text = "Remote Folder Download";
+                inputForm.Size = new Size(450, 200);
+                inputForm.StartPosition = FormStartPosition.CenterParent;
+                inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                inputForm.MaximizeBox = false;
+                inputForm.MinimizeBox = false;
+                
+                Label lblInfo = new Label(); 
+                lblInfo.Left = 10; 
+                lblInfo.Top = 20; 
+                lblInfo.Text = "Enter remote folder path:"; 
+                lblInfo.AutoSize = true;
+                
+                TextBox txtRemoteFolder = new TextBox(); 
+                txtRemoteFolder.Left = 10; 
+                txtRemoteFolder.Top = 50; 
+                txtRemoteFolder.Width = 400;
+                txtRemoteFolder.Text = "/";
+                
+                CheckBox chkIncludeSubfolders = new CheckBox();
+                chkIncludeSubfolders.Left = 10;
+                chkIncludeSubfolders.Top = 80;
+                chkIncludeSubfolders.Text = "Include subfolders";
+                chkIncludeSubfolders.Checked = true;
+                chkIncludeSubfolders.AutoSize = true;
+                
+                Button buttonOk = new Button(); 
+                buttonOk.Text = "Download"; 
+                buttonOk.Left = 220; 
+                buttonOk.Top = 120; 
+                buttonOk.DialogResult = DialogResult.OK;
+                
+                Button buttonCancel = new Button(); 
+                buttonCancel.Text = "Cancel"; 
+                buttonCancel.Left = 320; 
+                buttonCancel.Top = 120; 
+                buttonCancel.DialogResult = DialogResult.Cancel;
+                
+                inputForm.Controls.Add(lblInfo);
+                inputForm.Controls.Add(txtRemoteFolder);
+                inputForm.Controls.Add(chkIncludeSubfolders);
+                inputForm.Controls.Add(buttonOk);
+                inputForm.Controls.Add(buttonCancel);
+                inputForm.AcceptButton = buttonOk;
+                inputForm.CancelButton = buttonCancel;
+                
+                if (inputForm.ShowDialog() == DialogResult.OK)
+                {
+                    string remoteFolder = txtRemoteFolder.Text.Trim();
+                    bool includeSubfolders = chkIncludeSubfolders.Checked;
+                    
+                    if (!string.IsNullOrEmpty(remoteFolder))
+                    {
+                        // Ask for local download destination
+                        using (FolderBrowserDialog folderDialog = new FolderBrowserDialog())
+                        {
+                            folderDialog.Description = "Select local folder to save downloaded files";
+                            folderDialog.ShowNewFolderButton = true;
+                            
+                            if (folderDialog.ShowDialog() == DialogResult.OK)
+                            {
+                                PerformFolderDownload(remoteFolder, folderDialog.SelectedPath, includeSubfolders);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void PerformDownload(string[] remoteFilePaths, string localDestinationFolder)
+        {
+            if (remoteFilePaths == null || remoteFilePaths.Length == 0) return;
+
             BackgroundWorker worker = new BackgroundWorker();
             worker.WorkerReportsProgress = true;
+            
             worker.DoWork += (sender, e) =>
             {
                 try
                 {
-                    string fileName = Path.GetFileName(remotePath);
-                    string localFilePath = Path.Combine(localFolderPath, fileName);
-                    
-                    worker.ReportProgress(50, string.Format("Downloading {0}...", fileName));
-                    
-                    string error;
-                    bool success = _currentTransferClient.DownloadFile(_coreConnectionSettings, remotePath, localFilePath, true, out error);
-                    
-                    if (!success)
+                    for (int i = 0; i < remoteFilePaths.Length; i++)
                     {
-                        throw new Exception(string.Format("Failed to download {0}: {1}", fileName, error));
-                    }
-                    else
-                    {
-                        ServiceLocator.LogService.LogInfo(string.Format("Successfully downloaded: {0}", fileName));
+                        string remoteFile = remoteFilePaths[i].Trim();
+                        if (string.IsNullOrEmpty(remoteFile)) continue;
                         
-                        // Delete source file from remote if checkbox is checked
-                        if (chkDeleteSourceAfterTransfer.Checked)
+                        // Extract filename from remote path
+                        string fileName = GetFileNameFromPath(remoteFile);
+                        string localFile = Path.Combine(localDestinationFolder, fileName);
+                        
+                        worker.ReportProgress((i * 100) / remoteFilePaths.Length, 
+                            string.Format("Downloading {0}...", fileName));
+                        
+                        ServiceLocator.LogService.LogInfo(string.Format("Downloading: {0} -> {1}", remoteFile, localFile));
+                        
+                        // Download the file
+                        string downloadError;
+                        bool success = _currentTransferClient.DownloadFile(_coreConnectionSettings, remoteFile, localFile, true, out downloadError);
+                        
+                        if (!success)
                         {
-                            try
+                            string errorMsg = string.Format("Failed to download {0}: {1}", fileName, downloadError ?? "Unknown error");
+                            ServiceLocator.LogService.LogError(errorMsg);
+                            throw new Exception(errorMsg);
+                        }
+                        else
+                        {
+                            ServiceLocator.LogService.LogInfo(string.Format("Successfully downloaded: {0}", fileName));
+                            
+                            // Delete source file if checkbox is checked and download was successful
+                            if (chkDeleteSourceAfterTransfer.Checked)
                             {
-                                string deleteError;
-                                bool deleteSuccess = _currentTransferClient.DeleteFile(_coreConnectionSettings, remotePath, out deleteError);
-                                
-                                if (deleteSuccess)
+                                try
                                 {
-                                    ServiceLocator.LogService.LogInfo(string.Format("Source file deleted from remote after successful download: {0}", fileName));
+                                    string deleteError;
+                                    bool deleted = _currentTransferClient.DeleteFile(_coreConnectionSettings, remoteFile, out deleteError);
+                                    if (deleted)
+                                    {
+                                        ServiceLocator.LogService.LogInfo(string.Format("Source file deleted after successful download: {0}", fileName));
+                                    }
+                                    else
+                                    {
+                                        ServiceLocator.LogService.LogWarning(string.Format("Failed to delete source file {0}: {1}", fileName, deleteError ?? "Unknown error"));
+                                    }
                                 }
-                                else
+                                catch (Exception deleteEx)
                                 {
-                                    ServiceLocator.LogService.LogWarning(string.Format("Failed to delete remote source file {0}: {1}", fileName, deleteError ?? "Unknown error"));
+                                    ServiceLocator.LogService.LogWarning(string.Format("Failed to delete source file {0}: {1}", fileName, deleteEx.Message));
                                     // Don't throw exception here - download was successful
                                 }
-                            }
-                            catch (Exception deleteEx)
-                            {
-                                ServiceLocator.LogService.LogWarning(string.Format("Failed to delete remote source file {0}: {1}", fileName, deleteEx.Message));
-                                // Don't throw exception here - download was successful
                             }
                         }
                     }
                     
                     worker.ReportProgress(100, "Download completed successfully!");
+                    ServiceLocator.LogService.LogInfo("All downloads completed successfully");
                 }
                 catch (Exception ex)
                 {
+                    ServiceLocator.LogService.LogError("Download failed: " + ex.Message);
                     e.Result = ex;
                 }
             };
             
             worker.ProgressChanged += (sender, e) =>
             {
+                // Could show progress dialog here
                 if (e.UserState != null)
                 {
                     ServiceLocator.LogService.LogInfo(e.UserState.ToString());
@@ -3616,7 +3612,7 @@ namespace syncer.ui
                 }
                 else
                 {
-                    MessageBox.Show("File downloaded successfully!", "Download Complete", 
+                    MessageBox.Show("Files downloaded successfully!", "Download Complete", 
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     ServiceLocator.LogService.LogInfo("Download completed successfully");
                 }
@@ -3625,20 +3621,141 @@ namespace syncer.ui
             worker.RunWorkerAsync();
         }
 
-        #endregion
-
-        #region Direct Transfer Methods
-
-        private void btnDirectUpload_Click(object sender, EventArgs e)
+        private void PerformFolderDownload(string remoteFolder, string localDestinationFolder, bool includeSubfolders)
         {
-            // Same functionality as btnUploadFile_Click
-            btnUploadFile_Click(sender, e);
+            BackgroundWorker worker = new BackgroundWorker();
+            worker.WorkerReportsProgress = true;
+            
+            worker.DoWork += (sender, e) =>
+            {
+                try
+                {
+                    worker.ReportProgress(10, "Getting remote file list...");
+                    ServiceLocator.LogService.LogInfo(string.Format("Starting folder download: {0} -> {1}", remoteFolder, localDestinationFolder));
+                    
+                    // Get list of files from remote folder
+                    List<string> remoteFiles;
+                    string listError;
+                    
+                    if (_currentTransferClient.ListFiles(_coreConnectionSettings, remoteFolder, out remoteFiles, out listError))
+                    {
+                        if (remoteFiles.Count == 0)
+                        {
+                            worker.ReportProgress(100, "No files found in remote folder");
+                            return;
+                        }
+                        
+                        ServiceLocator.LogService.LogInfo(string.Format("Found {0} files to download", remoteFiles.Count));
+                        
+                        int successCount = 0;
+                        int failCount = 0;
+                        
+                        for (int i = 0; i < remoteFiles.Count; i++)
+                        {
+                            string remoteFile = remoteFiles[i];
+                            string fileName = GetFileNameFromPath(remoteFile);
+                            
+                            // Create local destination path
+                            string localFile = Path.Combine(localDestinationFolder, fileName);
+                            
+                            worker.ReportProgress((i * 90) / remoteFiles.Count + 10, 
+                                string.Format("Downloading {0}...", fileName));
+                            
+                            ServiceLocator.LogService.LogInfo(string.Format("Downloading: {0} -> {1}", remoteFile, localFile));
+                            
+                            // Download the file
+                            string downloadError;
+                            bool success = _currentTransferClient.DownloadFile(_coreConnectionSettings, remoteFile, localFile, true, out downloadError);
+                            
+                            if (success)
+                            {
+                                successCount++;
+                                ServiceLocator.LogService.LogInfo(string.Format("Successfully downloaded: {0}", fileName));
+                                
+                                // Delete source file if checkbox is checked
+                                if (chkDeleteSourceAfterTransfer.Checked)
+                                {
+                                    try
+                                    {
+                                        string deleteError;
+                                        bool deleted = _currentTransferClient.DeleteFile(_coreConnectionSettings, remoteFile, out deleteError);
+                                        if (deleted)
+                                        {
+                                            ServiceLocator.LogService.LogInfo(string.Format("Source file deleted after download: {0}", fileName));
+                                        }
+                                        else
+                                        {
+                                            ServiceLocator.LogService.LogWarning(string.Format("Failed to delete source file {0}: {1}", fileName, deleteError ?? "Unknown error"));
+                                        }
+                                    }
+                                    catch (Exception deleteEx)
+                                    {
+                                        ServiceLocator.LogService.LogWarning(string.Format("Failed to delete source file {0}: {1}", fileName, deleteEx.Message));
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                failCount++;
+                                ServiceLocator.LogService.LogError(string.Format("Failed to download {0}: {1}", fileName, downloadError ?? "Unknown error"));
+                            }
+                        }
+                        
+                        worker.ReportProgress(100, string.Format("Download completed: {0} successful, {1} failed", successCount, failCount));
+                        ServiceLocator.LogService.LogInfo(string.Format("Folder download completed: {0} successful, {1} failed", successCount, failCount));
+                        
+                        if (failCount > 0)
+                        {
+                            throw new Exception(string.Format("Some downloads failed: {0} successful, {1} failed", successCount, failCount));
+                        }
+                    }
+                    else
+                    {
+                        string errorMsg = string.Format("Failed to list remote files: {0}", listError ?? "Unknown error");
+                        ServiceLocator.LogService.LogError(errorMsg);
+                        throw new Exception(errorMsg);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ServiceLocator.LogService.LogError("Folder download failed: " + ex.Message);
+                    e.Result = ex;
+                }
+            };
+            
+            worker.ProgressChanged += (sender, e) =>
+            {
+                if (e.UserState != null)
+                {
+                    ServiceLocator.LogService.LogInfo(e.UserState.ToString());
+                }
+            };
+            
+            worker.RunWorkerCompleted += (sender, e) =>
+            {
+                if (e.Result is Exception)
+                {
+                    Exception ex = (Exception)e.Result;
+                    MessageBox.Show("Folder download failed: " + ex.Message, "Download Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else
+                {
+                    MessageBox.Show("Folder downloaded successfully!", "Download Complete", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            };
+            
+            worker.RunWorkerAsync();
         }
 
-        private void btnDirectDownload_Click(object sender, EventArgs e)
+        private string GetFileNameFromPath(string path)
         {
-            // Same functionality as btnDownloadFile_Click
-            btnDownloadFile_Click(sender, e);
+            if (string.IsNullOrEmpty(path)) return "unknown_file";
+            
+            // Handle both forward and backslashes
+            string[] pathParts = path.Split(new char[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+            return pathParts.Length > 0 ? pathParts[pathParts.Length - 1] : "unknown_file";
         }
 
         private void chkDeleteSourceAfterTransfer_CheckedChanged(object sender, EventArgs e)

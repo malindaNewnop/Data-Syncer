@@ -469,84 +469,105 @@ namespace syncer.ui.Services
             {
                 ServiceLocator.LogService.LogInfo(string.Format("Starting download transfer job: {0}", job.Name));
                 
-                // Get connection settings
-                ConnectionSettings uiSettings = ServiceLocator.ConnectionService.GetConnectionSettings();
-                if (uiSettings == null)
+                // Create appropriate transfer client based on source protocol
+                syncer.core.ITransferClient transferClient = null;
+                var sourceConnection = job.SourceConnection;
+                
+                if (sourceConnection == null)
                 {
-                    throw new Exception("No connection settings available for download transfer");
+                    throw new Exception("Source connection settings are missing");
                 }
                 
-                // Convert to core connection settings
-                var coreConnectionSettings = new syncer.core.ConnectionSettings
+                // Initialize transfer client based on protocol
+                switch (sourceConnection.Protocol.ToUpper())
                 {
-                    Protocol = uiSettings.Protocol == "SFTP" ? syncer.core.ProtocolType.Sftp :
-                              uiSettings.Protocol == "FTP" ? syncer.core.ProtocolType.Ftp :
-                              syncer.core.ProtocolType.Local,
-                    Host = uiSettings.Host,
-                    Port = uiSettings.Port,
-                    Username = uiSettings.Username,
-                    Password = uiSettings.Password,
-                    SshKeyPath = uiSettings.SshKeyPath,
-                    Timeout = uiSettings.Timeout
-                };
-                
-                // Create transfer client
-                var factory = syncer.core.ServiceFactory.CreateTransferClientFactory();
-                var transferClient = factory.Create(coreConnectionSettings.Protocol);
-                
-                // Get list of files from remote directory
-                List<string> remoteFiles;
-                string error;
-                bool success = transferClient.ListFiles(coreConnectionSettings, job.SourcePath, out remoteFiles, out error);
-                
-                if (!success)
-                {
-                    throw new Exception($"Failed to list remote files: {error}");
+                    case "FTP":
+                        transferClient = new syncer.core.Transfers.EnhancedFtpTransferClient();
+                        break;
+                    case "SFTP":
+                        transferClient = new syncer.core.Transfers.ProductionSftpTransferClient();
+                        break;
+                    case "LOCAL":
+                        transferClient = new syncer.core.LocalTransferClient();
+                        break;
+                    default:
+                        throw new Exception(string.Format("Unsupported source protocol: {0}", sourceConnection.Protocol));
                 }
                 
-                if (remoteFiles == null || remoteFiles.Count == 0)
+                // Convert UI connection settings to core connection settings
+                var coreSourceConnection = ConvertToConnectionSettings(sourceConnection);
+                
+                // Test connection first
+                string testError;
+                if (!transferClient.TestConnection(coreSourceConnection, out testError))
                 {
-                    ServiceLocator.LogService.LogInfo("No files found in remote directory for download");
+                    throw new Exception(string.Format("Connection test failed: {0}", testError));
+                }
+                
+                // Get files to download from remote source
+                List<string> filesToDownload;
+                string listError;
+                
+                if (!transferClient.ListFiles(coreSourceConnection, job.SourcePath, out filesToDownload, out listError))
+                {
+                    throw new Exception(string.Format("Failed to list remote files: {0}", listError));
+                }
+                
+                if (filesToDownload.Count == 0)
+                {
+                    ServiceLocator.LogService.LogInfo("No files found to download");
                     job.LastFileCount = 0;
                     job.LastTransferSize = 0;
                     return;
                 }
                 
-                ServiceLocator.LogService.LogInfo(string.Format("Found {0} files to download", remoteFiles.Count));
+                ServiceLocator.LogService.LogInfo(string.Format("Found {0} files to download", filesToDownload.Count));
                 
-                // Ensure local destination directory exists
+                // Ensure destination directory exists
                 if (!Directory.Exists(job.DestinationPath))
                 {
                     Directory.CreateDirectory(job.DestinationPath);
-                    ServiceLocator.LogService.LogInfo($"Created local destination directory: {job.DestinationPath}");
+                    ServiceLocator.LogService.LogInfo(string.Format("Created destination directory: {0}", job.DestinationPath));
                 }
                 
                 int successCount = 0;
                 long totalBytes = 0;
                 
-                // Download each file
-                foreach (string remoteFile in remoteFiles)
+                foreach (string remoteFile in filesToDownload)
                 {
                     try
                     {
+                        // Calculate local destination path
                         string fileName = Path.GetFileName(remoteFile);
+                        if (string.IsNullOrEmpty(fileName)) continue;
+                        
                         string localFile = Path.Combine(job.DestinationPath, fileName);
                         
                         ServiceLocator.LogService.LogInfo(string.Format("Downloading: {0} -> {1}", remoteFile, localFile));
                         
                         string downloadError;
-                        if (transferClient.DownloadFile(coreConnectionSettings, remoteFile, localFile, job.OverwriteExisting, out downloadError))
+                        if (transferClient.DownloadFile(coreSourceConnection, remoteFile, localFile, job.OverwriteExisting, out downloadError))
                         {
                             successCount++;
-                            
-                            // Get file size for statistics
                             if (File.Exists(localFile))
                             {
-                                FileInfo fileInfo = new FileInfo(localFile);
-                                totalBytes += fileInfo.Length;
+                                totalBytes += new FileInfo(localFile).Length;
                             }
-                            
                             ServiceLocator.LogService.LogInfo(string.Format("Successfully downloaded: {0}", fileName));
+                            
+                            // Delete source file if requested
+                            if (job.DeleteSourceAfterTransfer)
+                            {
+                                string deleteError;
+                                if (transferClient.DeleteFile(coreSourceConnection, remoteFile, out deleteError))
+                                {
+                                    ServiceLocator.LogService.LogInfo(string.Format("Source file deleted after download: {0}", fileName));
+                                }
+                                else
+                                {
+                                    ServiceLocator.LogService.LogWarning(string.Format("Failed to delete source file {0}: {1}", fileName, deleteError));
+                                }
+                            }
                         }
                         else
                         {
@@ -562,20 +583,33 @@ namespace syncer.ui.Services
                 // Update job statistics
                 job.LastFileCount = successCount;
                 job.LastTransferSize = totalBytes;
-                job.LastRun = DateTime.Now;
-                job.LastStatus = $"Downloaded {successCount} files successfully";
                 
-                ServiceLocator.LogService.LogInfo(string.Format("Download job completed successfully. Downloaded {0} files ({1} bytes)", successCount, totalBytes));
+                if (successCount == filesToDownload.Count)
+                {
+                    ServiceLocator.LogService.LogInfo(string.Format("Download job completed successfully. Downloaded {0} files ({1} bytes)", successCount, totalBytes));
+                }
+                else if (successCount > 0)
+                {
+                    ServiceLocator.LogService.LogWarning(string.Format("Download partially completed. {0} of {1} files downloaded successfully", successCount, filesToDownload.Count));
+                }
+                else
+                {
+                    throw new Exception("Download job failed - no files were downloaded successfully");
+                }
             }
             catch (Exception ex)
             {
                 ServiceLocator.LogService.LogError(string.Format("Download transfer job failed: {0}", ex.Message));
+                
+                // Update job statistics to reflect the error
                 if (job != null)
                 {
                     job.LastRun = DateTime.Now;
-                    job.LastStatus = "Failed: " + ex.Message;
+                    job.LastStatus = "Error: " + ex.Message;
+                    job.LastFileCount = 0;
+                    job.LastTransferSize = 0;
                 }
-                throw;
+                throw; // Re-throw to update job status
             }
         }
 

@@ -325,7 +325,7 @@ namespace syncer.core.Transfers
         }
 
         /// <summary>
-        /// Download file with retry logic and progress tracking
+        /// Download file from FTP server with retry logic and progress tracking
         /// </summary>
         public bool DownloadFile(ConnectionSettings settings, string remotePath, string localPath, bool overwrite, out string error)
         {
@@ -361,6 +361,7 @@ namespace syncer.core.Transfers
                         return false;
                     }
 
+                    // Check if local file exists and overwrite is false
                     if (!overwrite && File.Exists(localPath))
                     {
                         error = $"Destination file already exists: {localPath}";
@@ -369,8 +370,10 @@ namespace syncer.core.Transfers
 
                     // Ensure local directory exists
                     var localDir = Path.GetDirectoryName(localPath);
-                    if (!Directory.Exists(localDir))
+                    if (!string.IsNullOrEmpty(localDir) && !Directory.Exists(localDir))
+                    {
                         Directory.CreateDirectory(localDir);
+                    }
 
                     // Get file size for progress tracking
                     _currentFileSize = GetFileSize(settings, remotePath);
@@ -393,9 +396,14 @@ namespace syncer.core.Transfers
                         {
                             if (_cancelRequested)
                             {
-                                fileStream.Close();
-                                File.Delete(localPath); // Clean up partial file
                                 error = "Transfer was cancelled";
+                                // Clean up partial file
+                                try
+                                {
+                                    fileStream.Close();
+                                    File.Delete(localPath);
+                                }
+                                catch { } // Ignore cleanup errors
                                 return false;
                             }
 
@@ -411,17 +419,38 @@ namespace syncer.core.Transfers
                         }
                     }
 
-                    return true;
+                    // Verify download by checking file size
+                    if (File.Exists(localPath))
+                    {
+                        var localFileInfo = new FileInfo(localPath);
+                        if (_currentFileSize > 0 && localFileInfo.Length != _currentFileSize)
+                        {
+                            error = $"Download verification failed: file sizes do not match (local: {localFileInfo.Length}, remote: {_currentFileSize})";
+                            
+                            if (attempt < _defaultRetryCount)
+                            {
+                                Thread.Sleep(_defaultRetryDelayMs * (attempt + 1));
+                                continue;
+                            }
+                            return false;
+                        }
+                        return true;
+                    }
+                    else
+                    {
+                        error = "Download failed: local file does not exist after download";
+                        
+                        if (attempt < _defaultRetryCount)
+                        {
+                            Thread.Sleep(_defaultRetryDelayMs * (attempt + 1));
+                            continue;
+                        }
+                        return false;
+                    }
                 }
                 catch (WebException ex)
                 {
                     error = $"Download failed: {GetWebExceptionMessage(ex)}";
-                    
-                    // Clean up partial file
-                    if (File.Exists(localPath))
-                    {
-                        try { File.Delete(localPath); } catch { }
-                    }
                     
                     if (attempt < _defaultRetryCount && !IsConnectionError(ex))
                     {
@@ -433,12 +462,6 @@ namespace syncer.core.Transfers
                 catch (Exception ex)
                 {
                     error = $"Download failed: {ex.Message}";
-                    
-                    // Clean up partial file
-                    if (File.Exists(localPath))
-                    {
-                        try { File.Delete(localPath); } catch { }
-                    }
                     
                     if (attempt < _defaultRetryCount)
                     {
@@ -537,23 +560,13 @@ namespace syncer.core.Transfers
                 remoteDir = remoteDir.Replace('\\', '/');
                 if (!remoteDir.StartsWith("/"))
                     remoteDir = "/" + remoteDir;
+                if (!remoteDir.EndsWith("/"))
+                    remoteDir = remoteDir + "/";
 
-                var request = CreateFtpRequest(settings, remoteDir, WebRequestMethods.Ftp.ListDirectory);
-                using (var response = (FtpWebResponse)request.GetResponse())
-                using (var reader = new StreamReader(response.GetResponseStream()))
-                {
-                    string line;
-                    while ((line = reader.ReadLine()) != null)
-                    {
-                        var fileName = line.Trim();
-                        if (!string.IsNullOrEmpty(fileName) && fileName != "." && fileName != "..")
-                        {
-                            files.Add(fileName);
-                        }
-                    }
-                }
+                // Recursively list all files including subfolders
+                ListFilesRecursive(settings, remoteDir, files, out error);
 
-                return true;
+                return error == null;
             }
             catch (WebException ex)
             {
@@ -564,6 +577,69 @@ namespace syncer.core.Transfers
             {
                 error = $"List files failed: {ex.Message}";
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Recursively list all files in directory and subdirectories
+        /// </summary>
+        private void ListFilesRecursive(ConnectionSettings settings, string directory, List<string> files, out string error)
+        {
+            error = null;
+            try
+            {
+                var request = CreateFtpRequest(settings, directory, WebRequestMethods.Ftp.ListDirectoryDetails);
+                using (var response = (FtpWebResponse)request.GetResponse())
+                using (var reader = new StreamReader(response.GetResponseStream()))
+                {
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        var fileName = line.Trim();
+                        if (!string.IsNullOrEmpty(fileName) && fileName != "." && fileName != "..")
+                        {
+                            var fullPath = directory + fileName;
+                            
+                            // Try to determine if this is a file or directory
+                            // Simple approach: assume it's a directory if listing it doesn't fail
+                            bool isDirectory = false;
+                            try
+                            {
+                                var testRequest = CreateFtpRequest(settings, fullPath + "/", WebRequestMethods.Ftp.ListDirectory);
+                                testRequest.Timeout = 5000; // Short timeout for directory test
+                                using (var testResponse = (FtpWebResponse)testRequest.GetResponse())
+                                {
+                                    isDirectory = true;
+                                }
+                            }
+                            catch
+                            {
+                                isDirectory = false;
+                            }
+                            
+                            if (isDirectory)
+                            {
+                                // Recursively process subdirectory
+                                string subError;
+                                ListFilesRecursive(settings, fullPath + "/", files, out subError);
+                                if (subError != null && error == null)
+                                    error = subError;
+                            }
+                            else
+                            {
+                                files.Add(fullPath);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (WebException ex)
+            {
+                error = $"List files failed in directory {directory}: {GetWebExceptionMessage(ex)}";
+            }
+            catch (Exception ex)
+            {
+                error = $"List files failed in directory {directory}: {ex.Message}";
             }
         }
 

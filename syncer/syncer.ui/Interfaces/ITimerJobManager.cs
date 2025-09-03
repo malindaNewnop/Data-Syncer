@@ -217,5 +217,44 @@ namespace syncer.ui.Interfaces
         /// <param name="jobId">The ID of the job</param>
         /// <returns>DateTime when the current upload started, or null if not uploading</returns>
         DateTime? GetTimerJobUploadStartTime(long jobId);
+        
+        // Download-specific methods
+        
+        /// <summary>
+        /// Registers a download timer job that will download files from remote to local
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <param name="jobName">The name of the download job</param>
+        /// <param name="remoteFolderPath">The remote folder path to download from</param>
+        /// <param name="localDestinationPath">The local destination path to save files to</param>
+        /// <param name="intervalMs">The timer interval in milliseconds</param>
+        /// <param name="includeSubfolders">Whether to include subfolders in download</param>
+        /// <param name="deleteSourceAfterTransfer">Whether to delete remote files after successful download</param>
+        /// <param name="enableFilters">Whether to enable file filtering</param>
+        /// <param name="includeExtensions">List of file extensions to include</param>
+        /// <param name="excludeExtensions">List of file extensions to exclude</param>
+        /// <returns>True if the download job was registered successfully</returns>
+        bool RegisterDownloadTimerJob(long jobId, string jobName, string remoteFolderPath, string localDestinationPath, double intervalMs, bool includeSubfolders, bool deleteSourceAfterTransfer, bool enableFilters, List<string> includeExtensions, List<string> excludeExtensions);
+        
+        /// <summary>
+        /// Gets the last download time for a job
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>DateTime of the last download or null if never downloaded</returns>
+        DateTime? GetLastDownloadTime(long jobId);
+        
+        /// <summary>
+        /// Checks if a timer job is currently performing a download
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>True if the job is currently downloading</returns>
+        bool IsTimerJobDownloading(long jobId);
+        
+        /// <summary>
+        /// Gets the download start time for a timer job
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>DateTime when the current download started, or null if not downloading</returns>
+        DateTime? GetTimerJobDownloadStartTime(long jobId);
     }
 }

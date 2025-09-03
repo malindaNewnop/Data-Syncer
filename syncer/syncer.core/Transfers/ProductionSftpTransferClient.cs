@@ -371,7 +371,7 @@ namespace syncer.core.Transfers
         }
 
         /// <summary>
-        /// Download file with retry logic and progress tracking
+        /// Download file from SFTP server with retry logic and progress tracking
         /// </summary>
         public bool DownloadFile(ConnectionSettings settings, string remotePath, string localPath, bool overwrite, out string error)
         {
@@ -402,13 +402,14 @@ namespace syncer.core.Transfers
                         return false;
                     }
 
-                    var remoteAttrs = client.GetAttributes(remotePath);
-                    if (!remoteAttrs.IsRegularFile)
+                    var attrs = client.GetAttributes(remotePath);
+                    if (!attrs.IsRegularFile)
                     {
-                        error = $"Source is not a regular file: {remotePath}";
+                        error = $"Remote path is not a regular file: {remotePath}";
                         return false;
                     }
 
+                    // Check if local file exists and overwrite is false
                     if (!overwrite && File.Exists(localPath))
                     {
                         error = $"Destination file already exists: {localPath}";
@@ -417,11 +418,13 @@ namespace syncer.core.Transfers
 
                     // Ensure local directory exists
                     var localDir = Path.GetDirectoryName(localPath);
-                    if (!Directory.Exists(localDir))
+                    if (!string.IsNullOrEmpty(localDir) && !Directory.Exists(localDir))
+                    {
                         Directory.CreateDirectory(localDir);
+                    }
 
                     // Get file size for progress tracking
-                    _currentFileSize = remoteAttrs.Size;
+                    _currentFileSize = attrs.Size;
                     _currentBytesTransferred = 0;
                     _transferStartTime = DateTime.Now;
 
@@ -442,7 +445,7 @@ namespace syncer.core.Transfers
                         });
                     }
 
-                    // Verify download
+                    // Verify download by checking file size
                     if (File.Exists(localPath))
                     {
                         var localFileInfo = new FileInfo(localPath);
@@ -452,10 +455,7 @@ namespace syncer.core.Transfers
                         }
                         else
                         {
-                            error = $"Download verification failed: file sizes do not match (remote: {_currentFileSize}, local: {localFileInfo.Length})";
-                            
-                            // Clean up partial file
-                            try { File.Delete(localPath); } catch { }
+                            error = $"Download verification failed: file sizes do not match (local: {localFileInfo.Length}, remote: {_currentFileSize})";
                             
                             if (attempt < _defaultRetryCount)
                             {
@@ -481,12 +481,6 @@ namespace syncer.core.Transfers
                 {
                     error = $"SFTP connection failed during download: {ex.Message}";
                     
-                    // Clean up partial file
-                    if (File.Exists(localPath))
-                    {
-                        try { File.Delete(localPath); } catch { }
-                    }
-                    
                     if (attempt < _defaultRetryCount)
                     {
                         Thread.Sleep(_defaultRetryDelayMs * (attempt + 1));
@@ -497,13 +491,6 @@ namespace syncer.core.Transfers
                 catch (SftpPermissionDeniedException ex)
                 {
                     error = $"Permission denied during download: {ex.Message}";
-                    
-                    // Clean up partial file
-                    if (File.Exists(localPath))
-                    {
-                        try { File.Delete(localPath); } catch { }
-                    }
-                    
                     return false; // Don't retry permission errors
                 }
                 catch (SftpPathNotFoundException ex)
@@ -514,12 +501,6 @@ namespace syncer.core.Transfers
                 catch (Exception ex)
                 {
                     error = $"Download failed: {ex.Message}";
-                    
-                    // Clean up partial file
-                    if (File.Exists(localPath))
-                    {
-                        try { File.Delete(localPath); } catch { }
-                    }
                     
                     if (attempt < _defaultRetryCount)
                     {
@@ -653,6 +634,8 @@ namespace syncer.core.Transfers
             try
             {
                 remoteDir = remoteDir.Replace('\\', '/');
+                if (!remoteDir.EndsWith("/"))
+                    remoteDir = remoteDir + "/";
 
                 client = CreateSftpClient(settings);
                 client.Connect();
@@ -670,14 +653,8 @@ namespace syncer.core.Transfers
                     return false;
                 }
 
-                var entries = client.ListDirectory(remoteDir);
-                foreach (var entry in entries)
-                {
-                    if (entry.IsRegularFile)
-                    {
-                        files.Add(entry.Name);
-                    }
-                }
+                // Recursively list all files including subfolders
+                ListFilesRecursive(client, remoteDir, files);
 
                 return true;
             }
@@ -708,6 +685,40 @@ namespace syncer.core.Transfers
                     try { client.Disconnect(); } catch { }
                     client.Dispose();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Recursively list all files in directory and subdirectories
+        /// </summary>
+        private void ListFilesRecursive(SftpClient client, string directory, List<string> files)
+        {
+            try
+            {
+                var entries = client.ListDirectory(directory);
+                foreach (var entry in entries)
+                {
+                    if (entry.Name == "." || entry.Name == "..")
+                        continue;
+
+                    var fullPath = directory + entry.Name;
+                    
+                    if (entry.IsRegularFile)
+                    {
+                        files.Add(fullPath);
+                    }
+                    else if (entry.IsDirectory)
+                    {
+                        // Recursively process subdirectory
+                        ListFilesRecursive(client, fullPath + "/", files);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log error but continue with other files
+                // In production, you might want to use proper logging
+                System.Diagnostics.Debug.WriteLine($"Error listing directory {directory}: {ex.Message}");
             }
         }
 

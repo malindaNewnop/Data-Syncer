@@ -304,10 +304,6 @@ namespace syncer.core
                     {
                         success = destClient.UploadFile(job.DestinationConnection, sourceFile, destinationFile, job.OverwriteExisting, out error);
                     }
-                    else if (destClient.Protocol == ProtocolType.Local)
-                    {
-                        success = sourceClient.DownloadFile(job.Connection, sourceFile, destinationFile, job.OverwriteExisting, out error);
-                    }
                 }
 
                 if (!success)
