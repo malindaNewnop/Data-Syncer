@@ -259,7 +259,58 @@ namespace syncer.ui
         {
             try
             {
-                // Clear timer jobs grid
+                ServiceLocator.LogService?.LogInfo("Starting application reset to fresh state...");
+
+                // 1. Stop and remove all timer jobs
+                ITimerJobManager timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager != null)
+                {
+                    List<long> runningJobs = timerJobManager.GetRegisteredTimerJobs();
+                    foreach (long jobId in runningJobs)
+                    {
+                        // Stop the timer job first
+                        timerJobManager.StopTimerJob(jobId);
+                        // Then remove it completely
+                        timerJobManager.RemoveTimerJob(jobId);
+                    }
+                    ServiceLocator.LogService?.LogInfo($"Removed {runningJobs.Count} timer jobs");
+                }
+
+                // 2. Clear all sync jobs from job service
+                if (_jobService != null)
+                {
+                    List<SyncJob> allJobs = _jobService.GetAllJobs();
+                    foreach (SyncJob job in allJobs)
+                    {
+                        _jobService.StopJob(job.Id);
+                        _jobService.DeleteJob(job.Id);
+                    }
+                    ServiceLocator.LogService?.LogInfo($"Cleared {allJobs.Count} sync jobs");
+                }
+
+                // 3. Reset connection settings to empty/default
+                if (_connectionService != null)
+                {
+                    ConnectionSettings emptySettings = new ConnectionSettings
+                    {
+                        Protocol = "LOCAL",
+                        ProtocolType = 0, // 0 = Local
+                        Host = "",
+                        Port = 22,
+                        Username = "",
+                        SshKeyPath = "",
+                        Timeout = 30,
+                        IsConnected = false
+                    };
+                    _connectionService.SaveConnectionSettings(emptySettings);
+                    ServiceLocator.LogService?.LogInfo("Reset connection settings to default empty state");
+                }
+
+                // 4. Clear logs
+                ServiceLocator.LogService?.ClearLogs();
+                ServiceLocator.LogService?.LogInfo("Cleared application logs");
+
+                // 5. Clear timer jobs grid
                 if (dgvTimerJobs.InvokeRequired)
                 {
                     dgvTimerJobs.Invoke(new Action(() => dgvTimerJobs.Rows.Clear()));
@@ -269,18 +320,32 @@ namespace syncer.ui
                     dgvTimerJobs.Rows.Clear();
                 }
 
-                // Clear any logs or status displays
+                // 6. Clear any logs or status displays
                 ClearLogDisplays();
                 
-                // Update UI status
+                // 7. Update UI status to show fresh state
                 UpdateServiceStatus();
                 UpdateConnectionStatus();
 
-                ServiceLocator.LogService?.LogInfo("Application reset to new state for creating new configuration");
+                // 8. Update running jobs label
+                if (lblRunningTimerJobs != null)
+                {
+                    if (lblRunningTimerJobs.InvokeRequired)
+                    {
+                        lblRunningTimerJobs.Invoke(new Action(() => lblRunningTimerJobs.Text = "Active Timer Jobs: 0"));
+                    }
+                    else
+                    {
+                        lblRunningTimerJobs.Text = "Active Timer Jobs: 0";
+                    }
+                }
+
+                ServiceLocator.LogService?.LogInfo("Application successfully reset to fresh state - ready for new configuration");
             }
             catch (Exception ex)
             {
                 ServiceLocator.LogService?.LogError("Error resetting application state: " + ex.Message);
+                throw; // Re-throw to be caught by the calling method
             }
         }
 
@@ -324,12 +389,24 @@ namespace syncer.ui
         {
             try
             {
-                // Reset application to new instance state
-                ResetApplicationToNewState();
+                // Ask for confirmation before resetting
+                DialogResult result = MessageBox.Show(
+                    "This will clear all current jobs, connections, and configurations to start fresh.\n\n" +
+                    "Are you sure you want to create a new configuration?", 
+                    "New Configuration", 
+                    MessageBoxButtons.YesNo, 
+                    MessageBoxIcon.Question);
 
-                // Show confirmation that application has been reset
-                MessageBox.Show("Application has been reset to a fresh start.", "New", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (result == DialogResult.Yes)
+                {
+                    // Reset application to new instance state
+                    ResetApplicationToNewState();
+
+                    // Show confirmation that application has been reset
+                    MessageBox.Show("Application has been reset to a fresh start.\n\nYou can now configure new connections and jobs.", 
+                        "New Configuration Created", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
             }
             catch (Exception ex)
             {
