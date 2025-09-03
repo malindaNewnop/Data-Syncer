@@ -79,9 +79,6 @@ namespace syncer.ui.Services
         {
             try
             {
-                // Debug logging
-                _logService.LogInfo(string.Format("=== REGISTERING TIMER JOB {0} ===", jobId));
-                
                 // Check if the job already exists
                 if (_timerJobs.ContainsKey(jobId))
                 {

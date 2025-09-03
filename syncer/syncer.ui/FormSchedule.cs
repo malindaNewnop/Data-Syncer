@@ -1037,15 +1037,9 @@ namespace syncer.ui
                 int intervalValue = (int)numTimerInterval.Value;
                 string unit = cmbTimerUnit.SelectedItem.ToString();
                 
-                // Convert to minutes for storage
-                if (unit == "Seconds")
-                    _currentJob.IntervalValue = intervalValue / 60; // Convert seconds to minutes
-                else if (unit == "Minutes")
-                    _currentJob.IntervalValue = intervalValue;
-                else if (unit == "Hours")
-                    _currentJob.IntervalValue = intervalValue * 60;
-                
-                _currentJob.IntervalType = "Minutes"; // Always store as minutes internally
+                // Store the original value and unit without conversion
+                _currentJob.IntervalValue = intervalValue;
+                _currentJob.IntervalType = unit; // Store the actual selected unit
             }
             else
             {
@@ -1110,7 +1104,17 @@ namespace syncer.ui
                     // Register or update the job with the timer job manager
                     if (timerJobManager != null)
                     {
-                        double intervalMs = CalculateTimerInterval();
+                        // Use the stored interval values from _currentJob instead of recalculating from UI
+                        // This ensures consistency between what's stored and what's registered
+                        double intervalMs;
+                        if (_currentJob != null && _currentJob.IntervalValue > 0 && !string.IsNullOrEmpty(_currentJob.IntervalType))
+                        {
+                            intervalMs = GetIntervalInMilliseconds(_currentJob.IntervalValue, _currentJob.IntervalType);
+                        }
+                        else
+                        {
+                            intervalMs = CalculateTimerInterval();
+                        }
                         
                         string sourcePath = _currentTransferMode == "Upload" ? _selectedFolderForTimer : _selectedRemoteFolderForTimer;
                         string destPath = _currentTransferMode == "Upload" ? _timerUploadDestination : _timerDownloadDestination;
@@ -2596,7 +2600,7 @@ namespace syncer.ui
                 IncludeSubFolders = true, // Default value
                 OverwriteExisting = true, // Default value
                 IntervalValue = (int)numTimerInterval.Value,
-                IntervalType = "Minutes", // Based on the form's timer setting
+                IntervalType = cmbTimerUnit?.SelectedItem?.ToString() ?? "Minutes", // Get actual selected unit from combo box
                 TransferMode = "Upload", // This is a timer upload job
                 CreatedDate = DateTime.Now,
                 LastStatus = "Ready to run",
@@ -2656,6 +2660,16 @@ namespace syncer.ui
             {
                 if (config.JobSettings != null)
                 {
+                    // **CRITICAL FIX**: Update _currentJob with loaded configuration values
+                    if (_currentJob == null) _currentJob = new SyncJob();
+                    _currentJob.Id = config.JobSettings.Id;
+                    _currentJob.Name = config.JobSettings.Name;
+                    _currentJob.IntervalValue = config.JobSettings.IntervalValue;
+                    _currentJob.IntervalType = config.JobSettings.IntervalType;
+                    _currentJob.SourcePath = config.JobSettings.SourcePath;
+                    _currentJob.DestinationPath = config.JobSettings.DestinationPath;
+                    _currentJob.IsEnabled = config.JobSettings.IsEnabled;
+                    
                     // Apply job settings to form controls
                     txtJobName.Text = config.JobSettings.Name ?? "";
                     chkEnableJob.Checked = config.JobSettings.IsEnabled;
@@ -2664,16 +2678,21 @@ namespace syncer.ui
                     _selectedFolderForTimer = config.JobSettings.SourcePath;
                     _timerUploadDestination = config.JobSettings.DestinationPath;
                     
-                    // Set timer interval
-                    if (config.JobSettings.IntervalType?.ToLower() == "minutes")
+                    // Set timer interval - now we store original values and units
+                    numTimerInterval.Value = Math.Max(1, Math.Min((decimal)numTimerInterval.Maximum, config.JobSettings.IntervalValue));
+                    
+                    // Set the time unit combo box to match the stored unit
+                    if (cmbTimerUnit != null)
                     {
-                        numTimerInterval.Value = Math.Max(1, Math.Min((decimal)numTimerInterval.Maximum, config.JobSettings.IntervalValue));
-                    }
-                    else if (config.JobSettings.IntervalType?.ToLower() == "seconds")
-                    {
-                        // Convert seconds to minutes
-                        var minutes = Math.Max(1, config.JobSettings.IntervalValue / 60);
-                        numTimerInterval.Value = Math.Max(1, Math.Min((decimal)numTimerInterval.Maximum, minutes));
+                        string intervalType = config.JobSettings.IntervalType ?? "Minutes";
+                        for (int i = 0; i < cmbTimerUnit.Items.Count; i++)
+                        {
+                            if (cmbTimerUnit.Items[i].ToString().Equals(intervalType, StringComparison.OrdinalIgnoreCase))
+                            {
+                                cmbTimerUnit.SelectedIndex = i;
+                                break;
+                            }
+                        }
                     }
                     
 
@@ -2723,6 +2742,42 @@ namespace syncer.ui
                 {
                     var intervalMs = GetIntervalInMilliseconds(config.JobSettings.IntervalValue, config.JobSettings.IntervalType);
                     
+                    // **KEY FIX**: Register with TimerJobManager first
+                    ITimerJobManager timerJobManager = ServiceLocator.TimerJobManager;
+                    if (timerJobManager != null)
+                    {
+                        // Prepare current job object with correct interval values
+                        if (_currentJob == null) _currentJob = new SyncJob();
+                        _currentJob.Id = config.JobSettings.Id; // Use the config ID
+                        _currentJob.Name = config.JobSettings.Name;
+                        _currentJob.IntervalValue = config.JobSettings.IntervalValue;
+                        _currentJob.IntervalType = config.JobSettings.IntervalType;
+                        _currentJob.SourcePath = config.JobSettings.SourcePath;
+                        _currentJob.DestinationPath = config.JobSettings.DestinationPath;
+                        _currentJob.IsEnabled = true;
+                        
+                        // Register with timer job manager using the correct interval
+                        List<string> includeExtensions = new List<string>();
+                        List<string> excludeExtensions = new List<string>();
+                        
+                        bool registered = timerJobManager.RegisterTimerJob(
+                            _currentJob.Id, 
+                            _currentJob.Name,
+                            config.JobSettings.SourcePath, 
+                            config.JobSettings.DestinationPath, 
+                            intervalMs, // Use the calculated intervalMs from config
+                            true, // includeSubfolders
+                            false, // deleteSourceAfterTransfer
+                            false, // enableFilters
+                            includeExtensions, 
+                            excludeExtensions);
+                        
+                        if (registered)
+                        {
+                            timerJobManager.StartTimerJob(_currentJob.Id);
+                        }
+                    }
+                    
                     // Start the timer job similar to btnStartTimer_Click
                     if (_uploadTimer == null)
                     {
@@ -2762,10 +2817,13 @@ namespace syncer.ui
         {
             switch (intervalType?.ToLower())
             {
+                case "second":
                 case "seconds":
                     return intervalValue * 1000;
+                case "minute":
                 case "minutes":
                     return intervalValue * 60 * 1000;
+                case "hour":
                 case "hours":
                     return intervalValue * 60 * 60 * 1000;
                 default:

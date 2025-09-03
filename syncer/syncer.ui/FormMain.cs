@@ -1341,10 +1341,13 @@ namespace syncer.ui
         {
             switch (intervalType?.ToLower())
             {
+                case "second":
                 case "seconds":
                     return intervalValue * 1000;
+                case "minute":
                 case "minutes":
                     return intervalValue * 60 * 1000;
+                case "hour":
                 case "hours":
                     return intervalValue * 60 * 60 * 1000;
                 default:

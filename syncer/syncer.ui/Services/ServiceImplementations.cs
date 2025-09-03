@@ -613,13 +613,15 @@ namespace syncer.ui.Services
 
         private double GetIntervalInMilliseconds(SyncJob job)
         {
-            switch (job.IntervalType)
+            switch (job.IntervalType?.ToLower())
             {
-                case "Minutes":
+                case "seconds":
+                    return job.IntervalValue * 1000;
+                case "minutes":
                     return job.IntervalValue * 60 * 1000;
-                case "Hours":
+                case "hours":
                     return job.IntervalValue * 60 * 60 * 1000;
-                case "Days":
+                case "days":
                     return job.IntervalValue * 24 * 60 * 60 * 1000;
                 default:
                     return job.IntervalValue * 60 * 1000; // Default to minutes
