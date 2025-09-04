@@ -15,6 +15,7 @@ namespace syncer.ui
         private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem newConfigurationToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem saveConfigurationToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem saveAsConfigurationToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem loadConfigurationToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem sshKeyGenerationToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem fullScreenToolStripMenuItem;
@@ -95,6 +96,7 @@ namespace syncer.ui
             this.connectionSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.newConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.saveConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.saveAsConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.loadConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.sshKeyGenerationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.viewLogsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -177,6 +179,12 @@ namespace syncer.ui
             this.saveConfigurationToolStripMenuItem.Text = "Save";
             this.saveConfigurationToolStripMenuItem.Click += new System.EventHandler(this.saveConfigurationToolStripMenuItem_Click);
 
+            this.saveAsConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.saveAsConfigurationToolStripMenuItem.Name = "saveAsConfigurationToolStripMenuItem";
+            this.saveAsConfigurationToolStripMenuItem.Size = new System.Drawing.Size(200, 22);
+            this.saveAsConfigurationToolStripMenuItem.Text = "Save As...";
+            this.saveAsConfigurationToolStripMenuItem.Click += new System.EventHandler(this.saveAsConfigurationToolStripMenuItem_Click);
+
             this.loadConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.loadConfigurationToolStripMenuItem.Name = "loadConfigurationToolStripMenuItem";
             this.loadConfigurationToolStripMenuItem.Size = new System.Drawing.Size(200, 22);
@@ -187,6 +195,7 @@ namespace syncer.ui
             this.fileToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.newConfigurationToolStripMenuItem,
             this.saveConfigurationToolStripMenuItem,
+            this.saveAsConfigurationToolStripMenuItem,
             this.loadConfigurationToolStripMenuItem,
             this.showQuickLaunchToolStripMenuItem,
             this.toolStripSeparator2,

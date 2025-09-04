@@ -420,6 +420,40 @@ namespace syncer.ui
         {
             try
             {
+                // Ask user whether to load from saved configurations or from file
+                var result = MessageBox.Show(
+                    "How would you like to load the configuration?\n\n" +
+                    "• Click 'Yes' to browse saved configurations (internal database)\n" +
+                    "• Click 'No' to load from a custom file (*.json)\n" +
+                    "• Click 'Cancel' to return to main menu",
+                    "Load Configuration", 
+                    MessageBoxButtons.YesNoCancel, 
+                    MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
+                {
+                    // Load from saved configurations (existing functionality)
+                    LoadFromSavedConfigurations();
+                }
+                else if (result == DialogResult.No)
+                {
+                    // Load from custom file
+                    LoadFromCustomFile();
+                }
+                // If Cancel, just return without doing anything
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening configuration loader: " + ex.Message, "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService?.LogError("Error in load configuration: " + ex.Message);
+            }
+        }
+
+        private void LoadFromSavedConfigurations()
+        {
+            try
+            {
                 // Open the Configuration Manager (FormSimpleLoadConfiguration)
                 using (var configManager = new Forms.FormSimpleLoadConfiguration(
                     ServiceLocator.SavedJobConfigurationService))
@@ -447,9 +481,238 @@ namespace syncer.ui
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error opening configuration manager: " + ex.Message, "Error", 
+                MessageBox.Show("Error loading from saved configurations: " + ex.Message, "Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService?.LogError("Error opening configuration manager: " + ex.Message);
+                ServiceLocator.LogService?.LogError("Error loading saved configurations: " + ex.Message);
+            }
+        }
+
+        private void LoadFromCustomFile()
+        {
+            try
+            {
+                using (var openFileDialog = new OpenFileDialog())
+                {
+                    openFileDialog.Title = "Load FTPSyncer Configuration From File";
+                    openFileDialog.Filter = "FTPSyncer Configuration Files (*.json)|*.json|All Files (*.*)|*.*";
+                    openFileDialog.DefaultExt = "json";
+                    openFileDialog.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                    openFileDialog.CheckFileExists = true;
+                    openFileDialog.CheckPathExists = true;
+
+                    if (openFileDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // Load and apply configuration from selected file
+                        LoadConfigurationFromFile(openFileDialog.FileName);
+                        
+                        MessageBox.Show($"Configuration loaded successfully from:\n{openFileDialog.FileName}", 
+                            "Load Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        
+                        // Refresh timer jobs grid to show loaded configuration
+                        RefreshTimerJobsGrid();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading configuration from file: {ex.Message}", "Load Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService?.LogError($"Error loading configuration from custom file: {ex.Message}");
+            }
+        }
+
+        private void LoadConfigurationFromFile(string filePath)
+        {
+            try
+            {
+                // Read and parse JSON file
+                var json = System.IO.File.ReadAllText(filePath);
+                var configDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+
+                if (configDict == null)
+                {
+                    throw new Exception("Invalid configuration file format. Unable to parse JSON.");
+                }
+
+                // Extract connection settings
+                ConnectionSettings connectionSettings = null;
+                if (configDict.ContainsKey("Connection"))
+                {
+                    var connJson = configDict["Connection"].ToString();
+                    var connDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(connJson);
+                    
+                    if (connDict != null)
+                    {
+                        connectionSettings = new ConnectionSettings
+                        {
+                            Protocol = GetStringValue(connDict, "Protocol") ?? "FTP",
+                            Host = GetStringValue(connDict, "Host") ?? "",
+                            Port = GetIntValue(connDict, "Port", 21),
+                            Username = GetStringValue(connDict, "Username") ?? "",
+                            UsePassiveMode = GetBoolValue(connDict, "UsePassiveMode", true),
+                            UseSftp = GetBoolValue(connDict, "UseSftp", false),
+                            UseKeyAuthentication = GetBoolValue(connDict, "UseKeyAuthentication", false),
+                            SshKeyPath = GetStringValue(connDict, "SshKeyPath") ?? "",
+                            EnableSsl = GetBoolValue(connDict, "EnableSsl", false),
+                            Timeout = GetIntValue(connDict, "Timeout", 30),
+                            OperationTimeout = GetIntValue(connDict, "OperationTimeout", 60)
+                        };
+                    }
+                }
+
+                // Extract job settings
+                SyncJob jobSettings = null;
+                if (configDict.ContainsKey("Job"))
+                {
+                    var jobJson = configDict["Job"].ToString();
+                    var jobDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(jobJson);
+                    
+                    if (jobDict != null)
+                    {
+                        jobSettings = new SyncJob
+                        {
+                            Name = GetStringValue(jobDict, "Name") ?? "Imported Configuration",
+                            Description = GetStringValue(jobDict, "Description") ?? "Configuration loaded from file",
+                            SourcePath = GetStringValue(jobDict, "SourcePath") ?? "",
+                            DestinationPath = GetStringValue(jobDict, "DestinationPath") ?? "",
+                            TransferMode = GetStringValue(jobDict, "TransferMode") ?? "Copy (Keep both files)",
+                            IntervalValue = GetIntValue(jobDict, "IntervalValue", 30),
+                            IntervalType = GetStringValue(jobDict, "IntervalType") ?? "Minutes",
+                            IncludeSubFolders = GetBoolValue(jobDict, "IncludeSubFolders", true),
+                            OverwriteExisting = GetBoolValue(jobDict, "OverwriteExisting", true),
+                            IsEnabled = GetBoolValue(jobDict, "IsEnabled", true),
+                            DeleteSourceAfterTransfer = GetBoolValue(jobDict, "DeleteSourceAfterTransfer", false),
+                            StartTime = GetDateTimeValue(jobDict, "StartTime", DateTime.Now)
+                        };
+                    }
+                }
+
+                if (jobSettings == null)
+                {
+                    throw new Exception("Invalid configuration file format. Missing Job data.");
+                }
+
+                // Apply loaded settings to the application
+                ApplyLoadedConfigurationFromFile(jobSettings, connectionSettings);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to parse configuration file: {ex.Message}", ex);
+            }
+        }
+
+        private void ApplyLoadedConfigurationFromFile(SyncJob job, ConnectionSettings connection)
+        {
+            try
+            {
+                var connectionService = ServiceLocator.ConnectionService;
+                var timerJobManager = ServiceLocator.TimerJobManager;
+
+                // Save connection settings (equivalent to setting them)
+                connectionService.SaveConnectionSettings(connection);
+                
+                // Test connection
+                var isConnected = connectionService.TestConnection(connection);
+                if (!isConnected)
+                {
+                    MessageBox.Show("Warning: Could not establish connection with the loaded settings. " +
+                        "Please verify the connection details in the Connection Settings.", 
+                        "Connection Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+
+                // Create and add timer job using RegisterTimerJob method
+                long jobId = DateTime.Now.Ticks; // Generate unique job ID
+                bool isUpload = job.TransferMode.Contains("Upload") || job.TransferMode.Contains("Local");
+                double intervalMs = ConvertToMilliseconds(job.IntervalValue, job.IntervalType);
+                
+                if (isUpload)
+                {
+                    timerJobManager.RegisterTimerJob(
+                        jobId,
+                        job.Name ?? "Loaded Configuration",
+                        job.SourcePath,
+                        job.DestinationPath,
+                        intervalMs,
+                        job.IncludeSubFolders,
+                        job.DeleteSourceAfterTransfer
+                    );
+                }
+                else
+                {
+                    // For download jobs, we might need different handling
+                    // For now, treat them as upload jobs with reversed paths
+                    timerJobManager.RegisterTimerJob(
+                        jobId,
+                        job.Name ?? "Loaded Configuration",
+                        job.SourcePath,
+                        job.DestinationPath,
+                        intervalMs,
+                        job.IncludeSubFolders,
+                        job.DeleteSourceAfterTransfer
+                    );
+                }
+
+                ServiceLocator.LogService?.LogInfo($"Configuration loaded from file: {job.Name}");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to apply loaded configuration: {ex.Message}", ex);
+            }
+        }
+
+        // Helper methods for .NET 3.5 compatibility
+        private string GetStringValue(Dictionary<string, object> dict, string key)
+        {
+            return dict.ContainsKey(key) && dict[key] != null ? dict[key].ToString() : null;
+        }
+
+        private int GetIntValue(Dictionary<string, object> dict, string key, int defaultValue)
+        {
+            if (dict.ContainsKey(key) && dict[key] != null)
+            {
+                int result;
+                if (int.TryParse(dict[key].ToString(), out result))
+                    return result;
+            }
+            return defaultValue;
+        }
+
+        private bool GetBoolValue(Dictionary<string, object> dict, string key, bool defaultValue)
+        {
+            if (dict.ContainsKey(key) && dict[key] != null)
+            {
+                bool result;
+                if (bool.TryParse(dict[key].ToString(), out result))
+                    return result;
+            }
+            return defaultValue;
+        }
+
+        private DateTime GetDateTimeValue(Dictionary<string, object> dict, string key, DateTime defaultValue)
+        {
+            if (dict.ContainsKey(key) && dict[key] != null)
+            {
+                DateTime result;
+                if (DateTime.TryParse(dict[key].ToString(), out result))
+                    return result;
+            }
+            return defaultValue;
+        }
+
+        private double ConvertToMilliseconds(int intervalValue, string intervalType)
+        {
+            switch (intervalType.ToLower())
+            {
+                case "seconds":
+                    return intervalValue * 1000;
+                case "minutes":
+                    return intervalValue * 60 * 1000;
+                case "hours":
+                    return intervalValue * 60 * 60 * 1000;
+                case "days":
+                    return intervalValue * 24 * 60 * 60 * 1000;
+                default:
+                    return intervalValue * 60 * 1000; // Default to minutes
             }
         }
 
@@ -1237,6 +1500,125 @@ namespace syncer.ui
                 MessageBox.Show($"Error saving configuration: {ex.Message}", "Save Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 ServiceLocator.LogService.LogError($"Error saving configuration: {ex.Message}", "UI");
+            }
+        }
+
+        private void saveAsConfigurationToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Check if we have a current connection to save
+                var connectionService = ServiceLocator.ConnectionService;
+                var configService = ServiceLocator.SavedJobConfigurationService;
+                
+                // Get current connection settings
+                var currentConnection = connectionService.GetConnectionSettings();
+                if (currentConnection == null)
+                {
+                    MessageBox.Show("No connection settings found. Please configure a connection first.", 
+                        "No Connection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Check if there are timer jobs to save
+                if (dgvTimerJobs.Rows.Count == 0)
+                {
+                    MessageBox.Show("Please add at least one timer job before saving configuration.", "No Timer Jobs", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                
+                // Create a comprehensive job configuration from current state
+                var currentJob = CreateJobFromCurrentState();
+                
+                // Show SaveFileDialog to let user choose location and filename
+                using (var saveFileDialog = new SaveFileDialog())
+                {
+                    saveFileDialog.Title = "Save FTPSyncer Configuration As";
+                    saveFileDialog.Filter = "FTPSyncer Configuration Files (*.json)|*.json|All Files (*.*)|*.*";
+                    saveFileDialog.DefaultExt = "json";
+                    saveFileDialog.FileName = $"FTPSyncer_Config_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.json";
+                    saveFileDialog.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                    
+                    if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // Save configuration to selected file
+                        SaveConfigurationToFile(currentJob, currentConnection, saveFileDialog.FileName);
+                        
+                        MessageBox.Show($"Configuration saved successfully to:\n{saveFileDialog.FileName}", 
+                            "Save Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error saving configuration: {ex.Message}", "Save Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService.LogError($"Error saving configuration as file: {ex.Message}", "UI");
+            }
+        }
+
+        private void SaveConfigurationToFile(SyncJob job, ConnectionSettings connection, string filePath)
+        {
+            try
+            {
+                // Create a configuration object similar to what FormSaveJobConfiguration creates
+                var config = new
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    DisplayName = job.Name ?? "FTPSyncer Configuration",
+                    Description = job.Description ?? "Configuration exported from FTPSyncer",
+                    CreatedDate = DateTime.Now,
+                    LastModified = DateTime.Now,
+                    Version = "1.0",
+                    ApplicationName = "FTPSyncer",
+                    Job = new
+                    {
+                        Name = job.Name,
+                        Description = job.Description,
+                        SourcePath = job.SourcePath,
+                        DestinationPath = job.DestinationPath,
+                        TransferMode = job.TransferMode,
+                        IntervalValue = job.IntervalValue,
+                        IntervalType = job.IntervalType,
+                        IncludeSubFolders = job.IncludeSubFolders,
+                        OverwriteExisting = job.OverwriteExisting,
+                        IsEnabled = job.IsEnabled,
+                        StartTime = job.StartTime,
+                        DeleteSourceAfterTransfer = job.DeleteSourceAfterTransfer
+                    },
+                    Connection = new
+                    {
+                        Protocol = connection.Protocol,
+                        Host = connection.Host,
+                        Port = connection.Port,
+                        Username = connection.Username,
+                        // Don't save password in plain text for security
+                        UsePassiveMode = connection.UsePassiveMode,
+                        UseSftp = connection.UseSftp,
+                        UseKeyAuthentication = connection.UseKeyAuthentication,
+                        SshKeyPath = connection.SshKeyPath,
+                        EnableSsl = connection.EnableSsl,
+                        Timeout = connection.Timeout,
+                        OperationTimeout = connection.OperationTimeout
+                    },
+                    // Add timestamp and version info
+                    ExportInfo = new
+                    {
+                        ExportedBy = Environment.UserName,
+                        ExportedOn = Environment.MachineName,
+                        ExportDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                        FTPSyncerVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString()
+                    }
+                };
+                
+                // Convert to JSON and save to file
+                var json = Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented);
+                System.IO.File.WriteAllText(filePath, json);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to save configuration file: {ex.Message}", ex);
             }
         }
 
