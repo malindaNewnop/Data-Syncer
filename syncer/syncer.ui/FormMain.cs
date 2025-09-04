@@ -40,6 +40,9 @@ namespace syncer.ui
                 InitializeSystemTray();
                 InitializeCustomComponents();
                 InitializeBandwidthControl();
+                
+                // Update Quick Launch menu based on available configurations
+                UpdateQuickLaunchMenuVisibility();
             }
             catch (Exception ex)
             {
@@ -156,6 +159,9 @@ namespace syncer.ui
             // Refresh timer jobs grid when form becomes active
             // This ensures the grid is always up-to-date when user returns to main form
             RefreshTimerJobsGrid();
+            
+            // Update Quick Launch menu visibility in case configurations changed
+            UpdateQuickLaunchMenuVisibility();
         }
 
 
@@ -476,6 +482,9 @@ namespace syncer.ui
                         
                         // Refresh timer jobs grid to show any loaded/started jobs
                         RefreshTimerJobsGrid();
+                        
+                        // Update Quick Launch menu visibility in case configurations were loaded
+                        UpdateQuickLaunchMenuVisibility();
                     }
                 }
             }
@@ -510,6 +519,9 @@ namespace syncer.ui
                         
                         // Refresh timer jobs grid to show loaded configuration
                         RefreshTimerJobsGrid();
+                        
+                        // Update Quick Launch menu visibility
+                        UpdateQuickLaunchMenuVisibility();
                     }
                 }
             }
@@ -1492,6 +1504,9 @@ namespace syncer.ui
                     {
                         MessageBox.Show("Configuration saved successfully! You can access it from Quick Launch menu.", "Save Successful", 
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        
+                        // Update Quick Launch menu visibility since we now have configurations
+                        UpdateQuickLaunchMenuVisibility();
                     }
                 }
             }
@@ -1843,6 +1858,22 @@ namespace syncer.ui
         {
             try
             {
+                // Check if there are any saved configurations first
+                if (!HasSavedConfigurations())
+                {
+                    MessageBox.Show(
+                        "No saved configurations found!\n\n" +
+                        "To use Quick Launch, you need to:\n" +
+                        "1. Set up your connection settings\n" +
+                        "2. Create and configure timer jobs\n" +
+                        "3. Save your configuration using File → Save\n\n" +
+                        "After saving configurations, you can quickly access them here.",
+                        "No Configurations Available", 
+                        MessageBoxButtons.OK, 
+                        MessageBoxIcon.Information);
+                    return;
+                }
+
                 if (_quickLaunchForm == null || _quickLaunchForm.IsDisposed)
                 {
                     _quickLaunchForm = new FormQuickLaunch(this);
@@ -1860,6 +1891,58 @@ namespace syncer.ui
             {
                 MessageBox.Show($"Error showing Quick Launch popup: {ex.Message}", "Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Checks if there are any saved configurations available
+        /// </summary>
+        private bool HasSavedConfigurations()
+        {
+            try
+            {
+                var configService = ServiceLocator.SavedJobConfigurationService;
+                if (configService != null)
+                {
+                    var configs = configService.GetAllConfigurations();
+                    return configs != null && configs.Count > 0;
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Updates the visibility and text of Quick Launch menu based on available configurations
+        /// </summary>
+        private void UpdateQuickLaunchMenuVisibility()
+        {
+            try
+            {
+                bool hasConfigs = HasSavedConfigurations();
+                
+                if (showQuickLaunchToolStripMenuItem != null)
+                {
+                    showQuickLaunchToolStripMenuItem.Enabled = hasConfigs;
+                    
+                    if (hasConfigs)
+                    {
+                        showQuickLaunchToolStripMenuItem.Text = "Quick Launch Panel";
+                        showQuickLaunchToolStripMenuItem.ToolTipText = "Access your saved configurations quickly";
+                    }
+                    else
+                    {
+                        showQuickLaunchToolStripMenuItem.Text = "Quick Launch Panel (No configurations)";
+                        showQuickLaunchToolStripMenuItem.ToolTipText = "Save configurations first to enable Quick Launch";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService?.LogError("Error updating Quick Launch menu visibility: " + ex.Message);
             }
         }
 
