@@ -133,10 +133,10 @@ namespace syncer.ui
             this.rbUpload.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.rbUpload.Location = new System.Drawing.Point(20, 30);
             this.rbUpload.Name = "rbUpload";
-            this.rbUpload.Size = new System.Drawing.Size(118, 19);
+            this.rbUpload.Size = new System.Drawing.Size(170, 19);
             this.rbUpload.TabIndex = 0;
             this.rbUpload.TabStop = true;
-            this.rbUpload.Text = "Upload (Local →)";
+            this.rbUpload.Text = "Upload (Local → Remote)";
             this.rbUpload.UseVisualStyleBackColor = true;
             this.rbUpload.CheckedChanged += new System.EventHandler(this.RbUpload_CheckedChanged);
             // 
@@ -159,7 +159,7 @@ namespace syncer.ui
             this.gbTimerSettings.Size = new System.Drawing.Size(400, 150);
             this.gbTimerSettings.TabIndex = 2;
             this.gbTimerSettings.TabStop = false;
-            this.gbTimerSettings.Text = "Timer Settings";
+            this.gbTimerSettings.Text = "Upload Timer Settings (Local → Remote)";
             // 
             // chkIncludeSubfolders
             // 

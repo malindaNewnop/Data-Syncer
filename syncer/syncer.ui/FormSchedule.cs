@@ -676,7 +676,18 @@ namespace syncer.ui
             // Update timer settings label based on mode
             if (gbTimerSettings != null)
             {
-                gbTimerSettings.Text = _currentTransferMode + " Timer Settings";
+                if (_currentTransferMode == "Upload")
+                {
+                    gbTimerSettings.Text = "Upload Timer Settings (Local → Remote)";
+                }
+                else if (_currentTransferMode == "Download")
+                {
+                    gbTimerSettings.Text = "Download Timer Settings (Remote → Local)";
+                }
+                else
+                {
+                    gbTimerSettings.Text = "Timer Settings";
+                }
             }
 
             // Update file manager groupbox title to be more descriptive
@@ -772,6 +783,36 @@ namespace syncer.ui
             }
 
             ServiceLocator.LogService.LogInfo(string.Format("Transfer mode changed to: {0}", _currentTransferMode));
+        }
+
+        /// <summary>
+        /// Updates the path display for upload mode to show both source and destination like download mode
+        /// </summary>
+        private void UpdateUploadPathDisplay(string localPath, int fileCount)
+        {
+            if (lblNoFilesSelected == null) return;
+
+            string localDisplay = Path.GetFileName(localPath) ?? localPath;
+            string remoteDisplay = _timerUploadDestination ?? "/";
+            string subfolderInfo = chkIncludeSubfolders?.Checked == true ? " + subfolders" : " (top level only)";
+
+            if (fileCount == 0)
+            {
+                lblNoFilesSelected.Text = string.Format("Local Folder: {0} → Remote Path: {1} (empty/monitoring for new files){2}", 
+                    localDisplay, remoteDisplay, subfolderInfo);
+            }
+            else if (fileCount == 1)
+            {
+                lblNoFilesSelected.Text = string.Format("Local Folder: {0} → Remote Path: {1} (1 file + new files){2}", 
+                    localDisplay, remoteDisplay, subfolderInfo);
+            }
+            else
+            {
+                lblNoFilesSelected.Text = string.Format("Local Folder: {0} → Remote Path: {1} ({2} files + new files){3}", 
+                    localDisplay, remoteDisplay, fileCount, subfolderInfo);
+            }
+
+            lblNoFilesSelected.ForeColor = System.Drawing.Color.Blue;
         }
 
         #endregion
@@ -1396,20 +1437,8 @@ namespace syncer.ui
                     // Update the label to show selected folder and file count
                     if (lblNoFilesSelected != null)
                     {
-                        string subfolderInfo = chkIncludeSubfolders.Checked ? " + subfolders" : " (top level only)";
-                        
-                        if (filteredFiles.Count == 0)
-                        {
-                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (empty/no matching files - will monitor for new files)" + subfolderInfo;
-                        }
-                        else if (filteredFiles.Count == 1)
-                        {
-                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (1 file, including new files added later)" + subfolderInfo;
-                        }
-                        else
-                        {
-                            lblNoFilesSelected.Text = Path.GetFileName(folderPath) + " (" + filteredFiles.Count + " files, including new files added later)" + subfolderInfo;
-                        }
+                        // Show source and destination paths like in download mode
+                        UpdateUploadPathDisplay(folderPath, filteredFiles.Count);
                     }
                     
                     ServiceLocator.LogService.LogInfo(string.Format("Selected local folder '{0}' with {1} files for timer upload (will also include newly added files)", 
@@ -1689,6 +1718,13 @@ namespace syncer.ui
                     {
                         _timerUploadDestination = destination;
                         ServiceLocator.LogService.LogInfo("Timer upload destination set to: " + _timerUploadDestination);
+                        
+                        // Update the display to show both source and destination
+                        if (!string.IsNullOrEmpty(_selectedFolderForTimer))
+                        {
+                            string[] files = Directory.GetFiles(_selectedFolderForTimer, "*", GetSearchOption());
+                            UpdateUploadPathDisplay(_selectedFolderForTimer, files?.Length ?? 0);
+                        }
                     }
                 }
             }
