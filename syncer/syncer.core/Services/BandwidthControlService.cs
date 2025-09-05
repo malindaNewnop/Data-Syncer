@@ -18,6 +18,14 @@ namespace syncer.core.Services
         private long _globalDownloadLimitBytesPerSecond = 0; // 0 = unlimited
         private bool _isBandwidthControlEnabled = false;
         
+        // Current speed tracking
+        private double _currentUploadSpeedBytesPerSecond = 0;
+        private double _currentDownloadSpeedBytesPerSecond = 0;
+        private DateTime _lastSpeedUpdate = DateTime.Now;
+        private long _totalBytesUploaded = 0;
+        private long _totalBytesDownloaded = 0;
+        private DateTime _sessionStartTime = DateTime.Now;
+        
         private readonly string _configFilePath;
         
         public static BandwidthControlService Instance
@@ -118,6 +126,180 @@ namespace syncer.core.Services
             GlobalDownloadLimitBytesPerSecond = kbps * 1024;
         }
         
+        /// <summary>
+        /// Get current upload speed in bytes per second
+        /// </summary>
+        public double GetCurrentUploadSpeedBytesPerSecond()
+        {
+            return _currentUploadSpeedBytesPerSecond;
+        }
+        
+        /// <summary>
+        /// Get current download speed in bytes per second
+        /// </summary>
+        public double GetCurrentDownloadSpeedBytesPerSecond()
+        {
+            return _currentDownloadSpeedBytesPerSecond;
+        }
+        
+        /// <summary>
+        /// Get current upload speed formatted as string (KB/s, MB/s, etc.)
+        /// </summary>
+        public string GetCurrentUploadSpeedFormatted()
+        {
+            return FormatBytesPerSecond((long)_currentUploadSpeedBytesPerSecond);
+        }
+        
+        /// <summary>
+        /// Get current download speed formatted as string (KB/s, MB/s, etc.)
+        /// </summary>
+        public string GetCurrentDownloadSpeedFormatted()
+        {
+            return FormatBytesPerSecond((long)_currentDownloadSpeedBytesPerSecond);
+        }
+        
+        /// <summary>
+        /// Update current upload speed with bytes transferred and duration
+        /// </summary>
+        public void UpdateUploadSpeed(long bytesTransferred, double durationSeconds)
+        {
+            try
+            {
+                if (durationSeconds > 0)
+                {
+                    _currentUploadSpeedBytesPerSecond = bytesTransferred / durationSeconds;
+                    _lastSpeedUpdate = DateTime.Now;
+                    _totalBytesUploaded += bytesTransferred;
+                }
+            }
+            catch (Exception)
+            {
+                // Don't let speed calculation errors crash the application
+                _currentUploadSpeedBytesPerSecond = 0;
+            }
+        }
+        
+        /// <summary>
+        /// Update current upload speed based on pre-calculated bytes per second
+        /// </summary>
+        public void UpdateUploadSpeed(long bytesPerSecond)
+        {
+            try
+            {
+                _currentUploadSpeedBytesPerSecond = bytesPerSecond;
+                _lastSpeedUpdate = DateTime.Now;
+            }
+            catch (Exception)
+            {
+                // Don't let speed calculation errors crash the application
+                _currentUploadSpeedBytesPerSecond = 0;
+            }
+        }
+        
+        /// <summary>
+        /// Update current download speed with bytes transferred and duration
+        /// </summary>
+        public void UpdateDownloadSpeed(long bytesTransferred, double durationSeconds)
+        {
+            try
+            {
+                if (durationSeconds > 0)
+                {
+                    _currentDownloadSpeedBytesPerSecond = bytesTransferred / durationSeconds;
+                    _lastSpeedUpdate = DateTime.Now;
+                    _totalBytesDownloaded += bytesTransferred;
+                }
+            }
+            catch (Exception)
+            {
+                // Don't let speed calculation errors crash the application
+                _currentDownloadSpeedBytesPerSecond = 0;
+            }
+        }
+        
+        /// <summary>
+        /// Update current download speed based on pre-calculated bytes per second
+        /// </summary>
+        public void UpdateDownloadSpeed(long bytesPerSecond)
+        {
+            try
+            {
+                _currentDownloadSpeedBytesPerSecond = bytesPerSecond;
+                _lastSpeedUpdate = DateTime.Now;
+            }
+            catch (Exception)
+            {
+                // Don't let speed calculation errors crash the application
+                _currentDownloadSpeedBytesPerSecond = 0;
+            }
+        }
+        
+        /// <summary>
+        /// Reset speed tracking counters
+        /// </summary>
+        public void ResetSpeedTracking()
+        {
+            _currentUploadSpeedBytesPerSecond = 0;
+            _currentDownloadSpeedBytesPerSecond = 0;
+            _totalBytesUploaded = 0;
+            _totalBytesDownloaded = 0;
+            _sessionStartTime = DateTime.Now;
+            _lastSpeedUpdate = DateTime.Now;
+        }
+        
+        /// <summary>
+        /// Apply speed decay when no transfers are active (call periodically)
+        /// </summary>
+        public void ApplySpeedDecay(double decayFactor = 0.8)
+        {
+            try
+            {
+                // Check if it's been more than 5 seconds since last update
+                if ((DateTime.Now - _lastSpeedUpdate).TotalSeconds > 5)
+                {
+                    _currentUploadSpeedBytesPerSecond *= decayFactor;
+                    _currentDownloadSpeedBytesPerSecond *= decayFactor;
+                    
+                    // If speed is very low, set to zero to avoid displaying tiny values
+                    if (_currentUploadSpeedBytesPerSecond < 100) // Less than 100 B/s
+                        _currentUploadSpeedBytesPerSecond = 0;
+                        
+                    if (_currentDownloadSpeedBytesPerSecond < 100) // Less than 100 B/s
+                        _currentDownloadSpeedBytesPerSecond = 0;
+                }
+            }
+            catch (Exception)
+            {
+                // Don't let decay errors crash the application
+                _currentUploadSpeedBytesPerSecond = 0;
+                _currentDownloadSpeedBytesPerSecond = 0;
+            }
+        }
+        
+        /// <summary>
+        /// Get total bytes uploaded in current session
+        /// </summary>
+        public long GetTotalBytesUploaded()
+        {
+            return _totalBytesUploaded;
+        }
+        
+        /// <summary>
+        /// Get total bytes downloaded in current session
+        /// </summary>
+        public long GetTotalBytesDownloaded()
+        {
+            return _totalBytesDownloaded;
+        }
+        
+        /// <summary>
+        /// Get session duration
+        /// </summary>
+        public TimeSpan GetSessionDuration()
+        {
+            return DateTime.Now - _sessionStartTime;
+        }
+
         /// <summary>
         /// Get formatted upload speed limit for display
         /// </summary>

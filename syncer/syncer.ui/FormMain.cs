@@ -2077,37 +2077,122 @@ namespace syncer.ui
         {
             try
             {
-                // This is a placeholder - in a real implementation, you would get actual transfer speeds
-                // from active transfer operations or from a monitoring service
-                lblCurrentUploadSpeed.Text = "Current Upload: 0 B/s";
-                lblCurrentDownloadSpeed.Text = "Current Download: 0 B/s";
+                // Get actual current transfer speeds from the bandwidth service
+                string currentUploadSpeed = _bandwidthService.GetCurrentUploadSpeedFormatted();
+                string currentDownloadSpeed = _bandwidthService.GetCurrentDownloadSpeedFormatted();
                 
-                // Update color coding based on limits
+                lblCurrentUploadSpeed.Text = $"Current Upload: {currentUploadSpeed}";
+                lblCurrentDownloadSpeed.Text = $"Current Download: {currentDownloadSpeed}";
+                
+                // Update color coding based on limits and current speeds
                 if (_bandwidthService.IsBandwidthControlEnabled)
                 {
                     long uploadLimit = _bandwidthService.GetUploadLimitKBps();
                     long downloadLimit = _bandwidthService.GetDownloadLimitKBps();
                     
+                    // Color coding for upload speed
                     if (uploadLimit > 0)
                     {
+                        double currentUploadBps = _bandwidthService.GetCurrentUploadSpeedBytesPerSecond();
+                        double currentUploadKbps = currentUploadBps / 1024;
+                        
+                        if (currentUploadKbps > uploadLimit * 0.9) // Within 90% of limit
+                        {
+                            lblCurrentUploadSpeed.ForeColor = Color.Red;
+                        }
+                        else if (currentUploadKbps > uploadLimit * 0.7) // Within 70% of limit
+                        {
+                            lblCurrentUploadSpeed.ForeColor = Color.Orange;
+                        }
+                        else
+                        {
+                            lblCurrentUploadSpeed.ForeColor = Color.Green;
+                        }
+                        
                         lblCurrentUploadSpeed.Text += $" (Limit: {uploadLimit} KB/s)";
                     }
+                    else
+                    {
+                        lblCurrentUploadSpeed.ForeColor = Color.Blue; // Unlimited
+                        lblCurrentUploadSpeed.Text += " (Unlimited)";
+                    }
                     
+                    // Color coding for download speed
                     if (downloadLimit > 0)
                     {
+                        double currentDownloadBps = _bandwidthService.GetCurrentDownloadSpeedBytesPerSecond();
+                        double currentDownloadKbps = currentDownloadBps / 1024;
+                        
+                        if (currentDownloadKbps > downloadLimit * 0.9) // Within 90% of limit
+                        {
+                            lblCurrentDownloadSpeed.ForeColor = Color.Red;
+                        }
+                        else if (currentDownloadKbps > downloadLimit * 0.7) // Within 70% of limit
+                        {
+                            lblCurrentDownloadSpeed.ForeColor = Color.Orange;
+                        }
+                        else
+                        {
+                            lblCurrentDownloadSpeed.ForeColor = Color.Green;
+                        }
+                        
                         lblCurrentDownloadSpeed.Text += $" (Limit: {downloadLimit} KB/s)";
                     }
+                    else
+                    {
+                        lblCurrentDownloadSpeed.ForeColor = Color.Blue; // Unlimited
+                        lblCurrentDownloadSpeed.Text += " (Unlimited)";
+                    }
+                }
+                else
+                {
+                    // Bandwidth control disabled
+                    lblCurrentUploadSpeed.ForeColor = Color.Black;
+                    lblCurrentDownloadSpeed.ForeColor = Color.Black;
+                    lblCurrentUploadSpeed.Text += " (Control Disabled)";
+                    lblCurrentDownloadSpeed.Text += " (Control Disabled)";
                 }
             }
             catch (Exception ex)
             {
                 ServiceLocator.LogService.LogError($"Error updating speed labels: {ex.Message}", "UI");
+                // Fallback display
+                lblCurrentUploadSpeed.Text = "Current Upload: Error";
+                lblCurrentDownloadSpeed.Text = "Current Download: Error";
+                lblCurrentUploadSpeed.ForeColor = Color.Red;
+                lblCurrentDownloadSpeed.ForeColor = Color.Red;
             }
         }
         
         private void SpeedUpdateTimer_Tick(object sender, EventArgs e)
         {
-            UpdateSpeedLabels();
+            try
+            {
+                // Check if there are any active transfers
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                bool hasActiveTransfers = false;
+                
+                if (timerJobManager != null)
+                {
+                    // Check if any timer jobs are currently running transfers
+                    var activeJobs = timerJobManager.GetRunningJobs();
+                    hasActiveTransfers = activeJobs != null && activeJobs.Count > 0;
+                }
+                
+                // If no active transfers, apply speed decay
+                if (!hasActiveTransfers)
+                {
+                    _bandwidthService.ApplySpeedDecay(0.7); // Decay by 30% each update cycle
+                }
+                
+                UpdateSpeedLabels();
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError($"Error in speed update timer: {ex.Message}", "UI");
+                // Fallback to basic update
+                UpdateSpeedLabels();
+            }
         }
         
         private void BandwidthService_SettingsChanged(object sender, EventArgs e)
@@ -2147,18 +2232,25 @@ namespace syncer.ui
                 long uploadLimitKBps = (long)numUploadLimit.Value;
                 long downloadLimitKBps = (long)numDownloadLimit.Value;
                 
+                // Automatically enable bandwidth control if any limits are set
+                bool shouldEnable = uploadLimitKBps > 0 || downloadLimitKBps > 0 || chkEnableBandwidthControl.Checked;
+                _bandwidthService.IsBandwidthControlEnabled = shouldEnable;
+                chkEnableBandwidthControl.Checked = shouldEnable;
+                
                 _bandwidthService.SetUploadLimitKBps(uploadLimitKBps);
                 _bandwidthService.SetDownloadLimitKBps(downloadLimitKBps);
                 
+                UpdateBandwidthControlsState();
                 UpdateSpeedLabels();
                 
                 string message = "Bandwidth settings applied successfully!\n" +
                                $"Upload limit: {(uploadLimitKBps == 0 ? "Unlimited" : uploadLimitKBps + " KB/s")}\n" +
-                               $"Download limit: {(downloadLimitKBps == 0 ? "Unlimited" : downloadLimitKBps + " KB/s")}";
+                               $"Download limit: {(downloadLimitKBps == 0 ? "Unlimited" : downloadLimitKBps + " KB/s")}\n" +
+                               $"Bandwidth control: {(shouldEnable ? "Enabled" : "Disabled")}";
                 
                 MessageBox.Show(message, "Settings Applied", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 
-                ServiceLocator.LogService.LogInfo($"Bandwidth settings applied - Upload: {uploadLimitKBps} KB/s, Download: {downloadLimitKBps} KB/s", "UI");
+                ServiceLocator.LogService.LogInfo($"Bandwidth settings applied - Upload: {uploadLimitKBps} KB/s, Download: {downloadLimitKBps} KB/s, Enabled: {shouldEnable}", "UI");
             }
             catch (Exception ex)
             {

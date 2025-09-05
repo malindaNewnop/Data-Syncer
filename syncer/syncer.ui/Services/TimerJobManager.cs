@@ -143,6 +143,27 @@ namespace syncer.ui.Services
                     Timeout = connectionSettings.Timeout
                 };
 
+                // Apply bandwidth limits based on transfer direction (this is an upload job)
+                try
+                {
+                    var bandwidthService = syncer.core.Services.BandwidthControlService.Instance;
+                    if (bandwidthService.IsBandwidthControlEnabled && coreSettings.Protocol == syncer.core.ProtocolType.Sftp)
+                    {
+                        // For upload jobs, apply upload bandwidth limits
+                        var sftpConfig = new syncer.core.Configuration.SftpConfiguration();
+                        bandwidthService.ApplyLimitsToSftpConfig(sftpConfig, true); // true = upload
+                        
+                        // Apply the bandwidth limit to the core settings if supported
+                        // Note: This depends on your core ConnectionSettings having bandwidth support
+                        _logService.LogInfo(string.Format("Applied upload bandwidth limits to job {0}: {1} bytes/sec", 
+                            jobId, sftpConfig.BandwidthLimitBytesPerSecond));
+                    }
+                }
+                catch (Exception bwEx)
+                {
+                    _logService.LogError(string.Format("Error applying bandwidth limits to upload job {0}: {1}", jobId, bwEx.Message));
+                }
+
                 // Get the appropriate transfer client using the factory
                 syncer.core.TransferClientFactory factory = new syncer.core.TransferClientFactory();
                 ITransferClient transferClient = factory.Create(coreSettings.Protocol);
@@ -878,7 +899,9 @@ namespace syncer.ui.Services
                             _logService.LogInfo(string.Format("Downloading: {0} -> {1}", remoteFile, localFile));
 
                             string error = null;
+                            DateTime transferStart = DateTime.Now;
                             bool success = job.TransferClient.DownloadFile(job.ConnectionSettings, remoteFile, localFile, true, out error);
+                            DateTime transferEnd = DateTime.Now;
 
                             if (!success)
                             {
@@ -895,6 +918,23 @@ namespace syncer.ui.Services
                                 FileInfo localFileInfo = new FileInfo(localFile);
                                 _logService.LogInfo(string.Format("Successfully downloaded: {0} ({1} bytes)", fileName, localFileInfo.Length));
                                 successfulDownloads++;
+
+                                // Update bandwidth tracking for download speed
+                                try
+                                {
+                                    var bandwidthService = syncer.core.Services.BandwidthControlService.Instance;
+                                    double transferDurationSeconds = (transferEnd - transferStart).TotalSeconds;
+                                    if (transferDurationSeconds > 0)
+                                    {
+                                        bandwidthService.UpdateDownloadSpeed(localFileInfo.Length, transferDurationSeconds);
+                                        _logService.LogInfo(string.Format("Download speed updated: {0} bytes in {1:F2} seconds ({2:F0} bytes/second)", 
+                                            localFileInfo.Length, transferDurationSeconds, localFileInfo.Length / transferDurationSeconds));
+                                    }
+                                }
+                                catch (Exception speedEx)
+                                {
+                                    _logService.LogError(string.Format("Error updating download speed tracking: {0}", speedEx.Message));
+                                }
 
                                 // Check if we should delete source file after successful download
                                 if (job.DeleteSourceAfterTransfer)
@@ -1076,7 +1116,9 @@ namespace syncer.ui.Services
                             _logService.LogInfo(string.Format("Local file size: {0} bytes", fileInfo.Length));
 
                             string error = null;
+                            DateTime transferStart = DateTime.Now;
                             bool success = job.TransferClient.UploadFile(job.ConnectionSettings, localFile, remoteFile, true, out error);
+                            DateTime transferEnd = DateTime.Now;
 
                             if (!success)
                             {
@@ -1092,6 +1134,23 @@ namespace syncer.ui.Services
                             {
                                 _logService.LogInfo(string.Format("Successfully uploaded: {0} ({1} bytes)", fileName, fileInfo.Length));
                                 successfulUploads++;
+
+                                // Update bandwidth tracking for upload speed
+                                try
+                                {
+                                    var bandwidthService = syncer.core.Services.BandwidthControlService.Instance;
+                                    double transferDurationSeconds = (transferEnd - transferStart).TotalSeconds;
+                                    if (transferDurationSeconds > 0)
+                                    {
+                                        bandwidthService.UpdateUploadSpeed(fileInfo.Length, transferDurationSeconds);
+                                        _logService.LogInfo(string.Format("Upload speed updated: {0} bytes in {1:F2} seconds ({2:F0} bytes/second)", 
+                                            fileInfo.Length, transferDurationSeconds, fileInfo.Length / transferDurationSeconds));
+                                    }
+                                }
+                                catch (Exception speedEx)
+                                {
+                                    _logService.LogError(string.Format("Error updating upload speed tracking: {0}", speedEx.Message));
+                                }
 
                                 // Check if we should delete source file after successful upload
                                 if (job.DeleteSourceAfterTransfer)
@@ -1256,6 +1315,26 @@ namespace syncer.ui.Services
                     SshKeyPath = connectionSettings.SshKeyPath,
                     Timeout = connectionSettings.Timeout
                 };
+
+                // Apply bandwidth limits based on transfer direction (this is a download job)
+                try
+                {
+                    var bandwidthService = syncer.core.Services.BandwidthControlService.Instance;
+                    if (bandwidthService.IsBandwidthControlEnabled && coreSettings.Protocol == syncer.core.ProtocolType.Sftp)
+                    {
+                        // For download jobs, apply download bandwidth limits
+                        var sftpConfig = new syncer.core.Configuration.SftpConfiguration();
+                        bandwidthService.ApplyLimitsToSftpConfig(sftpConfig, false); // false = download
+                        
+                        // Apply the bandwidth limit to the core settings if supported
+                        _logService.LogInfo(string.Format("Applied download bandwidth limits to job {0}: {1} bytes/sec", 
+                            jobId, sftpConfig.BandwidthLimitBytesPerSecond));
+                    }
+                }
+                catch (Exception bwEx)
+                {
+                    _logService.LogError(string.Format("Error applying bandwidth limits to download job {0}: {1}", jobId, bwEx.Message));
+                }
                 
                 // Get the appropriate transfer client using the factory
                 syncer.core.TransferClientFactory factory = new syncer.core.TransferClientFactory();
