@@ -1092,6 +1092,9 @@ namespace syncer.ui
             // Add selection changed event
             dgvTimerJobs.SelectionChanged += dgvTimerJobs_SelectionChanged;
             
+            // Add double-click event for job details popup
+            dgvTimerJobs.CellDoubleClick += dgvTimerJobs_CellDoubleClick;
+            
             // Initially disable action buttons (job-specific buttons only)
             btnStopTimerJob.Enabled = false;
             btnEditTimerJob.Enabled = false;
@@ -1107,6 +1110,55 @@ namespace syncer.ui
             btnEditTimerJob.Enabled = hasSelection;
             btnDeleteTimerJob.Enabled = hasSelection;
             btnResumeTimerJob.Enabled = hasSelection;
+        }
+        
+        private void dgvTimerJobs_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            try
+            {
+                // Check if a valid row was double-clicked (not header)
+                if (e.RowIndex < 0) return;
+                
+                // Get the job ID from the selected row
+                DataGridViewRow row = dgvTimerJobs.Rows[e.RowIndex];
+                object jobIdObj = row.Cells["JobId"].Value;
+                
+                if (jobIdObj == null) return;
+                
+                long jobId;
+                if (!long.TryParse(jobIdObj.ToString(), out jobId)) return;
+                
+                // Check if the job is actually running
+                ITimerJobManager timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager == null)
+                {
+                    MessageBox.Show("Timer job manager is not available.", "Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                
+                bool isRunning = timerJobManager.IsTimerJobRunning(jobId);
+                if (!isRunning)
+                {
+                    MessageBox.Show("This job is not currently running. Job details are only available for running jobs.", 
+                        "Job Not Running", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                
+                // Open the job details popup
+                using (var detailsForm = new Forms.JobDetailsPopup(jobId))
+                {
+                    detailsForm.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening job details: " + ex.Message, "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                
+                // Log the error
+                ServiceLocator.LogService?.LogError("Error opening job details popup: " + ex.Message, "UI");
+            }
         }
         
         private void RefreshTimerJobsGrid()
