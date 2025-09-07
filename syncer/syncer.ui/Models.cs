@@ -516,6 +516,12 @@ namespace syncer.ui
         public DateTime? LastSuccessfulRun { get; set; }
         public TimeSpan? LastExecutionTime { get; set; }
         
+        // File Information
+        /// <summary>
+        /// The file path from which this configuration was imported
+        /// </summary>
+        public string SourceFilePath { get; set; }
+        
         public SavedJobConfiguration()
         {
             Id = Guid.NewGuid().ToString();

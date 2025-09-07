@@ -262,6 +262,9 @@ namespace syncer.ui.Services
                     config.LastUsed = null;
                     config.TimesUsed = 0;
                     
+                    // Store the source file path for display purposes
+                    config.SourceFilePath = Path.GetFullPath(filePath);
+                    
                     if (SaveConfiguration(config))
                         return config;
                 }
@@ -293,6 +296,9 @@ namespace syncer.ui.Services
                         config.CreatedDate = DateTime.Now;
                         config.LastUsed = null;
                         config.TimesUsed = 0;
+                        
+                        // Store the source file path for display purposes
+                        config.SourceFilePath = Path.GetFullPath(filePath);
                         
                         if (SaveConfiguration(config))
                             importedConfigs.Add(config);
@@ -685,6 +691,15 @@ namespace syncer.ui.Services
             }
 
             return configsToDelete.Count;
+        }
+
+        #endregion
+
+        #region File Path Information
+
+        public string GetConfigurationStoragePath()
+        {
+            return _configDirectory;
         }
 
         #endregion

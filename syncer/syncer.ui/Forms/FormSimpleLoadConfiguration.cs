@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using syncer.ui.Interfaces;
@@ -133,6 +134,7 @@ namespace syncer.ui.Forms
                 lblDestinationPath.Text = "Destination: ";
                 lblSourceConnection.Text = "Source Connection: ";
                 lblDestinationConnection.Text = "Destination Connection: ";
+                lblSourceFilePath.Text = "File Location: ";
                 
                 // Disable action buttons
                 btnLoadAndStart.Enabled = false;
@@ -200,6 +202,18 @@ namespace syncer.ui.Forms
                 lblDestinationConnection.Text = "Destination Connection: Local/Not configured";
             }
             
+            // Show file path information
+            if (!string.IsNullOrEmpty(config.SourceFilePath))
+            {
+                lblSourceFilePath.Text = "File Location: " + config.SourceFilePath;
+            }
+            else
+            {
+                // Show the local storage path for configurations created within the application
+                string storagePath = _configService.GetConfigurationStoragePath();
+                lblSourceFilePath.Text = "File Location: " + Path.Combine(storagePath, "configurations.json") + " (Local Storage)";
+            }
+            
             // Enable action buttons
             btnLoadAndStart.Enabled = true;
             btnEdit.Enabled = true;
@@ -223,6 +237,11 @@ namespace syncer.ui.Forms
         private void btnLoadAndStart_Click(object sender, EventArgs e)
         {
             LoadConfiguration(true);
+        }
+
+        private void btnLoad_Click(object sender, EventArgs e)
+        {
+            LoadConfiguration(false);
         }
 
         private void btnEdit_Click(object sender, EventArgs e)

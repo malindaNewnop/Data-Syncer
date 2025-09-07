@@ -131,6 +131,9 @@ namespace syncer.ui
         List<string> GetValidationErrors(SavedJobConfiguration config);
         int CleanupUnusedConfigurations(int daysOld = 30);
         
+        // File path information
+        string GetConfigurationStoragePath();
+        
         // Events
         event EventHandler<SavedJobConfigurationEventArgs> ConfigurationSaved;
         event EventHandler<SavedJobConfigurationEventArgs> ConfigurationDeleted;

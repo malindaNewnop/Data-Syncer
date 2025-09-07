@@ -32,6 +32,7 @@ namespace syncer.ui.Forms
             this.listBoxConfigurations = new System.Windows.Forms.ListBox();
             this.groupBoxDetails = new System.Windows.Forms.GroupBox();
             this.lblDestinationConnection = new System.Windows.Forms.Label();
+            this.lblSourceFilePath = new System.Windows.Forms.Label();
             this.lblSourceConnection = new System.Windows.Forms.Label();
             this.lblDestinationPath = new System.Windows.Forms.Label();
             this.lblSourcePath = new System.Windows.Forms.Label();
@@ -88,10 +89,11 @@ namespace syncer.ui.Forms
             this.groupBoxDetails.Controls.Add(this.lblCategory);
             this.groupBoxDetails.Controls.Add(this.lblDescription);
             this.groupBoxDetails.Controls.Add(this.lblConfigName);
+            this.groupBoxDetails.Controls.Add(this.lblSourceFilePath);
             this.groupBoxDetails.Location = new System.Drawing.Point(380, 50);
             this.groupBoxDetails.Name = "groupBoxDetails";
             this.groupBoxDetails.Padding = new System.Windows.Forms.Padding(15, 10, 15, 15);
-            this.groupBoxDetails.Size = new System.Drawing.Size(420, 420);
+            this.groupBoxDetails.Size = new System.Drawing.Size(420, 460);
             this.groupBoxDetails.TabIndex = 2;
             this.groupBoxDetails.TabStop = false;
             this.groupBoxDetails.Text = "Configuration Details";
@@ -103,6 +105,17 @@ namespace syncer.ui.Forms
             this.lblDestinationConnection.Size = new System.Drawing.Size(390, 30);
             this.lblDestinationConnection.TabIndex = 9;
             this.lblDestinationConnection.Text = "Destination Connection: ";
+            // 
+            // lblSourceFilePath
+            // 
+            this.lblSourceFilePath.Font = new System.Drawing.Font("Segoe UI", 8.25F);
+            this.lblSourceFilePath.ForeColor = System.Drawing.Color.DarkBlue;
+            this.lblSourceFilePath.Location = new System.Drawing.Point(15, 415);
+            this.lblSourceFilePath.Name = "lblSourceFilePath";
+            this.lblSourceFilePath.Size = new System.Drawing.Size(390, 35);
+            this.lblSourceFilePath.TabIndex = 10;
+            this.lblSourceFilePath.Text = "File Location: ";
+            this.lblSourceFilePath.Font = new System.Drawing.Font("Segoe UI", 7.75F, System.Drawing.FontStyle.Italic);
             // 
             // lblSourceConnection
             // 
@@ -189,7 +202,7 @@ namespace syncer.ui.Forms
             // panelSeparator
             // 
             this.panelSeparator.BackColor = System.Drawing.Color.LightSteelBlue;
-            this.panelSeparator.Location = new System.Drawing.Point(24, 460);
+            this.panelSeparator.Location = new System.Drawing.Point(24, 520);
             this.panelSeparator.Name = "panelSeparator";
             this.panelSeparator.Size = new System.Drawing.Size(770, 2);
             this.panelSeparator.TabIndex = 10;
@@ -197,7 +210,7 @@ namespace syncer.ui.Forms
             // btnImport
             // 
             this.btnImport.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnImport.Location = new System.Drawing.Point(700, 480);
+            this.btnImport.Location = new System.Drawing.Point(700, 540);
             this.btnImport.Name = "btnImport";
             this.btnImport.Size = new System.Drawing.Size(90, 35);
             this.btnImport.TabIndex = 8;
@@ -208,7 +221,7 @@ namespace syncer.ui.Forms
             // btnExport
             // 
             this.btnExport.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnExport.Location = new System.Drawing.Point(590, 480);
+            this.btnExport.Location = new System.Drawing.Point(590, 540);
             this.btnExport.Name = "btnExport";
             this.btnExport.Size = new System.Drawing.Size(90, 35);
             this.btnExport.TabIndex = 7;
@@ -219,7 +232,7 @@ namespace syncer.ui.Forms
             // btnDelete
             // 
             this.btnDelete.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnDelete.Location = new System.Drawing.Point(480, 480);
+            this.btnDelete.Location = new System.Drawing.Point(480, 540);
             this.btnDelete.Name = "btnDelete";
             this.btnDelete.Size = new System.Drawing.Size(90, 35);
             this.btnDelete.TabIndex = 6;
@@ -230,7 +243,7 @@ namespace syncer.ui.Forms
             // btnEdit
             // 
             this.btnEdit.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnEdit.Location = new System.Drawing.Point(370, 480);
+            this.btnEdit.Location = new System.Drawing.Point(370, 540);
             this.btnEdit.Name = "btnEdit";
             this.btnEdit.Size = new System.Drawing.Size(90, 35);
             this.btnEdit.TabIndex = 5;
@@ -241,13 +254,24 @@ namespace syncer.ui.Forms
             // btnLoadAndStart
             // 
             this.btnLoadAndStart.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnLoadAndStart.Location = new System.Drawing.Point(24, 480);
+            this.btnLoadAndStart.Location = new System.Drawing.Point(24, 540);
             this.btnLoadAndStart.Name = "btnLoadAndStart";
             this.btnLoadAndStart.Size = new System.Drawing.Size(120, 35);
             this.btnLoadAndStart.TabIndex = 4;
             this.btnLoadAndStart.Text = "Load && Start";
             this.btnLoadAndStart.UseVisualStyleBackColor = true;
             this.btnLoadAndStart.Click += new System.EventHandler(this.btnLoadAndStart_Click);
+            // 
+            // btnLoad
+            // 
+            this.btnLoad.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnLoad.Location = new System.Drawing.Point(160, 540);
+            this.btnLoad.Name = "btnLoad";
+            this.btnLoad.Size = new System.Drawing.Size(90, 35);
+            this.btnLoad.TabIndex = 3;
+            this.btnLoad.Text = "Load";
+            this.btnLoad.UseVisualStyleBackColor = true;
+            this.btnLoad.Click += new System.EventHandler(this.btnLoad_Click);
             // 
 
             // 
@@ -256,11 +280,12 @@ namespace syncer.ui.Forms
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.ClientSize = new System.Drawing.Size(820, 560);
+            this.ClientSize = new System.Drawing.Size(820, 620);
             this.Controls.Add(this.btnImport);
             this.Controls.Add(this.btnExport);
             this.Controls.Add(this.btnDelete);
             this.Controls.Add(this.btnEdit);
+            this.Controls.Add(this.btnLoad);
             this.Controls.Add(this.btnLoadAndStart);
             this.Controls.Add(this.panelSeparator);
             this.Controls.Add(this.groupBoxDetails);
@@ -294,6 +319,7 @@ namespace syncer.ui.Forms
         private System.Windows.Forms.Label lblDestinationPath;
         private System.Windows.Forms.Label lblSourceConnection;
         private System.Windows.Forms.Label lblDestinationConnection;
+        private System.Windows.Forms.Label lblSourceFilePath;
         private System.Windows.Forms.Panel panelSeparator;
         private System.Windows.Forms.Button btnLoad;
         private System.Windows.Forms.Button btnLoadAndStart;
