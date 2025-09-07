@@ -149,6 +149,8 @@
     <Compile Include="Forms\JobDetailsPopup.Designer.cs">
       <DependentUpon>JobDetailsPopup.cs</DependentUpon>
     </Compile>
+    <!-- Job Recovery Form -->
+    <Compile Include="Forms\FormJobRecovery.cs" />
     <Compile Include="Examples\ConnectionFormUsageExample.cs" />
     <EmbeddedResource Include="FormConnection.resx">
       <DependentUpon>FormConnection.cs</DependentUpon>
