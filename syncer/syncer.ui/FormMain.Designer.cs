@@ -53,6 +53,9 @@ namespace syncer.ui
         
         // Quick Launch menu item
         private System.Windows.Forms.ToolStripMenuItem showQuickLaunchToolStripMenuItem;
+        
+        // Job Recovery menu item
+        private System.Windows.Forms.ToolStripMenuItem jobRecoveryToolStripMenuItem;
 
         protected override void Dispose(bool disposing)
         {
@@ -106,6 +109,7 @@ namespace syncer.ui
             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             this.helpToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.aboutToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.jobRecoveryToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.btnAddJob = new System.Windows.Forms.Button();
             this.btnStartStop = new System.Windows.Forms.Button();
             this.btnLoadConfiguration = new System.Windows.Forms.Button();
@@ -229,7 +233,8 @@ namespace syncer.ui
             this.viewToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.fullScreenToolStripMenuItem,
             this.normalViewToolStripMenuItem,
-            this.toolStripSeparator1});
+            this.toolStripSeparator1,
+            this.jobRecoveryToolStripMenuItem});
             this.viewToolStripMenuItem.Name = "viewToolStripMenuItem";
             this.viewToolStripMenuItem.Size = new System.Drawing.Size(44, 20);
             this.viewToolStripMenuItem.Text = "View";
@@ -250,6 +255,12 @@ namespace syncer.ui
             // toolStripSeparator1
             this.toolStripSeparator1.Name = "toolStripSeparator1";
             this.toolStripSeparator1.Size = new System.Drawing.Size(177, 6);
+            
+            // jobRecoveryToolStripMenuItem
+            this.jobRecoveryToolStripMenuItem.Name = "jobRecoveryToolStripMenuItem";
+            this.jobRecoveryToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.jobRecoveryToolStripMenuItem.Text = "Job Recovery Manager";
+            this.jobRecoveryToolStripMenuItem.Click += new System.EventHandler(this.jobRecoveryToolStripMenuItem_Click);
             // connectionSettingsToolStripMenuItem
             this.connectionSettingsToolStripMenuItem.Name = "connectionSettingsToolStripMenuItem";
             this.connectionSettingsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);

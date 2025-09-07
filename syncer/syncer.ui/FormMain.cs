@@ -765,6 +765,22 @@ namespace syncer.ui
         {
             MessageBox.Show("FTPSyncer v1.0\nFile Synchronization Tool\n\nDeveloped for automated file transfers.", "About FTPSyncer", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
+
+        private void jobRecoveryToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (var formJobRecovery = new Forms.FormJobRecovery())
+                {
+                    formJobRecovery.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening Job Recovery Manager: " + ex.Message, "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
         
 
         private void btnAddJob_Click(object sender, EventArgs e)
@@ -1351,8 +1367,8 @@ namespace syncer.ui
                 List<string> excludeExtensions = timerJobManager.GetTimerJobExcludeExtensions(jobId);
                 DateTime? lastDownload = timerJobManager.GetLastDownloadTime(jobId);
                 
-                // Create a SyncJob object to pass to the FormSchedule
-                SyncJob jobToEdit = new SyncJob
+                // Create a SyncJob object to store the job settings
+                SyncJob jobSettings = new SyncJob
                 {
                     Id = (int)jobId,
                     Name = jobName ?? "Timer Job " + jobId,
@@ -1371,38 +1387,141 @@ namespace syncer.ui
                 // Convert interval from milliseconds to appropriate display unit
                 if (intervalMs >= 3600000) // 1 hour or more
                 {
-                    jobToEdit.IntervalValue = (int)(intervalMs / 3600000);
-                    jobToEdit.IntervalType = "Hours";
+                    jobSettings.IntervalValue = (int)(intervalMs / 3600000);
+                    jobSettings.IntervalType = "Hours";
                 }
                 else if (intervalMs >= 60000) // 1 minute or more
                 {
-                    jobToEdit.IntervalValue = (int)(intervalMs / 60000);
-                    jobToEdit.IntervalType = "Minutes";
+                    jobSettings.IntervalValue = (int)(intervalMs / 60000);
+                    jobSettings.IntervalType = "Minutes";
                 }
                 else // Less than 1 minute, use seconds
                 {
-                    jobToEdit.IntervalValue = Math.Max(1, (int)(intervalMs / 1000));
-                    jobToEdit.IntervalType = "Seconds";
+                    jobSettings.IntervalValue = Math.Max(1, (int)(intervalMs / 1000));
+                    jobSettings.IntervalType = "Seconds";
                 }
                 
-                // Open the FormSchedule in edit mode
-                using (FormSchedule editForm = new FormSchedule(jobToEdit))
+                // Create a SavedJobConfiguration object for the FormEditConfiguration
+                SavedJobConfiguration configToEdit = new SavedJobConfiguration
+                {
+                    Id = "timer_job_" + jobId,
+                    Name = jobName ?? "Timer Job " + jobId,
+                    Description = "Timer job configuration for " + (jobName ?? "Job " + jobId),
+                    JobSettings = jobSettings,
+                    CreatedDate = DateTime.Now,
+                    LastUsed = DateTime.Now,
+                    IsDefault = false,
+                    Category = "Timer Jobs",
+                    EnableQuickLaunch = false,
+                    AutoStartOnLoad = false
+                };
+                
+                // Initialize connection settings based on transfer mode
+                if (configToEdit.SourceConnection == null)
+                    configToEdit.SourceConnection = new SavedConnection();
+                if (configToEdit.DestinationConnection == null)
+                    configToEdit.DestinationConnection = new SavedConnection();
+                
+                if (isDownloadJob)
+                {
+                    // For downloads: source is remote, destination is local
+                    configToEdit.SourceConnection.Settings = new ConnectionSettings
+                    {
+                        Host = "Remote Server", // Placeholder - will be configured in the form
+                        Protocol = "SFTP",
+                        Port = 22
+                    };
+                    configToEdit.DestinationConnection.Settings = new ConnectionSettings
+                    {
+                        Host = "localhost",
+                        Protocol = "LOCAL"
+                    };
+                }
+                else
+                {
+                    // For uploads: source is local, destination is remote
+                    configToEdit.SourceConnection.Settings = new ConnectionSettings
+                    {
+                        Host = "localhost",
+                        Protocol = "LOCAL"
+                    };
+                    configToEdit.DestinationConnection.Settings = new ConnectionSettings
+                    {
+                        Host = "Remote Server", // Placeholder - will be configured in the form
+                        Protocol = "SFTP",
+                        Port = 22
+                    };
+                }
+                
+                // Open the FormEditConfiguration in edit mode
+                using (FormEditConfiguration editForm = new FormEditConfiguration(configToEdit, true)) // true = isTimerJob
                 {
                     editForm.Text = "Edit Timer Job - " + jobName;
                     
                     if (editForm.ShowDialog() == DialogResult.OK)
                     {
-                        // The job has been updated, refresh the grid
-                        RefreshTimerJobsGrid();
+                        // The job configuration has been updated, now we need to update the timer job
+                        // Get the updated configuration from the form
+                        var updatedJobSettings = configToEdit.JobSettings;
                         
-                        ServiceLocator.LogService.LogInfo(string.Format("Timer job '{0}' (ID: {1}) has been edited", jobName, jobId));
+                        // Convert the interval back to milliseconds for the timer job manager
+                        double updatedIntervalMs = GetIntervalInMilliseconds(updatedJobSettings.IntervalValue, updatedJobSettings.IntervalType);
                         
-                        // Show confirmation message
-                        MessageBox.Show(
-                            "Timer job has been updated successfully!\n\nNote: The changes will take effect after the job is restarted.",
-                            "Job Updated",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Information);
+                        // Parse the include/exclude extensions back to lists
+                        List<string> updatedIncludeExtensions = new List<string>();
+                        if (!string.IsNullOrEmpty(updatedJobSettings.IncludeFileTypes))
+                        {
+                            foreach (string ext in updatedJobSettings.IncludeFileTypes.Split(','))
+                            {
+                                string cleanExt = ext.Trim();
+                                if (!string.IsNullOrEmpty(cleanExt))
+                                    updatedIncludeExtensions.Add(cleanExt);
+                            }
+                        }
+                        
+                        List<string> updatedExcludeExtensions = new List<string>();
+                        if (!string.IsNullOrEmpty(updatedJobSettings.ExcludeFileTypes))
+                        {
+                            foreach (string ext in updatedJobSettings.ExcludeFileTypes.Split(','))
+                            {
+                                string cleanExt = ext.Trim();
+                                if (!string.IsNullOrEmpty(cleanExt))
+                                    updatedExcludeExtensions.Add(cleanExt);
+                            }
+                        }
+                        
+                        // Update the timer job with the new settings
+                        bool updateSuccess = timerJobManager.UpdateTimerJob(
+                            jobId,
+                            updatedJobSettings.Name,
+                            updatedJobSettings.SourcePath,
+                            updatedJobSettings.DestinationPath,
+                            updatedIntervalMs,
+                            updatedJobSettings.IncludeSubFolders,
+                            updatedJobSettings.DeleteSourceAfterTransfer,
+                            updatedJobSettings.EnableFilters,
+                            updatedIncludeExtensions,
+                            updatedExcludeExtensions
+                        );
+                        
+                        if (updateSuccess)
+                        {
+                            // Refresh the grid to show the updated values
+                            RefreshTimerJobsGrid();
+                            
+                            ServiceLocator.LogService.LogInfo(string.Format("Timer job '{0}' (ID: {1}) has been updated successfully", updatedJobSettings.Name, jobId));
+                            
+                            // Show confirmation message
+                            MessageBox.Show(
+                                "Timer job has been updated successfully!\n\nNote: The changes will take effect after the job is restarted.",
+                                "Job Updated",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+                        }
+                        else
+                        {
+                            MessageBox.Show("Failed to update the timer job. Please check the log for details.", "Update Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
                     }
                 }
             }

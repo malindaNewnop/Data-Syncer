@@ -8,12 +8,24 @@ namespace syncer.ui.Forms
     {
         private SavedJobConfiguration _configuration;
         private ISavedJobConfigurationService _configService;
+        private bool _isTimerJob = false; // Flag to indicate if this is a timer job
 
-        public FormEditConfiguration(SavedJobConfiguration configuration)
+        public FormEditConfiguration(SavedJobConfiguration configuration) : this(configuration, false)
+        {
+        }
+
+        public FormEditConfiguration(SavedJobConfiguration configuration, bool isTimerJob)
         {
             InitializeComponent();
             _configuration = configuration;
             _configService = ServiceLocator.SavedJobConfigurationService;
+            _isTimerJob = isTimerJob;
+            
+            // Hide connection tab for timer jobs
+            if (_isTimerJob && tabControl1.TabPages.Contains(tabConnection))
+            {
+                tabControl1.TabPages.Remove(tabConnection);
+            }
             
             LoadConfigurationData();
             
@@ -63,8 +75,8 @@ namespace syncer.ui.Forms
                 UpdateFilterControlStates();
             }
 
-            // Connection settings
-            if (_configuration.SourceConnection?.Settings != null)
+            // Connection settings (only load if not a timer job)
+            if (!_isTimerJob && _configuration.SourceConnection?.Settings != null)
             {
                 var conn = _configuration.SourceConnection.Settings;
                 cmbConnectionType.Text = conn.Protocol ?? "LOCAL";
@@ -143,19 +155,23 @@ namespace syncer.ui.Forms
                 _configuration.JobSettings.IncludeFileTypes = txtIncludeFileTypes.Text.Trim();
                 _configuration.JobSettings.ExcludeFileTypes = txtExcludeFileTypes.Text.Trim();
 
-                // Update connection settings
-                if (_configuration.SourceConnection == null)
-                    _configuration.SourceConnection = new SavedConnection();
-                if (_configuration.SourceConnection.Settings == null)
-                    _configuration.SourceConnection.Settings = new ConnectionSettings();
+                // Update connection settings (only if not a timer job)
+                if (!_isTimerJob)
+                {
+                    if (_configuration.SourceConnection == null)
+                        _configuration.SourceConnection = new SavedConnection();
+                    if (_configuration.SourceConnection.Settings == null)
+                        _configuration.SourceConnection.Settings = new ConnectionSettings();
 
-                var conn = _configuration.SourceConnection.Settings;
-                conn.Protocol = cmbConnectionType.Text;
-                conn.Host = txtServer.Text.Trim();
-                conn.Username = txtUsername.Text.Trim();
-                conn.Password = txtPassword.Text;
-                conn.Port = (int)numPort.Value;
-                conn.EnableSsl = chkUseSSL.Checked;
+                    var conn = _configuration.SourceConnection.Settings;
+                    conn.Protocol = cmbConnectionType.Text;
+                    conn.Host = txtServer.Text.Trim();
+                    conn.Username = txtUsername.Text.Trim();
+                    conn.Password = txtPassword.Text;
+                    conn.Port = (int)numPort.Value;
+                    conn.EnableSsl = chkUseSSL.Checked;
+                }
+                // For timer jobs, keep existing connection settings without modification
 
 
                 // Update timestamp
