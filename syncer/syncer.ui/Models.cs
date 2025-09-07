@@ -5,6 +5,37 @@ using System.Collections.Generic;
 namespace syncer.ui
 {
     /// <summary>
+    /// Result of a save configuration operation
+    /// </summary>
+    public enum SaveConfigurationResult
+    {
+        Success,
+        ValidationError,
+        NameConflict,
+        Error
+    }
+
+    /// <summary>
+    /// Detailed result of a save configuration operation
+    /// </summary>
+    public class SaveConfigurationOperationResult
+    {
+        public SaveConfigurationResult Result { get; set; }
+        public string Message { get; set; }
+        public SavedJobConfiguration ConflictingConfiguration { get; set; }
+        public bool Success => Result == SaveConfigurationResult.Success;
+
+        public SaveConfigurationOperationResult()
+        {
+        }
+
+        public SaveConfigurationOperationResult(SaveConfigurationResult result, string message = null)
+        {
+            Result = result;
+            Message = message;
+        }
+    }
+    /// <summary>
     /// Represents a sync job configuration with enhanced features
     /// </summary>
     public class SyncJob

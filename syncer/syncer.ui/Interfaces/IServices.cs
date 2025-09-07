@@ -89,6 +89,8 @@ namespace syncer.ui
     {
         // Basic CRUD operations
         bool SaveConfiguration(SavedJobConfiguration config);
+        SaveConfigurationOperationResult SaveConfigurationWithResult(SavedJobConfiguration config);
+        bool SaveConfigurationOverwrite(SavedJobConfiguration config);
         SavedJobConfiguration GetConfiguration(string id);
         SavedJobConfiguration GetConfigurationByName(string name);
         List<SavedJobConfiguration> GetAllConfigurations();

@@ -15,6 +15,7 @@ namespace syncer.ui.Forms
         private ConnectionSettings _destinationConnection;
         private ISavedJobConfigurationService _configService;
         private IConnectionService _connectionService;
+        private bool _shouldOverwrite = false;
         
         public SavedJobConfiguration SavedConfiguration { get; private set; }
 
@@ -232,8 +233,18 @@ namespace syncer.ui.Forms
                     return;
                 }
 
-                // Save the configuration
-                if (_configService.SaveConfiguration(config))
+                // Save the configuration using appropriate method
+                bool saveResult;
+                if (_shouldOverwrite)
+                {
+                    saveResult = _configService.SaveConfigurationOverwrite(config);
+                }
+                else
+                {
+                    saveResult = _configService.SaveConfiguration(config);
+                }
+                
+                if (saveResult)
                 {
                     SavedConfiguration = config;
                     
@@ -284,20 +295,37 @@ namespace syncer.ui.Forms
                 return false;
             }
 
-            // Check if name already exists
-            if (_configService.ConfigurationNameExists(textBoxName.Text.Trim()))
+            // Check if name already exists using the new method
+            var existingConfig = _configService.GetConfigurationByName(textBoxName.Text.Trim());
+            if (existingConfig != null)
             {
-                var result = MessageBox.Show(
-                    "A configuration with this name already exists. Do you want to overwrite it?", 
-                    "Configuration Exists", 
-                    MessageBoxButtons.YesNo, 
-                    MessageBoxIcon.Question);
+                string conflictMessage = string.Format(
+                    "A configuration with the name '{0}' already exists.\n\n" +
+                    "Existing Configuration:\n" +
+                    "- Created: {1}\n" +
+                    "- Last Used: {2}\n" +
+                    "- Category: {3}\n\n" +
+                    "Do you want to overwrite the existing configuration?",
+                    existingConfig.Name,
+                    existingConfig.CreatedDate.ToString("yyyy-MM-dd HH:mm"),
+                    existingConfig.LastUsed?.ToString("yyyy-MM-dd HH:mm") ?? "Never",
+                    existingConfig.Category ?? "General");
+                    
+                var result = MessageBox.Show(conflictMessage, "Configuration Name Conflict", 
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
                     
                 if (result != DialogResult.Yes)
                 {
                     textBoxName.Focus();
                     return false;
                 }
+                
+                // Set flag to indicate we should overwrite
+                _shouldOverwrite = true;
+            }
+            else
+            {
+                _shouldOverwrite = false;
             }
 
             if (IsNullOrWhiteSpace(comboBoxCategory.Text))

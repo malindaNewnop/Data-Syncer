@@ -177,11 +177,64 @@ namespace syncer.ui.Forms
                 // Update timestamp
                 _configuration.LastUsed = DateTime.Now;
 
-                // Save to file
-                _configService.SaveConfiguration(_configuration);
-
-                DialogResult = DialogResult.OK;
-                Close();
+                // Save to file with conflict detection
+                var saveResult = _configService.SaveConfigurationWithResult(_configuration);
+                
+                if (saveResult.Result == SaveConfigurationResult.Success)
+                {
+                    DialogResult = DialogResult.OK;
+                    Close();
+                }
+                else if (saveResult.Result == SaveConfigurationResult.NameConflict)
+                {
+                    // Show confirmation dialog for name conflict
+                    string conflictMessage = string.Format(
+                        "A configuration with the name '{0}' already exists.\n\n" +
+                        "Existing Configuration:\n" +
+                        "- Name: {1}\n" +
+                        "- Created: {2}\n" +
+                        "- Last Used: {3}\n\n" +
+                        "Do you want to overwrite the existing configuration?",
+                        _configuration.Name,
+                        saveResult.ConflictingConfiguration.Name,
+                        saveResult.ConflictingConfiguration.CreatedDate.ToString("yyyy-MM-dd HH:mm"),
+                        saveResult.ConflictingConfiguration.LastUsed?.ToString("yyyy-MM-dd HH:mm") ?? "Never");
+                    
+                    DialogResult confirmResult = MessageBox.Show(
+                        conflictMessage,
+                        "Configuration Name Conflict",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question,
+                        MessageBoxDefaultButton.Button2);
+                    
+                    if (confirmResult == DialogResult.Yes)
+                    {
+                        // User confirmed overwrite
+                        if (_configService.SaveConfigurationOverwrite(_configuration))
+                        {
+                            MessageBox.Show("Configuration saved successfully. The previous configuration has been replaced.", 
+                                "Configuration Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            DialogResult = DialogResult.OK;
+                            Close();
+                        }
+                        else
+                        {
+                            MessageBox.Show("Failed to save configuration. Please try again.", 
+                                "Save Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                    // If user says no, stay on the form so they can change the name
+                }
+                else if (saveResult.Result == SaveConfigurationResult.ValidationError)
+                {
+                    MessageBox.Show("Validation Error: " + saveResult.Message, 
+                        "Save Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                else
+                {
+                    MessageBox.Show("Error saving configuration: " + saveResult.Message, 
+                        "Save Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
             catch (Exception ex)
             {

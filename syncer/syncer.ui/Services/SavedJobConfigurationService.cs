@@ -58,6 +58,65 @@ namespace syncer.ui.Services
 
         public bool SaveConfiguration(SavedJobConfiguration config)
         {
+            return SaveConfigurationWithResult(config).Success;
+        }
+
+        public SaveConfigurationOperationResult SaveConfigurationWithResult(SavedJobConfiguration config)
+        {
+            if (config == null)
+                return new SaveConfigurationOperationResult(SaveConfigurationResult.Error, "Configuration is null");
+
+            try
+            {
+                lock (_lockObject)
+                {
+                    // Validate configuration
+                    var validationErrors = GetValidationErrors(config);
+                    if (validationErrors.Count > 0)
+                    {
+                        string errorMessage = string.Join("; ", validationErrors.ToArray());
+                        OnConfigurationSaved(config, "Save", false, errorMessage);
+                        return new SaveConfigurationOperationResult(SaveConfigurationResult.ValidationError, errorMessage);
+                    }
+
+                    // Generate new ID if not exists
+                    if (string.IsNullOrEmpty(config.Id))
+                        config.Id = Guid.NewGuid().ToString();
+
+                    // Check for name conflicts (only for new configurations or when name has changed)
+                    bool isUpdate = _configurations.ContainsKey(config.Id);
+                    if (!isUpdate || (isUpdate && !string.Equals(_configurations[config.Id].Name, config.Name, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var existingConfig = GetConfigurationByName(config.Name);
+                        if (existingConfig != null && !string.Equals(existingConfig.Id, config.Id, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var result = new SaveConfigurationOperationResult(SaveConfigurationResult.NameConflict, 
+                                $"A configuration with the name '{config.Name}' already exists. Do you want to overwrite it?");
+                            result.ConflictingConfiguration = existingConfig;
+                            return result;
+                        }
+                    }
+
+                    // Update or add configuration
+                    _configurations[config.Id] = config;
+
+                    // Save to file
+                    SaveConfigurationsToFile();
+
+                    OnConfigurationSaved(config, isUpdate ? "Update" : "Create", true);
+                    return new SaveConfigurationOperationResult(SaveConfigurationResult.Success, 
+                        isUpdate ? "Configuration updated successfully" : "Configuration saved successfully");
+                }
+            }
+            catch (Exception ex)
+            {
+                OnConfigurationSaved(config, "Save", false, ex.Message);
+                return new SaveConfigurationOperationResult(SaveConfigurationResult.Error, ex.Message);
+            }
+        }
+
+        public bool SaveConfigurationOverwrite(SavedJobConfiguration config)
+        {
             if (config == null)
                 return false;
 
@@ -71,6 +130,13 @@ namespace syncer.ui.Services
                     {
                         OnConfigurationSaved(config, "Save", false, string.Join("; ", validationErrors.ToArray()));
                         return false;
+                    }
+
+                    // If there's a name conflict, remove the existing configuration with the same name
+                    var existingConfig = GetConfigurationByName(config.Name);
+                    if (existingConfig != null && !string.Equals(existingConfig.Id, config.Id, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _configurations.Remove(existingConfig.Id);
                     }
 
                     // Generate new ID if not exists
