@@ -198,26 +198,69 @@ namespace syncer.ui
                     var connectionSettings = _connectionService.GetConnectionSettings();
                     if (connectionSettings != null && connectionSettings.IsRemoteConnection)
                     {
-                        // Test the connection
-                        bool isConnected = false;
-                        try
+                        // Check if any jobs are currently running instead of testing connection directly
+                        var timerJobManager = ServiceLocator.TimerJobManager;
+                        bool hasActiveJobs = false;
+                        
+                        if (timerJobManager != null)
                         {
-                            isConnected = _connectionService.TestConnection(connectionSettings);
-                        }
-                        catch
-                        {
-                            isConnected = false;
+                            try
+                            {
+                                var runningJobs = timerJobManager.GetRunningJobs();
+                                hasActiveJobs = runningJobs != null && runningJobs.Count > 0;
+                                
+                                // Also check if any jobs are actively uploading/downloading
+                                if (!hasActiveJobs)
+                                {
+                                    var allJobs = timerJobManager.GetAllJobs();
+                                    if (allJobs != null)
+                                    {
+                                        foreach (var jobKvp in allJobs)
+                                        {
+                                            if (timerJobManager.IsTimerJobUploading(jobKvp.Key) || 
+                                                timerJobManager.IsTimerJobDownloading(jobKvp.Key))
+                                            {
+                                                hasActiveJobs = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                hasActiveJobs = false;
+                            }
                         }
                         
-                        if (isConnected)
+                        if (hasActiveJobs)
                         {
-                            lblConnectionStatus.Text = $"Connected to {connectionSettings.Host}:{connectionSettings.Port}";
+                            lblConnectionStatus.Text = $"Connected to {connectionSettings.Host}:{connectionSettings.Port} (Job Running)";
                             lblConnectionStatus.ForeColor = Color.Green;
                         }
                         else
                         {
-                            lblConnectionStatus.Text = $"Connection failed to {connectionSettings.Host}:{connectionSettings.Port}";
-                            lblConnectionStatus.ForeColor = Color.Red;
+                            // Only test connection if no jobs are running
+                            bool isConnected = false;
+                            try
+                            {
+                                isConnected = _connectionService.TestConnection(connectionSettings);
+                            }
+                            catch
+                            {
+                                isConnected = false;
+                            }
+                            
+                            if (isConnected)
+                            {
+                                lblConnectionStatus.Text = $"Connected to {connectionSettings.Host}:{connectionSettings.Port}";
+                                lblConnectionStatus.ForeColor = Color.Green;
+                            }
+                            else
+                            {
+                                lblConnectionStatus.Text = $"Connection available to {connectionSettings.Host}:{connectionSettings.Port}";
+                                lblConnectionStatus.ForeColor = Color.Orange;
+                            }
                         }
                     }
                     else
@@ -770,14 +813,19 @@ namespace syncer.ui
         {
             try
             {
-                using (var formJobRecovery = new Forms.FormJobRecovery())
-                {
-                    formJobRecovery.ShowDialog(this);
-                }
+                // Show information about automatic job recovery via Windows service
+                string message = "Job Recovery is handled automatically by the FTPSyncer Windows Service.\n\n" +
+                               "Features:\n" +
+                               "• Jobs automatically resume after system restart\n" +
+                               "• No manual intervention required\n" +
+                               "• Service runs in background\n\n" +
+                               "Service Status: " + GetServiceStatus();
+                               
+                MessageBox.Show(message, "Automatic Job Recovery", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error opening Job Recovery Manager: " + ex.Message, "Error", 
+                MessageBox.Show("Error checking job recovery status: " + ex.Message, "Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -2454,6 +2502,24 @@ namespace syncer.ui
                 ServiceLocator.LogService.LogError($"Error resetting bandwidth settings: {ex.Message}", "UI");
                 MessageBox.Show($"Error resetting bandwidth settings: {ex.Message}", "Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        
+        /// <summary>
+        /// Get the status of the FTPSyncer Windows service
+        /// </summary>
+        private string GetServiceStatus()
+        {
+            try
+            {
+                using (var service = new System.ServiceProcess.ServiceController("FTPSyncerService"))
+                {
+                    return service.Status.ToString();
+                }
+            }
+            catch
+            {
+                return "Not Installed";
             }
         }
         

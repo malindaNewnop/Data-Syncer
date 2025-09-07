@@ -36,6 +36,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.ServiceProcess" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data" />
@@ -149,8 +150,7 @@
     <Compile Include="Forms\JobDetailsPopup.Designer.cs">
       <DependentUpon>JobDetailsPopup.cs</DependentUpon>
     </Compile>
-    <!-- Job Recovery Form -->
-    <Compile Include="Forms\FormJobRecovery.cs" />
+    <!-- Job Recovery is handled automatically by Windows Service -->
     <Compile Include="Examples\ConnectionFormUsageExample.cs" />
     <EmbeddedResource Include="FormConnection.resx">
       <DependentUpon>FormConnection.cs</DependentUpon>
