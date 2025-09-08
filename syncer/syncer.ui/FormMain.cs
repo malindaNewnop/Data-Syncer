@@ -509,18 +509,55 @@ namespace syncer.ui
                 {
                     if (configManager.ShowDialog() == DialogResult.OK)
                     {
-                        // Check if user selected Load & Start option
-                        if (configManager.LoadAndStart && configManager.SelectedConfiguration != null)
+                        if (configManager.SelectedConfiguration != null)
                         {
-                            // Configuration has been loaded and started
-                            MessageBox.Show("Configuration loaded and started successfully!", "Success", 
-                                MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        }
-                        else if (configManager.SelectedConfiguration != null)
-                        {
-                            // Configuration was just loaded (not started)
-                            MessageBox.Show("Configuration loaded successfully!", "Success", 
-                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            // Check if user selected Load & Start option
+                            if (configManager.LoadAndStart)
+                            {
+                                // Configuration will be loaded and started
+                                ApplyLoadedConfiguration(configManager.SelectedConfiguration, true);
+                                
+                                // Count jobs for message
+                                int jobCount = 0;
+                                if (configManager.SelectedConfiguration.Jobs != null)
+                                {
+                                    jobCount = configManager.SelectedConfiguration.Jobs.Count;
+                                }
+                                else if (configManager.SelectedConfiguration.JobSettings != null)
+                                {
+                                    jobCount = 1;
+                                }
+                                
+                                string message = jobCount > 1 
+                                    ? $"Configuration loaded and {jobCount} jobs started successfully!"
+                                    : "Configuration loaded and job started successfully!";
+                                    
+                                MessageBox.Show(message, "Success", 
+                                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
+                            else
+                            {
+                                // Configuration was just loaded (not started) - apply without starting
+                                ApplyLoadedConfiguration(configManager.SelectedConfiguration, false);
+                                
+                                // Count jobs for message
+                                int jobCount = 0;
+                                if (configManager.SelectedConfiguration.Jobs != null)
+                                {
+                                    jobCount = configManager.SelectedConfiguration.Jobs.Count;
+                                }
+                                else if (configManager.SelectedConfiguration.JobSettings != null)
+                                {
+                                    jobCount = 1;
+                                }
+                                
+                                string message = jobCount > 1 
+                                    ? $"Configuration loaded successfully! {jobCount} jobs are ready to start."
+                                    : "Configuration loaded successfully! Job is ready to start.";
+                                    
+                                MessageBox.Show(message, "Success", 
+                                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
                         }
                         
                         // Refresh timer jobs grid to show any loaded/started jobs
@@ -1708,7 +1745,94 @@ namespace syncer.ui
                     return;
                 }
                 
-                // Create a comprehensive job configuration from current state
+                // Always save ALL jobs when multiple exist (simplified user experience)
+                if (dgvTimerJobs.Rows.Count > 1)
+                {
+                    // Create multi-job configuration with ALL jobs
+                    var multiJobConfig = CreateMultiJobConfigurationFromCurrentState();
+                    if (multiJobConfig != null)
+                    {
+                        
+                        // Simple input dialog for multi-job configuration name using built-in method
+                        var inputResult = PromptForConfigurationName(
+                            $"Enter a name for your multi-job configuration:\n\n" +
+                            $"This configuration will contain {multiJobConfig.Jobs.Count} jobs that will run in parallel.\n" +
+                            $"Jobs: {string.Join(", ", multiJobConfig.Jobs.Take(3).Select(j => j.Name).ToArray())}" +
+                            $"{(multiJobConfig.Jobs.Count > 3 ? "..." : "")}",
+                            multiJobConfig.Name);
+                            
+                        if (string.IsNullOrEmpty(inputResult) || inputResult.Trim().Length == 0)
+                        {
+                            return; // User cancelled
+                        }
+                        
+                        // Update the configuration name
+                        string configName = inputResult.Trim();
+                        multiJobConfig.Name = configName;
+                        multiJobConfig.Description = $"Multi-job configuration with {multiJobConfig.Jobs.Count} jobs created on {DateTime.Now:yyyy-MM-dd HH:mm}";
+                        
+                        var saveResult = configService.SaveConfigurationWithResult(multiJobConfig);
+                        if (saveResult.Result == SaveConfigurationResult.Success)
+                        {
+                            MessageBox.Show($"Configuration saved successfully!\n\n" +
+                                $"• Name: {multiJobConfig.Name}\n" +
+                                $"• Jobs: {multiJobConfig.Jobs.Count} (will run in parallel)\n" +
+                                $"• Access from: File → Load Configuration or Quick Launch", 
+                                "Multi-Job Configuration Saved", 
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            
+                            // Update Quick Launch menu visibility since we now have configurations
+                            UpdateQuickLaunchMenuVisibility();
+                            return;
+                        }
+                        else if (saveResult.Result == SaveConfigurationResult.NameConflict)
+                        {
+                            var result = MessageBox.Show(
+                                $"A configuration with the name '{configName}' already exists.\n\n" +
+                                "Do you want to overwrite it?",
+                                "Name Conflict",
+                                MessageBoxButtons.YesNo,
+                                MessageBoxIcon.Question);
+                                
+                            if (result == DialogResult.Yes)
+                            {
+                                // Try to overwrite
+                                if (configService.SaveConfigurationOverwrite(multiJobConfig))
+                                {
+                                    MessageBox.Show($"Configuration '{configName}' updated successfully!\n\n" +
+                                        $"• Jobs: {multiJobConfig.Jobs.Count} (will run in parallel)",
+                                        "Configuration Updated", 
+                                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    
+                                    UpdateQuickLaunchMenuVisibility();
+                                    return;
+                                }
+                                else
+                                {
+                                    MessageBox.Show("Failed to overwrite configuration. Please try again.", 
+                                        "Save Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            string errorDetails = saveResult.Message ?? "Unknown error";
+                            ServiceLocator.LogService?.LogError($"Failed to save multi-job configuration: {errorDetails}", "UI");
+                            
+                            MessageBox.Show($"Failed to save configuration:\n\n{errorDetails}\n\nCheck the logs for more details.", 
+                                "Save Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("Failed to create multi-job configuration from current timer jobs.", "Error", 
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                }
+                
+                // Create single-job configuration (either user chose single-job or only 1 timer job exists)
                 var currentJob = CreateJobFromCurrentState();
                 
                 // Open the save configuration form
@@ -1762,7 +1886,23 @@ namespace syncer.ui
                     return;
                 }
                 
-                // Create a comprehensive job configuration from current state
+                // If user has multiple timer jobs, suggest using the built-in save configuration instead
+                if (dgvTimerJobs.Rows.Count > 1)
+                {
+                    var result = MessageBox.Show(
+                        $"You have {dgvTimerJobs.Rows.Count} timer jobs in your list.\n\n" +
+                        "For multiple timer jobs, we recommend using 'Save Configuration' instead of 'Save As' to create a proper multi-job configuration that will run all jobs in parallel.\n\n" +
+                        "• Click YES to continue with 'Save As' (will only save the first job to file)\n" +
+                        "• Click NO to cancel and use 'Save Configuration' instead",
+                        "Multiple Timer Jobs - Consider Save Configuration",
+                        MessageBoxButtons.YesNo, 
+                        MessageBoxIcon.Information);
+                        
+                    if (result == DialogResult.No)
+                        return;
+                }
+                
+                // Create single-job configuration for file export
                 var currentJob = CreateJobFromCurrentState();
                 
                 // Show SaveFileDialog to let user choose location and filename
@@ -1860,7 +2000,7 @@ namespace syncer.ui
         {
             try
             {
-                // Get first timer job from grid as primary job
+                // Get first timer job from grid as primary job (for backward compatibility with single-job saving)
                 if (dgvTimerJobs.Rows.Count > 0)
                 {
                     var firstRow = dgvTimerJobs.Rows[0];
@@ -1877,7 +2017,9 @@ namespace syncer.ui
                     return new SyncJob
                     {
                         Name = $"Configuration - {jobName}",
-                        Description = $"Saved configuration with {dgvTimerJobs.Rows.Count} timer job(s)",
+                        Description = dgvTimerJobs.Rows.Count > 1 
+                            ? $"Configuration with {dgvTimerJobs.Rows.Count} timer jobs (first job only - use multi-job configuration for all)" 
+                            : $"Saved configuration with 1 timer job",
                         SourcePath = sourcePath,
                         DestinationPath = remotePath,
                         IntervalValue = intervalValue,
@@ -1907,6 +2049,97 @@ namespace syncer.ui
             catch (Exception ex)
             {
                 ServiceLocator.LogService?.LogError("Error creating job from current state: " + ex.Message);
+                throw;
+            }
+        }
+        
+        /// <summary>
+        /// Creates a multi-job configuration from all timer jobs in the grid
+        /// </summary>
+        private SavedJobConfiguration CreateMultiJobConfigurationFromCurrentState()
+        {
+            try
+            {
+                if (dgvTimerJobs.Rows.Count == 0)
+                    return null;
+
+                var jobs = new List<SyncJob>();
+                var connectionService = ServiceLocator.ConnectionService;
+                var currentConnection = connectionService.GetConnectionSettings();
+                
+                // Create a job for each row in the timer jobs grid
+                for (int i = 0; i < dgvTimerJobs.Rows.Count; i++)
+                {
+                    var row = dgvTimerJobs.Rows[i];
+                    var jobName = row.Cells["JobName"].Value?.ToString() ?? $"Job {i + 1}";
+                    var sourcePath = row.Cells["FolderPath"].Value?.ToString() ?? "";
+                    var remotePath = row.Cells["RemotePath"].Value?.ToString() ?? "";
+                    var intervalText = row.Cells["Interval"].Value?.ToString() ?? "30 Minutes";
+                    
+                    // Parse interval
+                    string intervalType = "Minutes";
+                    int intervalValue = 30;
+                    ParseIntervalText(intervalText, out intervalValue, out intervalType);
+                    
+                    var job = new SyncJob
+                    {
+                        Name = jobName,
+                        Description = $"Timer job from main form grid (row {i + 1})",
+                        SourcePath = sourcePath,
+                        DestinationPath = remotePath,
+                        IntervalValue = intervalValue,
+                        IntervalType = intervalType,
+                        TransferMode = "Copy (Keep both files)",
+                        IncludeSubFolders = true,
+                        OverwriteExisting = true,
+                        IsEnabled = true,
+                        CreatedDate = DateTime.Now,
+                        
+                        // Set connection settings for each individual job
+                        SourceConnection = currentConnection,
+                        DestinationConnection = currentConnection
+                    };
+                    
+                    jobs.Add(job);
+                }
+                
+                // Create a multi-job configuration
+                var config = new SavedJobConfiguration
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = $"Multi-Job Configuration ({jobs.Count} jobs)",
+                    Description = $"Multi-job configuration with {jobs.Count} timer jobs created from main form",
+                    Category = "Multi-Job",
+                    CreatedDate = DateTime.Now,
+                    Jobs = jobs,
+                    JobSettings = null, // Explicitly set to null for multi-job configurations
+                    
+                    // Set up connections
+                    SourceConnection = new SavedConnection
+                    {
+                        Name = "Multi-Job Source Connection",
+                        Description = "Source connection for multi-job configuration",
+                        Settings = currentConnection,
+                        CreatedDate = DateTime.Now
+                    },
+                    DestinationConnection = new SavedConnection
+                    {
+                        Name = "Multi-Job Destination Connection", 
+                        Description = "Destination connection for multi-job configuration",
+                        Settings = currentConnection,
+                        CreatedDate = DateTime.Now
+                    }
+                };
+                
+                // Ensure compatibility
+                config.EnsureJobsCompatibility();
+                
+                
+                return config;
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService?.LogError($"Error creating multi-job configuration from current state: {ex.Message}");
                 throw;
             }
         }
@@ -1942,46 +2175,141 @@ namespace syncer.ui
         {
             try
             {
+                if (config == null) return;
+                
+                // Ensure backward compatibility migration
+                config.EnsureJobsCompatibility();
+                
                 var connectionService = ServiceLocator.ConnectionService;
                 var timerJobManager = ServiceLocator.TimerJobManager;
+                int jobsStarted = 0;
+                int totalJobs = 0;
+
+                // Determine which jobs to process
+                List<SyncJob> jobsToProcess = new List<SyncJob>();
+                
+                if (config.Jobs != null && config.Jobs.Count > 0)
+                {
+                    // Multi-job configuration
+                    jobsToProcess.AddRange(config.Jobs);
+                    totalJobs = config.Jobs.Count;
+                }
+                else if (config.JobSettings != null)
+                {
+                    // Single job configuration (backward compatibility - should be rare after migration)
+                    jobsToProcess.Add(config.JobSettings);
+                    totalJobs = 1;
+                }
+
+                if (jobsToProcess.Count == 0)
+                {
+                    ServiceLocator.LogService.LogWarning("No jobs found in configuration", "UI");
+                    return;
+                }
                 
                 // Auto-start service when loading configuration with jobs
-                if (startAfterLoad && config.JobSettings != null)
+                if (startAfterLoad && totalJobs > 0)
                 {
                     AutoStartServiceIfNeeded();
                 }
                 
-                // Apply connection settings
+                // Apply connection settings (use the first job's connection or the configuration's global connection)
+                ConnectionSettings connectionToApply = null;
+                
                 if (config.SourceConnection?.Settings != null)
                 {
-                    connectionService.SaveConnectionSettings(config.SourceConnection.Settings);
+                    connectionToApply = config.SourceConnection.Settings;
+                }
+                else if (jobsToProcess.Count > 0 && jobsToProcess[0].SourceConnection != null)
+                {
+                    connectionToApply = jobsToProcess[0].SourceConnection;
+                }
+                
+                if (connectionToApply != null)
+                {
+                    connectionService.SaveConnectionSettings(connectionToApply);
+                    ServiceLocator.LogService.LogInfo("Applied connection settings from configuration", "UI");
                     
                     // Small delay to ensure connection is properly applied (.NET 3.5 compatibility)
                     System.Threading.Thread.Sleep(100);
                 }
                 
-                // If the job should be started automatically
-                if (startAfterLoad && config.JobSettings != null)
+                // Process each job
+                if (startAfterLoad)
                 {
-                    // Register and start the timer job
-                    var intervalMs = GetIntervalInMilliseconds(config.JobSettings.IntervalValue, config.JobSettings.IntervalType);
+                    // Prepare jobs for parallel registration and starting
+                    var jobsToStart = new List<long>();
+                    var jobIdMapping = new Dictionary<long, SyncJob>();
                     
-                    var jobId = DateTime.Now.Ticks; // Use timestamp as unique ID
-                    
-                    if (timerJobManager.RegisterTimerJob(
-                        jobId,
-                        config.JobSettings.Name,
-                        config.JobSettings.SourcePath,
-                        config.JobSettings.DestinationPath,
-                        intervalMs,
-                        true, // Include subfolders (default)
-                        false)) // Don't delete source files (default for config-based jobs)
+                    foreach (var job in jobsToProcess)
                     {
-                        if (timerJobManager.StartTimerJob(jobId))
+                        try
                         {
-                            ServiceLocator.LogService.LogInfo($"Auto-started job '{config.JobSettings.Name}' from loaded configuration", "UI");
+                            // Skip disabled jobs
+                            if (!job.IsEnabled)
+                            {
+                                ServiceLocator.LogService.LogInfo($"Skipping disabled job: {job.Name}", "UI");
+                                continue;
+                            }
+
+                            // Register the timer job first
+                            var intervalMs = GetIntervalInMilliseconds(job.IntervalValue, job.IntervalType);
+                            var jobId = DateTime.Now.Ticks + jobsToStart.Count; // Use timestamp + counter as unique ID
+                            
+                            if (timerJobManager.RegisterTimerJob(
+                                jobId,
+                                job.Name ?? $"Job from {config.Name}",
+                                job.SourcePath,
+                                job.DestinationPath,
+                                intervalMs,
+                                job.IncludeSubFolders,
+                                job.DeleteSourceAfterTransfer))
+                            {
+                                jobsToStart.Add(jobId);
+                                jobIdMapping[jobId] = job;
+                                ServiceLocator.LogService.LogInfo($"Registered job '{job.Name}' for parallel start", "UI");
+                            }
+                            else
+                            {
+                                ServiceLocator.LogService.LogError($"Failed to register job '{job.Name}'", "UI");
+                            }
+                        }
+                        catch (Exception jobEx)
+                        {
+                            ServiceLocator.LogService.LogError($"Error processing job '{job.Name}': {jobEx.Message}", "UI");
                         }
                     }
+                    
+                    // Start all registered jobs in parallel
+                    if (jobsToStart.Count > 0)
+                    {
+                        ServiceLocator.LogService.LogInfo($"Starting {jobsToStart.Count} jobs in parallel from configuration '{config.Name}'", "UI");
+                        
+                        var startResults = timerJobManager.StartMultipleTimerJobs(jobsToStart);
+                        
+                        // Log results for each job
+                        foreach (var result in startResults)
+                        {
+                            var jobId = result.Key;
+                            var success = result.Value;
+                            
+                            if (jobIdMapping.ContainsKey(jobId))
+                            {
+                                var job = jobIdMapping[jobId];
+                                if (success)
+                                {
+                                    jobsStarted++;
+                                    ServiceLocator.LogService.LogInfo($"Auto-started job '{job.Name}' from loaded configuration (parallel)", "UI");
+                                }
+                                else
+                                {
+                                    ServiceLocator.LogService.LogError($"Failed to start job '{job.Name}' (parallel)", "UI");
+                                }
+                            }
+                        }
+                    }
+                    
+                    ServiceLocator.LogService.LogInfo($"Parallel job start completed: {jobsStarted} out of {totalJobs} jobs from configuration '{config.Name}'", "UI");
                 }
                 
                 // Update usage statistics
@@ -1991,9 +2319,19 @@ namespace syncer.ui
                 // Show notification if enabled
                 if (config.ShowNotificationOnStart && _notificationService != null)
                 {
+                    string notificationMessage;
+                    if (totalJobs > 1)
+                    {
+                        notificationMessage = $"Configuration '{config.DisplayName}' loaded with {jobsStarted} of {totalJobs} jobs started.";
+                    }
+                    else
+                    {
+                        notificationMessage = $"Configuration '{config.DisplayName}' has been loaded successfully.";
+                    }
+                    
                     _notificationService.ShowNotification(
                         "Configuration Loaded",
-                        $"Configuration '{config.DisplayName}' has been loaded successfully.",
+                        notificationMessage,
                         ToolTipIcon.Info);
                 }
                 
@@ -2169,28 +2507,98 @@ namespace syncer.ui
         {
             try
             {
-                // Load the job configuration and start it
-                if (configuration?.JobSettings != null)
+                if (configuration == null)
                 {
-                    ServiceLocator.LogService.LogInfo($"Quick Launch: Loading configuration '{configuration.Name}'", "QuickLaunch");
+                    MessageBox.Show("Invalid configuration provided.", "Configuration Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                
+                // Ensure backward compatibility migration
+                configuration.EnsureJobsCompatibility();
+                
+                // Check if configuration has jobs (either single or multiple)
+                bool hasJobs = false;
+                int jobCount = 0;
+                string jobSummary = "";
+
+                if (configuration?.Jobs != null && configuration.Jobs.Count > 0)
+                {
+                    // Multi-job configuration
+                    hasJobs = true;
+                    jobCount = configuration.Jobs.Count;
+                    
+                    // Always show the actual count
+                    if (jobCount > 1)
+                    {
+                        jobSummary = $"Loaded {jobCount} jobs from multi-job configuration '{configuration.Name}' (PARALLEL START)";
+                    }
+                    else
+                    {
+                        jobSummary = $"Loaded {jobCount} job from configuration '{configuration.Name}' (To add more jobs: Load Config → Edit → Add Job)";
+                    }
+                }
+                else if (configuration?.JobSettings != null)
+                {
+                    // Single job configuration (backward compatibility - should be rare after migration)
+                    hasJobs = true;
+                    jobCount = 1;
+                    jobSummary = $"Loaded single job '{configuration.JobSettings.Name}' from configuration '{configuration.Name}'";
+                }
+
+                if (hasJobs)
+                {
+                    ServiceLocator.LogService.LogInfo($"Quick Launch: Loading configuration '{configuration.Name}' with {jobCount} job(s)", "QuickLaunch");
                     
                     // Apply the loaded configuration
                     ApplyLoadedConfiguration(configuration, true);
                     
-                    // Show success message
-                    string message = $"Job '{configuration.Name}' started successfully!\n" +
-                                   $"Source: {configuration.JobSettings.SourcePath}\n" +
-                                   $"Destination: {configuration.JobSettings.DestinationPath}\n" +
-                                   $"Interval: {configuration.JobSettings.IntervalValue} {configuration.JobSettings.IntervalType}";
+                    // Show success message with job details
+                    string message = jobSummary + "\n\nJobs have been started successfully!";
                     
-                    MessageBox.Show(message, "Job Started Successfully", 
+                    if (configuration.Jobs != null && configuration.Jobs.Count > 1)
+                    {
+                        message += "\n\n✓ All jobs are now running in PARALLEL";
+                        message += "\n\nJob Details:";
+                        for (int i = 0; i < Math.Min(configuration.Jobs.Count, 5); i++) // Show first 5 jobs
+                        {
+                            var job = configuration.Jobs[i];
+                            message += $"\n• {job.Name ?? $"Job {i + 1}"}: {job.SourcePath} → {job.DestinationPath}";
+                        }
+                        if (configuration.Jobs.Count > 5)
+                        {
+                            message += $"\n... and {configuration.Jobs.Count - 5} more jobs";
+                        }
+                    }
+                    else if (configuration.Jobs != null && configuration.Jobs.Count == 1)
+                    {
+                        var job = configuration.Jobs[0];
+                        message += $"\n\nCurrent Job:";
+                        message += $"\n• {job.Name ?? "Job 1"}: {job.SourcePath} → {job.DestinationPath}";
+                        message += $"\n• Interval: {job.IntervalValue} {job.IntervalType}";
+                        message += "\n\nTo add more jobs for parallel execution:";
+                        message += "\n1. Stop current job";
+                        message += "\n2. Use 'Load Configuration' (not 'Load & Start')";
+                        message += "\n3. Right-click the configuration → 'Edit'";
+                        message += "\n4. Click 'Add Job' to create additional jobs";
+                        message += "\n5. Save and then 'Load & Start' again";
+                    }
+                    else if (configuration.JobSettings != null)
+                    {
+                        message += $"\nSource: {configuration.JobSettings.SourcePath}";
+                        message += $"\nDestination: {configuration.JobSettings.DestinationPath}";
+                        message += $"\nInterval: {configuration.JobSettings.IntervalValue} {configuration.JobSettings.IntervalType}";
+                        message += "\n\nNote: This is a legacy single-job configuration.";
+                    }
+                    
+                    MessageBox.Show(message, "Jobs Started Successfully", 
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     
-                    ServiceLocator.LogService.LogInfo($"Quick Launch: Job '{configuration.Name}' started successfully", "QuickLaunch");
+                    ServiceLocator.LogService.LogInfo($"Quick Launch: Successfully started {jobCount} job(s) from configuration '{configuration.Name}'", "QuickLaunch");
                 }
                 else
                 {
-                    MessageBox.Show("Invalid configuration: Missing job settings.", "Configuration Error", 
+                    MessageBox.Show("Invalid configuration: No job settings found.", "Configuration Error", 
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
@@ -2523,6 +2931,79 @@ namespace syncer.ui
             }
         }
         
+        #endregion
+
+        #region Helper Methods
+
+        /// <summary>
+        /// Simple input dialog for configuration name (compatible with .NET 3.5)
+        /// </summary>
+        private string PromptForConfigurationName(string message, string defaultValue)
+        {
+            // Create a simple form for input
+            using (var inputForm = new Form())
+            {
+                inputForm.Text = "Save Multi-Job Configuration";
+                inputForm.Size = new System.Drawing.Size(500, 250);
+                inputForm.StartPosition = FormStartPosition.CenterParent;
+                inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                inputForm.MaximizeBox = false;
+                inputForm.MinimizeBox = false;
+
+                var lblMessage = new Label()
+                {
+                    Text = message,
+                    Location = new System.Drawing.Point(12, 15),
+                    Size = new System.Drawing.Size(460, 80),
+                    AutoSize = false
+                };
+                inputForm.Controls.Add(lblMessage);
+
+                var lblName = new Label()
+                {
+                    Text = "Configuration Name:",
+                    Location = new System.Drawing.Point(12, 105),
+                    Size = new System.Drawing.Size(120, 23),
+                    TextAlign = ContentAlignment.MiddleLeft
+                };
+                inputForm.Controls.Add(lblName);
+
+                var txtName = new TextBox()
+                {
+                    Text = defaultValue,
+                    Location = new System.Drawing.Point(12, 130),
+                    Size = new System.Drawing.Size(460, 23)
+                };
+                inputForm.Controls.Add(txtName);
+
+                var btnOK = new Button()
+                {
+                    Text = "Save",
+                    DialogResult = DialogResult.OK,
+                    Location = new System.Drawing.Point(310, 170),
+                    Size = new System.Drawing.Size(80, 30)
+                };
+                inputForm.Controls.Add(btnOK);
+
+                var btnCancel = new Button()
+                {
+                    Text = "Cancel",
+                    DialogResult = DialogResult.Cancel,
+                    Location = new System.Drawing.Point(395, 170),
+                    Size = new System.Drawing.Size(80, 30)
+                };
+                inputForm.Controls.Add(btnCancel);
+
+                inputForm.AcceptButton = btnOK;
+                inputForm.CancelButton = btnCancel;
+
+                txtName.Focus();
+                txtName.SelectAll();
+
+                return inputForm.ShowDialog(this) == DialogResult.OK ? txtName.Text : null;
+            }
+        }
+
         #endregion
 
         #endregion

@@ -160,8 +160,8 @@ namespace syncer.ui.Services
         {
             string title = running ? "Service Started" : "Service Stopped";
             string message = running 
-                ? "The Data Syncer service has started. File synchronization will occur according to schedule."
-                : "The Data Syncer service has stopped. File synchronization will not occur until the service is restarted.";
+                ? "The FTPSyncer service has started. File synchronization will occur according to schedule."
+                : "The FTPSyncer service has stopped. File synchronization will not occur until the service is restarted.";
                 
             ToolTipIcon icon = running ? ToolTipIcon.Info : ToolTipIcon.Warning;
             

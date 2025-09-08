@@ -31,7 +31,7 @@ namespace syncer.core.Services
             _notifyIcon = new NotifyIcon
             {
                 Icon = GetApplicationIcon(),
-                Text = "Data Syncer",
+                Text = "FTPSyncer",
                 Visible = true
             };
             
@@ -52,7 +52,7 @@ namespace syncer.core.Services
             var contextMenu = new ContextMenu();
             
             // Open application
-            var openItem = new MenuItem("Open Data Syncer", (s, e) => OnShowMainWindowRequested());
+            var openItem = new MenuItem("Open FTPSyncer", (s, e) => OnShowMainWindowRequested());
             contextMenu.MenuItems.Add(openItem);
             
             // Settings item

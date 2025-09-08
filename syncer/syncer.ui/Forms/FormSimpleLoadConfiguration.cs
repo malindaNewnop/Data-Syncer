@@ -146,6 +146,9 @@ namespace syncer.ui.Forms
 
             var config = (SavedJobConfiguration)listBoxConfigurations.SelectedItem;
             
+            // Ensure backward compatibility migration for display
+            config.EnsureJobsCompatibility();
+            
             lblConfigName.Text = "Name: " + (config.Name ?? "N/A");
             lblDescription.Text = "Description: " + (config.Description ?? "N/A");
             lblCategory.Text = "Category: " + (config.Category ?? "General");
@@ -153,10 +156,31 @@ namespace syncer.ui.Forms
             lblLastUsed.Text = "Last Used: " + (config.LastUsed != null ? config.LastUsed.Value.ToString("yyyy-MM-dd HH:mm") : "Never");
             lblTimesUsed.Text = "Times Used: " + config.TimesUsed.ToString();
             
-            // Show job settings if available
-            if (config.JobSettings != null)
+            // Show job settings - handle both single job and multi-job configurations
+            if (config.Jobs != null && config.Jobs.Count > 0)
             {
-                lblSourcePath.Text = "Source: " + (config.JobSettings.SourcePath ?? "Not set");
+                // Multi-job configuration
+                if (config.Jobs.Count == 1)
+                {
+                    // Single job in Jobs collection
+                    var job = config.Jobs[0];
+                    lblSourcePath.Text = "Source: " + (job.SourcePath ?? "Not set") + " (1 job - Click Edit to add more)";
+                    lblDestinationPath.Text = "Destination: " + (job.DestinationPath ?? "Not set");
+                }
+                else
+                {
+                    // Multiple jobs - show summary
+                    lblSourcePath.Text = $"Multiple Jobs: {config.Jobs.Count} jobs configured (will run in PARALLEL)";
+                    lblDestinationPath.Text = "Paths: " + string.Join(", ", config.Jobs
+                        .Take(3)
+                        .Select(j => string.IsNullOrEmpty(j.Name) ? "Unnamed" : j.Name)
+                        .ToArray()) + (config.Jobs.Count > 3 ? "..." : "");
+                }
+            }
+            else if (config.JobSettings != null)
+            {
+                // Single job configuration (backward compatibility)
+                lblSourcePath.Text = "Source: " + (config.JobSettings.SourcePath ?? "Not set") + " (Legacy single job)";
                 lblDestinationPath.Text = "Destination: " + (config.JobSettings.DestinationPath ?? "Not set");
             }
             else

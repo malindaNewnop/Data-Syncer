@@ -105,8 +105,8 @@ namespace syncer.ui.Services
             
             string title = isRunning ? "Service Started" : "Service Stopped";
             string message = isRunning ? 
-                "Data Syncer service is now running and monitoring for changes" :
-                "Data Syncer service has been stopped - no automatic syncing will occur";
+                "FTPSyncer service is now running and monitoring for changes" :
+                "FTPSyncer service has been stopped - no automatic syncing will occur";
             
             ToolTipIcon icon = isRunning ? ToolTipIcon.Info : ToolTipIcon.Warning;
             _trayManager.ShowNotification(title, message, icon);

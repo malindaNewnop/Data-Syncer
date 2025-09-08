@@ -22,7 +22,7 @@ namespace syncer.core
         private readonly Dictionary<string, bool> _cancellationTokens = new Dictionary<string, bool>();
         private readonly Dictionary<string, JobExecutionContext> _executionContexts = new Dictionary<string, JobExecutionContext>();
         
-        private int _maxConcurrentJobs = 5;
+        private int _maxConcurrentJobs = 20; // Increased default limit for better parallelism
         private bool _isProcessing = false;
         private Timer _queueProcessorTimer;
         
@@ -52,7 +52,24 @@ namespace syncer.core
             _transferClientFactory = transferClientFactory;
             _fileEnumerator = fileEnumerator;
 
+            // Try to get configuration-based limits
+            try
+            {
+                var configService = new MultiJobConfigurationService(_logService);
+                var config = configService.GetConfiguration();
+                if (config != null)
+                {
+                    _maxConcurrentJobs = config.GlobalMaxConcurrentJobs;
+                    _logService.LogInfo(string.Format("MultiJobRunner using configuration-based concurrent limit: {0}", _maxConcurrentJobs), "MultiJobRunner");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogWarning(string.Format("Failed to load MultiJobConfiguration, using default limit: {0}", ex.Message), "MultiJobRunner");
+            }
+
             // Start queue processor timer (check every 5 seconds)
+            _queueProcessorTimer = new Timer(ProcessQueues, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
             _queueProcessorTimer = new Timer(ProcessQueues, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
             
             _logService.LogInfo("MultiJobRunner initialized with queue processing", "MultiJobRunner");

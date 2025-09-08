@@ -1069,8 +1069,8 @@ namespace syncer.ui.Services
 
         #region Real-time Logging Interface Implementation (No-op for UI LogService)
         
-        public event EventHandler<syncer.core.LogEntryEventArgs> RealTimeLogEntry;
-
+        // Removed: unused event RealTimeLogEntry
+        
         /// <summary>
         /// Enable real-time logging (no-op implementation for UI LogService)
         /// </summary>

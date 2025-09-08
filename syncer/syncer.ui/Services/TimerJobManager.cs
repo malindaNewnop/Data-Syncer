@@ -240,6 +240,93 @@ namespace syncer.ui.Services
             }
         }
 
+        public Dictionary<long, bool> StartMultipleTimerJobs(List<long> jobIds)
+        {
+            if (jobIds == null || jobIds.Count == 0)
+            {
+                return new Dictionary<long, bool>();
+            }
+
+            var results = new Dictionary<long, bool>();
+            var threads = new List<System.Threading.Thread>();
+            var lockObject = new object();
+            
+            _logService.LogInfo(string.Format("Starting {0} timer jobs in parallel", jobIds.Count), "TimerJobManager");
+
+            // Start each job in a separate thread for true parallelism
+            foreach (var jobId in jobIds)
+            {
+                var thread = new System.Threading.Thread(delegate(object data)
+                {
+                    var currentJobId = (long)data;
+                    bool success = false;
+                    
+                    try
+                    {
+                        success = StartTimerJob(currentJobId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(string.Format("Exception starting timer job {0}: {1}", currentJobId, ex.Message), "TimerJobManager");
+                        success = false;
+                    }
+                    
+                    // Thread-safe result storage
+                    lock (lockObject)
+                    {
+                        results[currentJobId] = success;
+                    }
+                })
+                {
+                    IsBackground = true,
+                    Name = string.Format("StartJob-{0}", jobId)
+                };
+                
+                threads.Add(thread);
+            }
+
+            // Start all threads at once for maximum parallelism
+            foreach (var thread in threads)
+            {
+                thread.Start(long.Parse(thread.Name.Split('-')[1])); // Extract jobId from thread name
+            }
+
+            // Wait for all threads to complete (with reasonable timeout)
+            const int timeoutMs = 30000; // 30 seconds timeout
+            var startTime = DateTime.Now;
+            
+            foreach (var thread in threads)
+            {
+                var remainingTime = timeoutMs - (int)(DateTime.Now - startTime).TotalMilliseconds;
+                if (remainingTime > 0)
+                {
+                    thread.Join(remainingTime);
+                }
+                else
+                {
+                    _logService.LogWarning("Timeout waiting for timer job start threads", "TimerJobManager");
+                    break;
+                }
+            }
+
+            var successCount = 0;
+            var failCount = 0;
+            
+            lock (lockObject)
+            {
+                foreach (var result in results.Values)
+                {
+                    if (result) successCount++;
+                    else failCount++;
+                }
+            }
+
+            _logService.LogInfo(string.Format("Parallel timer job start completed: {0} successful, {1} failed out of {2} total", 
+                successCount, failCount, jobIds.Count), "TimerJobManager");
+
+            return results;
+        }
+
         public bool StopTimerJob(long jobId)
         {
             try
@@ -414,9 +501,6 @@ namespace syncer.ui.Services
         {
             try
             {
-                // Debug logging
-                _logService.LogInfo(string.Format("=== UPDATING TIMER JOB {0} ===", jobId));
-
                 if (!_timerJobs.ContainsKey(jobId))
                 {
                     _logService.LogError(string.Format("Cannot update timer job {0}: Job not found", jobId));
@@ -587,10 +671,6 @@ namespace syncer.ui.Services
                 string[] currentFiles;
                 if (job.EnableFilters && (job.IncludeExtensions.Count > 0 || job.ExcludeExtensions.Count > 0))
                 {
-                    _logService.LogInfo(string.Format("TIMER JOB FILTER DEBUG: Applying filters - Include: {0}, Exclude: {1}",
-                        string.Join(",", job.IncludeExtensions.ToArray()),
-                        string.Join(",", job.ExcludeExtensions.ToArray())));
-
                     var filteredFiles = new List<string>();
 
                     foreach (string file in allFiles)
@@ -616,7 +696,6 @@ namespace syncer.ui.Services
                                     break;
                                 }
                             }
-                            _logService.LogInfo(string.Format("TIMER FILTER DEBUG: File '{0}' include check: {1}", fileName, shouldInclude));
                         }
 
                         // Apply exclude filter (only if not already excluded by include filter)
@@ -630,10 +709,7 @@ namespace syncer.ui.Services
                                     break;
                                 }
                             }
-                            _logService.LogInfo(string.Format("TIMER FILTER DEBUG: File '{0}' exclude check: {1}", fileName, shouldInclude));
                         }
-
-                        _logService.LogInfo(string.Format("TIMER FILTER DEBUG: Final decision for '{0}': {1}", fileName, shouldInclude ? "INCLUDE" : "EXCLUDE"));
 
                         if (shouldInclude)
                         {

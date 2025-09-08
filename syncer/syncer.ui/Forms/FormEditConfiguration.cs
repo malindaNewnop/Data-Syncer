@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -9,6 +10,8 @@ namespace syncer.ui.Forms
         private SavedJobConfiguration _configuration;
         private ISavedJobConfigurationService _configService;
         private bool _isTimerJob = false; // Flag to indicate if this is a timer job
+        private int _currentJobIndex = 0; // Index of currently selected job
+        private bool _isMultiJob = false; // Flag to indicate if this is a multi-job configuration
 
         public FormEditConfiguration(SavedJobConfiguration configuration) : this(configuration, false)
         {
@@ -21,11 +24,17 @@ namespace syncer.ui.Forms
             _configService = ServiceLocator.SavedJobConfigurationService;
             _isTimerJob = isTimerJob;
             
+            // Detect if this is a multi-job configuration
+            _isMultiJob = _configuration != null && _configuration.Jobs != null && _configuration.Jobs.Count > 1;
+            
             // Hide connection tab for timer jobs
             if (_isTimerJob && tabControl1.TabPages.Contains(tabConnection))
             {
                 tabControl1.TabPages.Remove(tabConnection);
             }
+            
+            // Initialize multi-job UI if needed
+            InitializeMultiJobUI();
             
             LoadConfigurationData();
             
@@ -40,6 +49,245 @@ namespace syncer.ui.Forms
                 cmbIntervalType.SelectedIndex = 1; // Minutes
         }
 
+        private void InitializeMultiJobUI()
+        {
+            if (!_isMultiJob) return;
+
+            // Show the multi-job panel
+            panelMultiJob.Visible = true;
+            
+            // Move other controls down to accommodate the panel
+            AdjustControlsForMultiJob();
+            
+            // Populate the job selector
+            LoadJobSelector();
+        }
+        
+        private void AdjustControlsForMultiJob()
+        {
+            // Move all job controls down by the height of the multi-job panel
+            int offsetY = panelMultiJob.Height + 5;
+            
+            foreach (Control control in tabJob.Controls)
+            {
+                if (control != panelMultiJob)
+                {
+                    control.Top += offsetY;
+                }
+            }
+        }
+        
+        private void LoadJobSelector()
+        {
+            cmbJobSelector.Items.Clear();
+            
+            if (_configuration?.Jobs != null)
+            {
+                for (int i = 0; i < _configuration.Jobs.Count; i++)
+                {
+                    var job = _configuration.Jobs[i];
+                    string displayName = string.IsNullOrEmpty(job.Name) ? string.Format("Job {0}", i + 1) : job.Name;
+                    cmbJobSelector.Items.Add(string.Format("{0}. {1}", i + 1, displayName));
+                }
+                
+                if (cmbJobSelector.Items.Count > 0)
+                {
+                    cmbJobSelector.SelectedIndex = Math.Min(_currentJobIndex, cmbJobSelector.Items.Count - 1);
+                }
+            }
+        }
+        
+        #region Multi-Job Event Handlers
+        
+        private void cmbJobSelector_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (cmbJobSelector.SelectedIndex >= 0 && cmbJobSelector.SelectedIndex != _currentJobIndex)
+            {
+                // Save current job before switching
+                SaveCurrentJobData();
+                
+                // Switch to new job
+                _currentJobIndex = cmbJobSelector.SelectedIndex;
+                LoadCurrentJobData();
+            }
+        }
+        
+        private void btnAddJob_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Save current job data first
+                SaveCurrentJobData();
+                
+                // Add new job to the configuration
+                if (_configuration.Jobs == null)
+                    _configuration.Jobs = new List<SyncJob>();
+                    
+                var newJob = new SyncJob
+                {
+                    Name = string.Format("Job {0}", _configuration.Jobs.Count + 1),
+                    IsEnabled = true,
+                    IntervalValue = 5,
+                    IntervalType = "Minutes"
+                };
+                
+                _configuration.Jobs.Add(newJob);
+                
+                // Update the job selector
+                LoadJobSelector();
+                
+                // Select the new job
+                cmbJobSelector.SelectedIndex = _configuration.Jobs.Count - 1;
+                
+                MessageBox.Show("New job added successfully!", "Add Job", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error adding new job: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        
+        private void btnDeleteJob_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_configuration?.Jobs == null || _configuration.Jobs.Count <= 1)
+                {
+                    MessageBox.Show("Cannot delete the last job in the configuration.", "Delete Job", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                
+                if (_currentJobIndex < 0 || _currentJobIndex >= _configuration.Jobs.Count)
+                    return;
+                    
+                var currentJob = _configuration.Jobs[_currentJobIndex];
+                string jobName = string.IsNullOrEmpty(currentJob.Name) ? string.Format("Job {0}", _currentJobIndex + 1) : currentJob.Name;
+                
+                DialogResult result = MessageBox.Show(
+                    string.Format("Are you sure you want to delete '{0}'?", jobName), 
+                    "Confirm Delete", 
+                    MessageBoxButtons.YesNo, 
+                    MessageBoxIcon.Question);
+                    
+                if (result == DialogResult.Yes)
+                {
+                    _configuration.Jobs.RemoveAt(_currentJobIndex);
+                    
+                    // Adjust current job index if needed
+                    if (_currentJobIndex >= _configuration.Jobs.Count)
+                        _currentJobIndex = _configuration.Jobs.Count - 1;
+                    
+                    // Check if we still have multiple jobs
+                    if (_configuration.Jobs.Count <= 1)
+                    {
+                        _isMultiJob = false;
+                        panelMultiJob.Visible = false;
+                        // Move controls back up
+                        int offsetY = -(panelMultiJob.Height + 5);
+                        foreach (Control control in tabJob.Controls)
+                        {
+                            if (control != panelMultiJob)
+                            {
+                                control.Top += offsetY;
+                            }
+                        }
+                    }
+                    
+                    // Update the job selector and load current job
+                    LoadJobSelector();
+                    LoadCurrentJobData();
+                    
+                    MessageBox.Show("Job deleted successfully!", "Delete Job", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error deleting job: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        
+        #endregion
+        
+        #region Multi-Job Data Methods
+        
+        private void SaveCurrentJobData()
+        {
+            if (_configuration?.Jobs == null || _currentJobIndex < 0 || _currentJobIndex >= _configuration.Jobs.Count)
+                return;
+                
+            var currentJob = _configuration.Jobs[_currentJobIndex];
+            
+            // Save job data from form fields to the current job
+            currentJob.Name = txtJobName.Text.Trim();
+            currentJob.SourcePath = txtSourcePath.Text.Trim();
+            currentJob.DestinationPath = txtDestinationPath.Text.Trim();
+            currentJob.IntervalValue = (int)numInterval.Value;
+            currentJob.IntervalType = cmbIntervalType.Text;
+            currentJob.IsEnabled = chkEnabled.Checked;
+            currentJob.IncludeSubFolders = chkIncludeSubfolders.Checked;
+            currentJob.DeleteSourceAfterTransfer = chkDeleteSourceAfterTransfer.Checked;
+            currentJob.EnableFilters = chkEnableFilters.Checked;
+            currentJob.IncludeFileTypes = txtIncludeFileTypes.Text.Trim();
+            currentJob.ExcludeFileTypes = txtExcludeFileTypes.Text.Trim();
+        }
+        
+        private void LoadCurrentJobData()
+        {
+            if (_configuration?.Jobs == null || _currentJobIndex < 0 || _currentJobIndex >= _configuration.Jobs.Count)
+            {
+                // Clear form if no valid job
+                ClearJobForm();
+                return;
+            }
+                
+            var currentJob = _configuration.Jobs[_currentJobIndex];
+            
+            // Load job data from current job to form fields
+            txtJobName.Text = currentJob.Name ?? "";
+            txtSourcePath.Text = currentJob.SourcePath ?? "";
+            txtDestinationPath.Text = currentJob.DestinationPath ?? "";
+            numInterval.Value = Math.Max(1, currentJob.IntervalValue);
+            
+            if (!string.IsNullOrEmpty(currentJob.IntervalType))
+            {
+                int index = cmbIntervalType.FindString(currentJob.IntervalType);
+                if (index >= 0) cmbIntervalType.SelectedIndex = index;
+            }
+            
+            chkEnabled.Checked = currentJob.IsEnabled;
+            chkIncludeSubfolders.Checked = currentJob.IncludeSubFolders;
+            chkDeleteSourceAfterTransfer.Checked = currentJob.DeleteSourceAfterTransfer;
+            chkEnableFilters.Checked = currentJob.EnableFilters;
+            txtIncludeFileTypes.Text = currentJob.IncludeFileTypes ?? "";
+            txtExcludeFileTypes.Text = currentJob.ExcludeFileTypes ?? "";
+            
+            // Update filter control states
+            UpdateFilterControlStates();
+        }
+        
+        private void ClearJobForm()
+        {
+            txtJobName.Text = "";
+            txtSourcePath.Text = "";
+            txtDestinationPath.Text = "";
+            numInterval.Value = 1;
+            cmbIntervalType.SelectedIndex = 1; // Minutes
+            chkEnabled.Checked = true;
+            chkIncludeSubfolders.Checked = false;
+            chkDeleteSourceAfterTransfer.Checked = false;
+            chkEnableFilters.Checked = false;
+            txtIncludeFileTypes.Text = "";
+            txtExcludeFileTypes.Text = "";
+            UpdateFilterControlStates();
+        }
+        
+        #endregion
+
         private void LoadConfigurationData()
         {
             if (_configuration == null) return;
@@ -48,31 +296,40 @@ namespace syncer.ui.Forms
             txtConfigName.Text = _configuration.Name ?? "";
             txtDescription.Text = _configuration.Description ?? "";
 
-            // Job settings
-            if (_configuration.JobSettings != null)
+            // Handle job settings based on configuration type
+            if (_isMultiJob)
             {
-                txtJobName.Text = _configuration.JobSettings.Name ?? "";
-                txtSourcePath.Text = _configuration.JobSettings.SourcePath ?? "";
-                txtDestinationPath.Text = _configuration.JobSettings.DestinationPath ?? "";
-                numInterval.Value = Math.Max(1, _configuration.JobSettings.IntervalValue);
-                
-                if (!string.IsNullOrEmpty(_configuration.JobSettings.IntervalType))
+                // For multi-job configurations, load the currently selected job
+                LoadCurrentJobData();
+            }
+            else
+            {
+                // For single job configurations, load from JobSettings (backward compatibility)
+                if (_configuration.JobSettings != null)
                 {
-                    int index = cmbIntervalType.FindString(_configuration.JobSettings.IntervalType);
-                    if (index >= 0) cmbIntervalType.SelectedIndex = index;
+                    txtJobName.Text = _configuration.JobSettings.Name ?? "";
+                    txtSourcePath.Text = _configuration.JobSettings.SourcePath ?? "";
+                    txtDestinationPath.Text = _configuration.JobSettings.DestinationPath ?? "";
+                    numInterval.Value = Math.Max(1, _configuration.JobSettings.IntervalValue);
+                    
+                    if (!string.IsNullOrEmpty(_configuration.JobSettings.IntervalType))
+                    {
+                        int index = cmbIntervalType.FindString(_configuration.JobSettings.IntervalType);
+                        if (index >= 0) cmbIntervalType.SelectedIndex = index;
+                    }
+                    
+                    chkEnabled.Checked = _configuration.JobSettings.IsEnabled;
+                    chkIncludeSubfolders.Checked = _configuration.JobSettings.IncludeSubFolders;
+                    chkDeleteSourceAfterTransfer.Checked = _configuration.JobSettings.DeleteSourceAfterTransfer;
+                    
+                    // Load filter settings
+                    chkEnableFilters.Checked = _configuration.JobSettings.EnableFilters;
+                    txtIncludeFileTypes.Text = _configuration.JobSettings.IncludeFileTypes ?? "";
+                    txtExcludeFileTypes.Text = _configuration.JobSettings.ExcludeFileTypes ?? "";
+                    
+                    // Update filter control states
+                    UpdateFilterControlStates();
                 }
-                
-                chkEnabled.Checked = _configuration.JobSettings.IsEnabled;
-                chkIncludeSubfolders.Checked = _configuration.JobSettings.IncludeSubFolders;
-                chkDeleteSourceAfterTransfer.Checked = _configuration.JobSettings.DeleteSourceAfterTransfer;
-                
-                // Load filter settings
-                chkEnableFilters.Checked = _configuration.JobSettings.EnableFilters;
-                txtIncludeFileTypes.Text = _configuration.JobSettings.IncludeFileTypes ?? "";
-                txtExcludeFileTypes.Text = _configuration.JobSettings.ExcludeFileTypes ?? "";
-                
-                // Update filter control states
-                UpdateFilterControlStates();
             }
 
             // Connection settings (only load if not a timer job)
@@ -86,8 +343,6 @@ namespace syncer.ui.Forms
                 numPort.Value = Math.Max(1, conn.Port);
                 chkUseSSL.Checked = conn.EnableSsl;
             }
-
-
         }
 
         private void SaveConfigurationData()
@@ -137,23 +392,32 @@ namespace syncer.ui.Forms
                 _configuration.Name = txtConfigName.Text.Trim();
                 _configuration.Description = txtDescription.Text.Trim();
 
-                // Update job settings
-                if (_configuration.JobSettings == null)
-                    _configuration.JobSettings = new SyncJob();
+                // Handle job settings based on configuration type
+                if (_isMultiJob)
+                {
+                    // For multi-job configurations, save current job data
+                    SaveCurrentJobData();
+                }
+                else
+                {
+                    // For single job configurations, update JobSettings (backward compatibility)
+                    if (_configuration.JobSettings == null)
+                        _configuration.JobSettings = new SyncJob();
 
-                _configuration.JobSettings.Name = txtJobName.Text.Trim();
-                _configuration.JobSettings.SourcePath = txtSourcePath.Text.Trim();
-                _configuration.JobSettings.DestinationPath = txtDestinationPath.Text.Trim();
-                _configuration.JobSettings.IntervalValue = (int)numInterval.Value;
-                _configuration.JobSettings.IntervalType = cmbIntervalType.Text;
-                _configuration.JobSettings.IsEnabled = chkEnabled.Checked;
-                _configuration.JobSettings.IncludeSubFolders = chkIncludeSubfolders.Checked;
-                _configuration.JobSettings.DeleteSourceAfterTransfer = chkDeleteSourceAfterTransfer.Checked;
-                
-                // Update filter settings
-                _configuration.JobSettings.EnableFilters = chkEnableFilters.Checked;
-                _configuration.JobSettings.IncludeFileTypes = txtIncludeFileTypes.Text.Trim();
-                _configuration.JobSettings.ExcludeFileTypes = txtExcludeFileTypes.Text.Trim();
+                    _configuration.JobSettings.Name = txtJobName.Text.Trim();
+                    _configuration.JobSettings.SourcePath = txtSourcePath.Text.Trim();
+                    _configuration.JobSettings.DestinationPath = txtDestinationPath.Text.Trim();
+                    _configuration.JobSettings.IntervalValue = (int)numInterval.Value;
+                    _configuration.JobSettings.IntervalType = cmbIntervalType.Text;
+                    _configuration.JobSettings.IsEnabled = chkEnabled.Checked;
+                    _configuration.JobSettings.IncludeSubFolders = chkIncludeSubfolders.Checked;
+                    _configuration.JobSettings.DeleteSourceAfterTransfer = chkDeleteSourceAfterTransfer.Checked;
+                    
+                    // Update filter settings
+                    _configuration.JobSettings.EnableFilters = chkEnableFilters.Checked;
+                    _configuration.JobSettings.IncludeFileTypes = txtIncludeFileTypes.Text.Trim();
+                    _configuration.JobSettings.ExcludeFileTypes = txtExcludeFileTypes.Text.Trim();
+                }
 
                 // Update connection settings (only if not a timer job)
                 if (!_isTimerJob)

@@ -530,8 +530,9 @@ namespace syncer.ui
         public string Category { get; set; }
         public List<string> Tags { get; set; }
 
-        // Job Settings
-        public SyncJob JobSettings { get; set; }
+        // Job Settings - Support for multiple jobs
+        public SyncJob JobSettings { get; set; } // Keep for backward compatibility
+        public List<SyncJob> Jobs { get; set; } // New multi-job support
         
         // Connection Settings
         public SavedConnection SourceConnection { get; set; }
@@ -567,6 +568,7 @@ namespace syncer.ui
             TimesUsed = 0;
             
             JobSettings = new SyncJob();
+            Jobs = new List<SyncJob>();
             SourceConnection = new SavedConnection();
             DestinationConnection = new SavedConnection();
         }
@@ -581,6 +583,146 @@ namespace syncer.ui
         }
         
         /// <summary>
+        /// Ensures backward compatibility by migrating old JobSettings to new Jobs collection
+        /// This should be called whenever a configuration is loaded
+        /// </summary>
+        public void EnsureJobsCompatibility()
+        {
+            // Debug logging to understand what's happening
+            var logService = syncer.ui.ServiceLocator.LogService;
+            if (logService != null)
+            {
+                logService.LogInfo($"EnsureJobsCompatibility called for config '{Name}': Jobs={Jobs?.Count ?? -1}, JobSettings={JobSettings != null}", "SavedJobConfiguration");
+            }
+            
+            // If we have Jobs collection, we're good
+            if (Jobs != null && Jobs.Count > 0)
+            {
+                if (logService != null)
+                {
+                    logService.LogInfo($"Configuration '{Name}' already has {Jobs.Count} jobs in Jobs collection", "SavedJobConfiguration");
+                }
+                return;
+            }
+                
+            // If we don't have Jobs collection, initialize it
+            if (Jobs == null)
+            {
+                Jobs = new List<SyncJob>();
+                if (logService != null)
+                {
+                    logService.LogInfo($"Initialized empty Jobs collection for config '{Name}'", "SavedJobConfiguration");
+                }
+            }
+            
+            // If we have old JobSettings and no jobs in the new collection, migrate it
+            if (JobSettings != null && Jobs.Count == 0)
+            {
+                Jobs.Add(JobSettings);
+                if (logService != null)
+                {
+                    logService.LogInfo($"Migrated single JobSettings to Jobs collection for config '{Name}'", "SavedJobConfiguration");
+                }
+                // Keep JobSettings for backward compatibility, but Jobs is the primary collection now
+            }
+            
+            if (logService != null)
+            {
+                logService.LogInfo($"EnsureJobsCompatibility completed for config '{Name}': Final Jobs count = {Jobs.Count}", "SavedJobConfiguration");
+            }
+        }
+        
+        /// <summary>
+        /// Gets whether this configuration has multiple jobs
+        /// </summary>
+        public bool IsMultiJob
+        {
+            get 
+            { 
+                EnsureJobsCompatibility();
+                return Jobs != null && Jobs.Count > 1; 
+            }
+        }
+        
+        /// <summary>
+        /// Gets the total number of jobs in this configuration
+        /// </summary>
+        public int JobCount
+        {
+            get
+            {
+                EnsureJobsCompatibility();
+                return Jobs?.Count ?? 0;
+            }
+        }
+        
+        /// <summary>
+        /// Gets all jobs (including legacy single job) as a unified collection
+        /// </summary>
+        public List<SyncJob> GetAllJobs()
+        {
+            var allJobs = new List<SyncJob>();
+            
+            if (IsMultiJob)
+            {
+                allJobs.AddRange(Jobs);
+            }
+            else if (JobSettings != null)
+            {
+                allJobs.Add(JobSettings);
+            }
+            
+            return allJobs;
+        }
+        
+        /// <summary>
+        /// Adds a new job to the configuration
+        /// </summary>
+        public void AddJob(SyncJob job)
+        {
+            if (job == null) return;
+            
+            if (Jobs == null)
+                Jobs = new List<SyncJob>();
+                
+            Jobs.Add(job);
+        }
+        
+        /// <summary>
+        /// Removes a job from the configuration
+        /// </summary>
+        public bool RemoveJob(SyncJob job)
+        {
+            if (Jobs == null || job == null) return false;
+            return Jobs.Remove(job);
+        }
+        
+        /// <summary>
+        /// Removes a job at the specified index
+        /// </summary>
+        public bool RemoveJobAt(int index)
+        {
+            if (Jobs == null || index < 0 || index >= Jobs.Count) return false;
+            Jobs.RemoveAt(index);
+            return true;
+        }
+        
+        /// <summary>
+        /// Migrates legacy single job to multi-job format
+        /// </summary>
+        public void MigrateToMultiJob()
+        {
+            if (!IsMultiJob && JobSettings != null)
+            {
+                if (Jobs == null)
+                    Jobs = new List<SyncJob>();
+                    
+                Jobs.Add(JobSettings);
+                JobSettings = null; // Clear the legacy job
+            }
+        }
+        
+        /// <summary>
         /// Gets a display name for the configuration
         /// </summary>
         public string DisplayName
@@ -588,9 +730,15 @@ namespace syncer.ui
             get
             {
                 if (!string.IsNullOrEmpty(Name))
+                {
+                    if (IsMultiJob)
+                        return string.Format("{0} ({1} jobs)", Name, JobCount);
                     return Name;
+                }
                 if (JobSettings != null && !string.IsNullOrEmpty(JobSettings.Name))
                     return JobSettings.Name;
+                if (IsMultiJob && Jobs.Count > 0 && !string.IsNullOrEmpty(Jobs[0].Name))
+                    return string.Format("{0} (+{1} more)", Jobs[0].Name, Jobs.Count - 1);
                 return "Unnamed Configuration";
             }
         }
@@ -625,17 +773,43 @@ namespace syncer.ui
             
             if (string.IsNullOrEmpty(Name))
                 errors.Add("Configuration name is required");
-                
-            if (JobSettings == null)
-                errors.Add("Job settings are required");
-            else
+            
+            // Validate job configuration - either single job or multi-job
+            if (JobSettings == null && (Jobs == null || Jobs.Count == 0))
+            {
+                errors.Add("Either job settings or jobs collection is required");
+            }
+            else if (JobSettings != null)
+            {
+                // Single job configuration
                 errors.AddRange(JobSettings.ValidateConfiguration());
                 
-            if (SourceConnection?.Settings == null)
-                errors.Add("Source connection settings are required");
-                
-            if (DestinationConnection?.Settings == null)
-                errors.Add("Destination connection settings are required");
+                // For single job, connection settings are required
+                if (SourceConnection?.Settings == null)
+                    errors.Add("Source connection settings are required");
+                    
+                if (DestinationConnection?.Settings == null)
+                    errors.Add("Destination connection settings are required");
+            }
+            else if (Jobs != null && Jobs.Count > 0)
+            {
+                // Multi-job configuration - each job has its own connections
+                for (int i = 0; i < Jobs.Count; i++)
+                {
+                    var job = Jobs[i];
+                    if (job == null)
+                    {
+                        errors.Add($"Job {i + 1} is null");
+                        continue;
+                    }
+                    
+                    var jobErrors = job.ValidateConfiguration();
+                    foreach (var jobError in jobErrors)
+                    {
+                        errors.Add($"Job '{job.Name ?? (i + 1).ToString()}': {jobError}");
+                    }
+                }
+            }
                 
             return errors;
         }

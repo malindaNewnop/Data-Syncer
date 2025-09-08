@@ -15,13 +15,13 @@ namespace syncer.core
         /// Maximum number of jobs that can run concurrently across all queues
         /// </summary>
         [XmlAttribute]
-        public int GlobalMaxConcurrentJobs { get; set; } = 5;
+        public int GlobalMaxConcurrentJobs { get; set; } = 20;
 
         /// <summary>
         /// Default maximum concurrent jobs per queue
         /// </summary>
         [XmlAttribute]
-        public int DefaultQueueMaxConcurrentJobs { get; set; } = 3;
+        public int DefaultQueueMaxConcurrentJobs { get; set; } = 10;
 
         /// <summary>
         /// Interval in seconds for queue processing checks

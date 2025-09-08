@@ -79,6 +79,13 @@ namespace syncer.ui.Interfaces
         bool StartTimerJob(long jobId);
         
         /// <summary>
+        /// Starts multiple timer jobs in parallel
+        /// </summary>
+        /// <param name="jobIds">List of job IDs to start</param>
+        /// <returns>Dictionary with job IDs as keys and success status as values</returns>
+        Dictionary<long, bool> StartMultipleTimerJobs(List<long> jobIds);
+        
+        /// <summary>
         /// Stops a timer job
         /// </summary>
         /// <param name="jobId">The ID of the job to stop</param>

@@ -100,6 +100,21 @@ namespace syncer.ui.Services
                     // Update or add configuration
                     _configurations[config.Id] = config;
 
+                    // Automatically add new configurations to Quick Launch
+                    if (!isUpdate && !_quickLaunchItems.Any(q => q.ConfigurationId == config.Id))
+                    {
+                        var quickLaunchItem = new QuickLaunchItem
+                        {
+                            ConfigurationId = config.Id,
+                            DisplayName = config.DisplayName + (config.IsMultiJob ? $" ({config.Jobs.Count} jobs)" : ""),
+                            Description = config.FormattedDescription,
+                            CreatedDate = config.CreatedDate,
+                            LastUsed = config.LastUsed,
+                            Configuration = config
+                        };
+                        _quickLaunchItems.Add(quickLaunchItem);
+                    }
+
                     // Save to file
                     SaveConfigurationsToFile();
 
@@ -322,6 +337,9 @@ namespace syncer.ui.Services
                 
                 if (config != null)
                 {
+                    // Ensure backward compatibility migration
+                    config.EnsureJobsCompatibility();
+                    
                     // Generate new ID to avoid conflicts
                     config.Id = Guid.NewGuid().ToString();
                     config.CreatedDate = DateTime.Now;
@@ -357,6 +375,9 @@ namespace syncer.ui.Services
                 {
                     foreach (var config in configs)
                     {
+                        // Ensure backward compatibility migration
+                        config.EnsureJobsCompatibility();
+                        
                         // Generate new ID to avoid conflicts
                         config.Id = Guid.NewGuid().ToString();
                         config.CreatedDate = DateTime.Now;
@@ -387,6 +408,24 @@ namespace syncer.ui.Services
         {
             lock (_lockObject)
             {
+                // If no specific Quick Launch items exist, create items from all configurations
+                if (_quickLaunchItems.Count == 0)
+                {
+                    foreach (var config in _configurations.Values)
+                    {
+                        var item = new QuickLaunchItem
+                        {
+                            ConfigurationId = config.Id,
+                            DisplayName = config.DisplayName + (config.IsMultiJob ? $" ({config.Jobs.Count} jobs)" : ""),
+                            Description = config.FormattedDescription,
+                            CreatedDate = config.CreatedDate,
+                            LastUsed = config.LastUsed,
+                            Configuration = config
+                        };
+                        _quickLaunchItems.Add(item);
+                    }
+                }
+                
                 return _quickLaunchItems.OrderBy(q => q.SortOrder).ThenBy(q => q.DisplayName).ToList();
             }
         }
@@ -707,16 +746,42 @@ namespace syncer.ui.Services
             if (string.IsNullOrEmpty(config.Name))
                 errors.Add("Configuration name is required");
 
-            if (config.JobSettings == null)
-                errors.Add("Job settings are required");
-            else
+            // Validate job configuration - either single job or multi-job
+            if (config.JobSettings == null && (config.Jobs == null || config.Jobs.Count == 0))
+            {
+                errors.Add("Either job settings or jobs collection is required");
+            }
+            else if (config.JobSettings != null)
+            {
+                // Single job configuration
                 errors.AddRange(config.JobSettings.ValidateConfiguration());
+                
+                // For single job, connection settings are required
+                if (config.SourceConnection?.Settings == null)
+                    errors.Add("Source connection settings are required");
 
-            if (config.SourceConnection?.Settings == null)
-                errors.Add("Source connection settings are required");
-
-            if (config.DestinationConnection?.Settings == null)
-                errors.Add("Destination connection settings are required");
+                if (config.DestinationConnection?.Settings == null)
+                    errors.Add("Destination connection settings are required");
+            }
+            else if (config.Jobs != null && config.Jobs.Count > 0)
+            {
+                // Multi-job configuration
+                for (int i = 0; i < config.Jobs.Count; i++)
+                {
+                    var job = config.Jobs[i];
+                    if (job == null)
+                    {
+                        errors.Add($"Job {i + 1} is null");
+                        continue;
+                    }
+                    
+                    var jobErrors = job.ValidateConfiguration();
+                    foreach (var jobError in jobErrors)
+                    {
+                        errors.Add($"Job '{job.Name ?? (i + 1).ToString()}': {jobError}");
+                    }
+                }
+            }
 
             return errors;
         }
@@ -797,7 +862,11 @@ namespace syncer.ui.Services
                             foreach (var config in configList)
                             {
                                 if (!string.IsNullOrEmpty(config.Id))
+                                {
+                                    // Ensure backward compatibility migration
+                                    config.EnsureJobsCompatibility();
                                     _configurations[config.Id] = config;
+                                }
                             }
                         }
                     }

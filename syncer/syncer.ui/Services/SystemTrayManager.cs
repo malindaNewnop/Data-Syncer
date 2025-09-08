@@ -45,7 +45,7 @@ namespace syncer.ui.Services
                 
                 // Initialize auto-start service using core log service
                 var coreLogService = new syncer.core.FileLogService();
-                _autoStartService = new syncer.core.Services.AutoStartService("Data Syncer", coreLogService);
+                _autoStartService = new syncer.core.Services.AutoStartService("FTPSyncer", coreLogService);
                 
                 // Load configuration settings
                 var configService = ServiceLocator.ConfigurationService;
@@ -292,7 +292,7 @@ namespace syncer.ui.Services
             _contextMenu = new ContextMenu();
 
             // Open/Restore window
-            MenuItem openItem = new MenuItem("Open Data Syncer", OnMenuOpenClick);
+            MenuItem openItem = new MenuItem("Open FTPSyncer", OnMenuOpenClick);
             openItem.DefaultItem = true;
             _contextMenu.MenuItems.Add(openItem);
             
@@ -483,7 +483,7 @@ namespace syncer.ui.Services
                             _logService.LogInfo("Service stopped by user from tray menu", "UI");
                             
                         ShowNotification("Service Stopped", 
-                            "The Data Syncer service has been stopped. File synchronization will not occur until the service is restarted.", 
+                            "The FTPSyncer service has been stopped. File synchronization will not occur until the service is restarted.", 
                             ToolTipIcon.Info);
                     }
                     else
@@ -499,7 +499,7 @@ namespace syncer.ui.Services
                             _logService.LogInfo("Service started by user from tray menu", "UI");
                             
                         ShowNotification("Service Started", 
-                            "The Data Syncer service has been started. File synchronization will now occur according to schedule.",
+                            "The FTPSyncer service has been started. File synchronization will now occur according to schedule.",
                             ToolTipIcon.Info);
                     }
                     else
@@ -632,7 +632,7 @@ namespace syncer.ui.Services
                     if (success)
                     {
                         menuItem.Checked = false;
-                        ShowNotification("Auto-start Disabled", "Data Syncer will no longer start with Windows", ToolTipIcon.Info);
+                        ShowNotification("Auto-start Disabled", "FTPSyncer will no longer start with Windows", ToolTipIcon.Info);
                         if (_logService != null)
                             _logService.LogInfo("Auto-start disabled from system tray", "UI");
                     }
@@ -648,7 +648,7 @@ namespace syncer.ui.Services
                     if (success)
                     {
                         menuItem.Checked = true;
-                        ShowNotification("Auto-start Enabled", "Data Syncer will now start with Windows", ToolTipIcon.Info);
+                        ShowNotification("Auto-start Enabled", "FTPSyncer will now start with Windows", ToolTipIcon.Info);
                         if (_logService != null)
                             _logService.LogInfo("Auto-start enabled from system tray", "UI");
                     }
@@ -678,7 +678,7 @@ namespace syncer.ui.Services
                     if (success)
                     {
                         UpdateStatus(true);
-                        ShowNotification("Service Started", "Data Syncer service is now running", ToolTipIcon.Info);
+                        ShowNotification("Service Started", "FTPSyncer service is now running", ToolTipIcon.Info);
                         if (_logService != null)
                             _logService.LogInfo("Service started from system tray", "UI");
                     }
@@ -706,7 +706,7 @@ namespace syncer.ui.Services
                     if (success)
                     {
                         UpdateStatus(false);
-                        ShowNotification("Service Stopped", "Data Syncer service has been stopped", ToolTipIcon.Warning);
+                        ShowNotification("Service Stopped", "FTPSyncer service has been stopped", ToolTipIcon.Warning);
                         if (_logService != null)
                             _logService.LogInfo("Service stopped from system tray", "UI");
                     }
@@ -730,7 +730,7 @@ namespace syncer.ui.Services
             {
                 if (_serviceManager != null)
                 {
-                    ShowNotification("Service Restarting", "Restarting Data Syncer service...", ToolTipIcon.Info);
+                    ShowNotification("Service Restarting", "Restarting FTPSyncer service...", ToolTipIcon.Info);
                     
                     _serviceManager.StopService();
                     System.Threading.Thread.Sleep(1000); // Wait 1 second
@@ -739,7 +739,7 @@ namespace syncer.ui.Services
                     if (success)
                     {
                         UpdateStatus(true);
-                        ShowNotification("Service Restarted", "Data Syncer service has been restarted", ToolTipIcon.Info);
+                        ShowNotification("Service Restarted", "FTPSyncer service has been restarted", ToolTipIcon.Info);
                         if (_logService != null)
                             _logService.LogInfo("Service restarted from system tray", "UI");
                     }

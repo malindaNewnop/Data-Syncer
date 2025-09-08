@@ -42,7 +42,7 @@ namespace syncer.ui
         private string _timerUploadDestination = "/"; // Default destination path
         private bool _isUploadInProgress = false; // Prevent overlapping uploads
         private DateTime? _uploadStartTime = null; // Track upload duration
-        private bool _includeSubfoldersForTimer = true; // Include subfolders in timer uploads (default: true)
+        // Removed: _includeSubfoldersForTimer (was assigned but never used)
 
         // Download mode fields
         private bool _isDownloadTimerRunning = false; // Track download timer state
@@ -65,14 +65,8 @@ namespace syncer.ui
         private Label lblExcludeTypes;
         private TextBox txtExcludeFileTypes;
         private Label lblFilterHint;
-        private CheckedListBox clbFileTypes; // Keep existing for compatibility
-        private NumericUpDown numMinFileSize; // Keep existing for compatibility
-        private NumericUpDown numMaxFileSize; // Keep existing for compatibility
-        private ComboBox cmbFileSizeUnit; // Keep existing for compatibility
-        private CheckBox chkIncludeHiddenFiles;
-        private CheckBox chkIncludeSystemFiles;
-        private CheckBox chkIncludeReadOnlyFiles;
-        private TextBox txtExcludePatterns; // Keep existing for compatibility
+        // Removed unused compatibility fields: clbFileTypes, numMinFileSize, numMaxFileSize, 
+        // cmbFileSizeUnit, chkIncludeHiddenFiles, chkIncludeSystemFiles, chkIncludeReadOnlyFiles, txtExcludePatterns
 
         public FormSchedule() : this(null) { }
 

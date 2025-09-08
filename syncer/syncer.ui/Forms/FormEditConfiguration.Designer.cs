@@ -35,6 +35,11 @@ namespace syncer.ui.Forms
             this.label2 = new System.Windows.Forms.Label();
             this.label1 = new System.Windows.Forms.Label();
             this.tabJob = new System.Windows.Forms.TabPage();
+            this.panelMultiJob = new System.Windows.Forms.Panel();
+            this.btnDeleteJob = new System.Windows.Forms.Button();
+            this.btnAddJob = new System.Windows.Forms.Button();
+            this.cmbJobSelector = new System.Windows.Forms.ComboBox();
+            this.lblJobSelector = new System.Windows.Forms.Label();
             this.chkDeleteSourceAfterTransfer = new System.Windows.Forms.CheckBox();
             this.chkIncludeSubfolders = new System.Windows.Forms.CheckBox();
             this.chkEnabled = new System.Windows.Forms.CheckBox();
@@ -144,6 +149,7 @@ namespace syncer.ui.Forms
             // 
             // tabJob
             // 
+            this.tabJob.Controls.Add(this.panelMultiJob);
             this.tabJob.Controls.Add(this.chkDeleteSourceAfterTransfer);
             this.tabJob.Controls.Add(this.chkIncludeSubfolders);
             this.tabJob.Controls.Add(this.chkEnabled);
@@ -590,6 +596,57 @@ namespace syncer.ui.Forms
             this.ShowIcon = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "Edit Configuration";
+            // 
+            // panelMultiJob
+            // 
+            this.panelMultiJob.Controls.Add(this.btnDeleteJob);
+            this.panelMultiJob.Controls.Add(this.btnAddJob);
+            this.panelMultiJob.Controls.Add(this.cmbJobSelector);
+            this.panelMultiJob.Controls.Add(this.lblJobSelector);
+            this.panelMultiJob.Location = new System.Drawing.Point(6, 6);
+            this.panelMultiJob.Name = "panelMultiJob";
+            this.panelMultiJob.Size = new System.Drawing.Size(540, 35);
+            this.panelMultiJob.TabIndex = 0;
+            this.panelMultiJob.Visible = false;
+            // 
+            // lblJobSelector
+            // 
+            this.lblJobSelector.AutoSize = true;
+            this.lblJobSelector.Location = new System.Drawing.Point(3, 9);
+            this.lblJobSelector.Name = "lblJobSelector";
+            this.lblJobSelector.Size = new System.Drawing.Size(66, 13);
+            this.lblJobSelector.TabIndex = 0;
+            this.lblJobSelector.Text = "Select Job:";
+            // 
+            // cmbJobSelector
+            // 
+            this.cmbJobSelector.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbJobSelector.FormattingEnabled = true;
+            this.cmbJobSelector.Location = new System.Drawing.Point(75, 6);
+            this.cmbJobSelector.Name = "cmbJobSelector";
+            this.cmbJobSelector.Size = new System.Drawing.Size(200, 21);
+            this.cmbJobSelector.TabIndex = 1;
+            this.cmbJobSelector.SelectedIndexChanged += new System.EventHandler(this.cmbJobSelector_SelectedIndexChanged);
+            // 
+            // btnAddJob
+            // 
+            this.btnAddJob.Location = new System.Drawing.Point(290, 4);
+            this.btnAddJob.Name = "btnAddJob";
+            this.btnAddJob.Size = new System.Drawing.Size(75, 25);
+            this.btnAddJob.TabIndex = 2;
+            this.btnAddJob.Text = "Add Job";
+            this.btnAddJob.UseVisualStyleBackColor = true;
+            this.btnAddJob.Click += new System.EventHandler(this.btnAddJob_Click);
+            // 
+            // btnDeleteJob
+            // 
+            this.btnDeleteJob.Location = new System.Drawing.Point(375, 4);
+            this.btnDeleteJob.Name = "btnDeleteJob";
+            this.btnDeleteJob.Size = new System.Drawing.Size(75, 25);
+            this.btnDeleteJob.TabIndex = 3;
+            this.btnDeleteJob.Text = "Delete Job";
+            this.btnDeleteJob.UseVisualStyleBackColor = true;
+            this.btnDeleteJob.Click += new System.EventHandler(this.btnDeleteJob_Click);
             this.tabControl1.ResumeLayout(false);
             this.tabGeneral.ResumeLayout(false);
             this.tabGeneral.PerformLayout();
@@ -651,5 +708,10 @@ namespace syncer.ui.Forms
         private System.Windows.Forms.Label lblExcludeTypes;
         private System.Windows.Forms.TextBox txtExcludeFileTypes;
         private System.Windows.Forms.Label lblFilterHint;
+        private System.Windows.Forms.Panel panelMultiJob;
+        private System.Windows.Forms.Button btnDeleteJob;
+        private System.Windows.Forms.Button btnAddJob;
+        private System.Windows.Forms.ComboBox cmbJobSelector;
+        private System.Windows.Forms.Label lblJobSelector;
     }
 }
