@@ -3,6 +3,7 @@ using syncer.ui.Interfaces;
 using System;
 using System.IO;
 using System.Reflection;
+using System.Windows.Forms;
 
 namespace syncer.ui
 {
@@ -60,6 +61,12 @@ namespace syncer.ui
                 
                 // Create the saved job configuration service
                 _savedJobConfigService = new Services.SavedJobConfigurationService();
+                
+                // Initialize restart recovery functionality
+                InitializeRestartRecovery();
+                
+                // Notify UI that initialization is complete
+                NotifyInitializationComplete();
                 
                 // Log initialization
                 _logService.LogInfo("Data Syncer UI started with core backend", "UI");
@@ -135,6 +142,242 @@ namespace syncer.ui
             catch (Exception ex)
             {
                 Console.WriteLine("Error setting up log rotation: " + ex.Message);
+            }
+        }
+        
+        /// <summary>
+        /// Notify UI components that initialization and restart recovery is complete
+        /// </summary>
+        private static void NotifyInitializationComplete()
+        {
+            try
+            {
+                // Find the main form and update its connection status
+                FormMain mainForm = null;
+                foreach (Form form in System.Windows.Forms.Application.OpenForms)
+                {
+                    if (form is FormMain)
+                    {
+                        mainForm = (FormMain)form;
+                        break;
+                    }
+                }
+                
+                if (mainForm != null)
+                {
+                    // Use Invoke to ensure we're on the UI thread
+                    mainForm.Invoke((Action)(() =>
+                    {
+                        // Call a method to refresh the connection status after restart recovery
+                        var updateMethod = mainForm.GetType().GetMethod("RefreshAfterStartup", 
+                            BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+                        if (updateMethod != null)
+                        {
+                            updateMethod.Invoke(mainForm, null);
+                        }
+                    }));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService?.LogWarning("Failed to notify UI of initialization completion: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Initialize restart recovery functionality to ensure proper job and connection restoration
+        /// </summary>
+        private static void InitializeRestartRecovery()
+        {
+            try
+            {
+                // First, ensure connection settings are loaded from persistent storage
+                if (_connectionService != null)
+                {
+                    try
+                    {
+                        // Load connection settings from persistent storage
+                        var restoredSettings = _connectionService.LoadConnectionForStartup();
+                        if (restoredSettings != null && !StringExtensions.IsNullOrWhiteSpace(restoredSettings.Host))
+                        {
+                            _logService.LogInfo(string.Format("Connection settings restored from persistent storage: {0}@{1}:{2} (Protocol: {3}, ProtocolType: {4}, IsRemote: {5})", 
+                                restoredSettings.Username, restoredSettings.Host, restoredSettings.Port,
+                                restoredSettings.Protocol, restoredSettings.ProtocolType, restoredSettings.IsRemoteConnection), "RestartRecovery");
+                                
+                            // Force reconnect to ensure IsConnected is properly set
+                            bool reconnected = _connectionService.ForceReconnect();
+                            if (reconnected)
+                            {
+                                _logService.LogInfo("Connection successfully restored and verified for restart", "RestartRecovery");
+                            }
+                            else
+                            {
+                                _logService.LogWarning("Connection restored but verification failed - jobs may not run properly", "RestartRecovery");
+                            }
+                        }
+                        else
+                        {
+                            _logService.LogWarning("No connection settings found in persistent storage for restart recovery", "RestartRecovery");
+                        }
+                    }
+                    catch (Exception connEx)
+                    {
+                        _logService.LogError("Error loading connection settings from persistent storage: " + connEx.Message, "RestartRecovery");
+                    }
+                }
+
+                // Verify that sync jobs are properly loaded (this is now handled by SyncJobService constructor)
+                if (_syncJobService != null)
+                {
+                    var jobs = _syncJobService.GetAllJobs();
+                    _logService.LogInfo(string.Format("Sync jobs restoration verified: {0} jobs loaded", jobs.Count), "RestartRecovery");
+                    
+                    int enabledJobs = 0;
+                    foreach (var job in jobs)
+                    {
+                        if (job.IsEnabled) enabledJobs++;
+                    }
+                    
+                    if (enabledJobs > 0)
+                    {
+                        _logService.LogInfo(string.Format("{0} enabled sync jobs will resume scheduling after restart", enabledJobs), "RestartRecovery");
+                    }
+                }
+
+                // Verify timer job manager restoration (this is handled by TimerJobManager constructor)
+                if (_timerJobManager != null)
+                {
+                    var timerJobIds = _timerJobManager.GetRegisteredTimerJobs();
+                    _logService.LogInfo(string.Format("Timer jobs restoration verified: {0} timer jobs loaded", timerJobIds.Count), "RestartRecovery");
+                }
+
+                _logService.LogInfo("Restart recovery initialization completed successfully", "RestartRecovery");
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError("Error during restart recovery initialization: " + ex.Message, "RestartRecovery");
+            }
+        }
+        
+        /// <summary>
+        /// Properly shutdown services and save state for restart
+        /// </summary>
+        public static void Shutdown()
+        {
+            try
+            {
+                _logService.LogInfo("Shutting down services and saving state for restart...", "Shutdown");
+
+                // Stop sync job scheduler and save jobs
+                if (_syncJobService != null)
+                {
+                    try
+                    {
+                        // If the service has a StopScheduler method, call it
+                        var stopMethod = _syncJobService.GetType().GetMethod("StopScheduler");
+                        if (stopMethod != null)
+                        {
+                            stopMethod.Invoke(_syncJobService, null);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError("Error stopping sync job scheduler: " + ex.Message, "Shutdown");
+                    }
+                }
+
+                // Stop timer jobs and save their state
+                if (_timerJobManager != null)
+                {
+                    try
+                    {
+                        var timerJobIds = _timerJobManager.GetRegisteredTimerJobs();
+                        foreach (var jobId in timerJobIds)
+                        {
+                            _timerJobManager.StopTimerJob(jobId);
+                        }
+                        _logService.LogInfo(string.Format("Stopped {0} timer jobs for shutdown", timerJobIds.Count), "Shutdown");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError("Error stopping timer jobs: " + ex.Message, "Shutdown");
+                    }
+                }
+
+                _logService.LogInfo("Application shutdown completed successfully", "Shutdown");
+            }
+            catch (Exception ex)
+            {
+                // Try to log the error even if the log service is failing
+                try
+                {
+                    _logService.LogError("Error during application shutdown: " + ex.Message, "Shutdown");
+                }
+                catch
+                {
+                    // Last resort - write to console/debug
+                    Console.WriteLine("Critical error during shutdown: " + ex.Message);
+                    System.Diagnostics.Debug.WriteLine("Critical error during shutdown: " + ex.Message);
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Manually trigger restart recovery - useful for troubleshooting
+        /// </summary>
+        public static bool ManualRestartRecovery()
+        {
+            try
+            {
+                _logService.LogInfo("Manual restart recovery initiated", "ManualRecovery");
+                
+                // First, reload connection settings from persistent storage
+                if (_connectionService != null)
+                {
+                    try
+                    {
+                        var restoredSettings = _connectionService.LoadConnectionForStartup();
+                        if (restoredSettings != null && !StringExtensions.IsNullOrWhiteSpace(restoredSettings.Host))
+                        {
+                            _logService.LogInfo(string.Format("Manual recovery: Connection settings reloaded: {0}@{1}:{2}", 
+                                restoredSettings.Username, restoredSettings.Host, restoredSettings.Port), "ManualRecovery");
+                                
+                            // Force reconnection
+                            bool reconnected = _connectionService.ForceReconnect();
+                            _logService.LogInfo("Manual force reconnect result: " + reconnected, "ManualRecovery");
+                        }
+                        else
+                        {
+                            _logService.LogWarning("Manual recovery: No connection settings found in persistent storage", "ManualRecovery");
+                        }
+                    }
+                    catch (Exception reconnectEx)
+                    {
+                        _logService.LogError("Error during manual connection recovery: " + reconnectEx.Message, "ManualRecovery");
+                    }
+                }
+                
+                // Reload sync jobs from persistence
+                if (_syncJobService != null)
+                {
+                    try
+                    {
+                        _syncJobService.ReloadJobsFromPersistence();
+                        _logService.LogInfo("Manual sync jobs reload completed", "ManualRecovery");
+                    }
+                    catch (Exception reloadEx)
+                    {
+                        _logService.LogError("Error during manual sync jobs reload: " + reloadEx.Message, "ManualRecovery");
+                    }
+                }
+                
+                _logService.LogInfo("Manual restart recovery completed", "ManualRecovery");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError("Error during manual restart recovery: " + ex.Message, "ManualRecovery");
+                return false;
             }
         }
         

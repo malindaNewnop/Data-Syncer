@@ -18,6 +18,20 @@ namespace syncer.ui.Services
                 _transferClientFactory = syncer.core.ServiceFactory.CreateTransferClientFactory();
                 _settings = new ConnectionSettings();
                 
+                // Try to load connection settings from persistent storage
+                var savedSettings = LoadConnectionForStartup();
+                if (savedSettings != null)
+                {
+                    _settings = savedSettings;
+                    DebugLogger.LogServiceActivity("CoreConnectionServiceAdapter", 
+                        string.Format("Loaded connection settings: {0}@{1}:{2}", 
+                        _settings.Username, _settings.Host, _settings.Port));
+                }
+                else
+                {
+                    DebugLogger.LogServiceActivity("CoreConnectionServiceAdapter", "No saved connection settings found");
+                }
+                
                 DebugLogger.LogServiceActivity("CoreConnectionServiceAdapter", "Initialized successfully");
             }
             catch (Exception ex)
@@ -35,6 +49,23 @@ namespace syncer.ui.Services
         public bool SaveConnectionSettings(ConnectionSettings settings)
         {
             _settings = settings;
+            
+            // Also persist to registry for restart recovery
+            if (settings != null && !StringExtensions.IsNullOrWhiteSpace(settings.Host))
+            {
+                try
+                {
+                    // Save as default connection for automatic restoration
+                    return SaveConnection("Default", settings, true);
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.LogError(ex, "Failed to persist connection settings");
+                    // Still return true since we saved to memory
+                    return true;
+                }
+            }
+            
             return true;
         }
 
@@ -96,8 +127,11 @@ namespace syncer.ui.Services
                         connectionKey.SetValue("Host", settings.Host ?? "");
                         connectionKey.SetValue("Port", settings.Port);
                         connectionKey.SetValue("Username", settings.Username ?? "");
+                        connectionKey.SetValue("Password", settings.Password ?? ""); // Add password field
                         connectionKey.SetValue("SshKeyPath", settings.SshKeyPath ?? "");
                         connectionKey.SetValue("Timeout", settings.Timeout);
+                        connectionKey.SetValue("UsePassiveMode", settings.UsePassiveMode);
+                        connectionKey.SetValue("UseSftp", settings.UseSftp);
                     }
                 }
                 return true;
@@ -130,9 +164,27 @@ namespace syncer.ui.Services
                                     Host = connectionKey.GetValue("Host", "").ToString(),
                                     Port = Convert.ToInt32(connectionKey.GetValue("Port", 21)),
                                     Username = connectionKey.GetValue("Username", "").ToString(),
+                                    Password = connectionKey.GetValue("Password", "").ToString(), // Load password
                                     SshKeyPath = connectionKey.GetValue("SshKeyPath", "").ToString(),
-                                    Timeout = Convert.ToInt32(connectionKey.GetValue("Timeout", 30))
+                                    Timeout = Convert.ToInt32(connectionKey.GetValue("Timeout", 30)),
+                                    UsePassiveMode = Convert.ToBoolean(connectionKey.GetValue("UsePassiveMode", false)),
+                                    UseSftp = Convert.ToBoolean(connectionKey.GetValue("UseSftp", false))
                                 };
+                                
+                                // Ensure ProtocolType is consistent with Protocol string (for backward compatibility)
+                                switch (settings.Protocol.ToUpper())
+                                {
+                                    case "SFTP":
+                                        settings.ProtocolType = 2;
+                                        break;
+                                    case "FTP":
+                                        settings.ProtocolType = 1;
+                                        break;
+                                    case "LOCAL":
+                                        settings.ProtocolType = 0;
+                                        break;
+                                }
+                                
                                 return settings;
                             }
                         }
@@ -255,6 +307,28 @@ namespace syncer.ui.Services
                 return defaultConnection;
             }
             return _settings;
+        }
+
+        public bool ForceReconnect()
+        {
+            // Test the current connection settings to verify they work
+            if (_settings != null && !StringExtensions.IsNullOrWhiteSpace(_settings.Host))
+            {
+                try
+                {
+                    bool isConnected = TestConnection(_settings);
+                    DebugLogger.LogServiceActivity("CoreConnectionServiceAdapter", $"ForceReconnect result: {isConnected}");
+                    return isConnected;
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.LogError(ex, "CoreConnectionServiceAdapter ForceReconnect");
+                    return false;
+                }
+            }
+            
+            DebugLogger.LogServiceActivity("CoreConnectionServiceAdapter", "ForceReconnect - no settings available");
+            return false;
         }
     }
 }

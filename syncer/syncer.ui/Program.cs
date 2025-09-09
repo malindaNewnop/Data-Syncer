@@ -83,6 +83,9 @@ namespace syncer.ui
                         // Initialize service locator with real services
                         ServiceLocator.Initialize();
                         
+                        // Configure startup for auto-restart functionality
+                        ConfigureApplicationStartup();
+                        
                         // Verify services
                         if (!ServiceVerifier.VerifyServices())
                         {
@@ -215,16 +218,42 @@ namespace syncer.ui
         {
             try
             {
+                // Save current state before exiting using ServiceLocator shutdown
+                if (ServiceLocator.LogService != null)
+                {
+                    ServiceLocator.LogService.LogInfo("Application exiting - initiating proper shutdown with state saving");
+                }
+
+                // Proper shutdown with state saving
+                ServiceLocator.Shutdown();
+
                 if (instanceMutex != null)
                 {
                     instanceMutex.ReleaseMutex();
                     instanceMutex.Close();
                     instanceMutex = null;
                 }
+
+                if (ServiceLocator.LogService != null)
+                {
+                    ServiceLocator.LogService.LogInfo("Application exit cleanup completed");
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore cleanup errors
+                // Try to log the error if possible
+                try
+                {
+                    if (ServiceLocator.LogService != null)
+                    {
+                        ServiceLocator.LogService.LogError("Error during application exit: " + ex.Message);
+                    }
+                }
+                catch
+                {
+                    // Last resort - console output
+                    Console.WriteLine("Critical error during application exit: " + ex.Message);
+                }
             }
         }
 
@@ -293,6 +322,144 @@ namespace syncer.ui
                     "Critical Error",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Configure application for automatic startup and job recovery
+        /// </summary>
+        private static void ConfigureApplicationStartup()
+        {
+            try
+            {
+                // Check command line arguments to see if we're in recovery mode
+                string[] args = Environment.GetCommandLineArgs();
+                bool isStartupRecovery = false;
+                
+                foreach (string arg in args)
+                {
+                    if (arg.Equals("-startup", StringComparison.OrdinalIgnoreCase))
+                    {
+                        isStartupRecovery = true;
+                        break;
+                    }
+                }
+
+                // Configure automatic startup using registry directly
+                var startupConfigured = ConfigureStartupRegistry();
+                
+                if (startupConfigured && ServiceLocator.LogService != null)
+                {
+                    ServiceLocator.LogService.LogInfo("Application startup configured successfully");
+                }
+
+                // If this is a startup recovery, attempt to restore timer jobs
+                if (isStartupRecovery)
+                {
+                    PerformStartupRecovery();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Don't let startup configuration errors prevent the app from running
+                if (ServiceLocator.LogService != null)
+                {
+                    ServiceLocator.LogService.LogError("Error configuring application startup: " + ex.Message);
+                }
+                else
+                {
+                    // Fallback if logging isn't available
+                    System.Diagnostics.EventLog.WriteEntry("FTPSyncer", 
+                        "Startup configuration error: " + ex.Message, 
+                        System.Diagnostics.EventLogEntryType.Warning);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Perform job recovery during application startup
+        /// </summary>
+        private static void PerformStartupRecovery()
+        {
+            try
+            {
+                if (ServiceLocator.LogService != null)
+                {
+                    ServiceLocator.LogService.LogInfo("Performing startup job recovery...");
+                }
+
+                // The TimerJobManager will automatically restore timer jobs during initialization
+                // Additional recovery logic can be added here if needed
+                
+                // For example, check for and restore any saved job configurations
+                var serviceManager = ServiceLocator.ServiceManager as IServiceManager;
+                if (serviceManager != null)
+                {
+                    // Start the service manager which will handle job restoration
+                    bool started = serviceManager.StartService();
+                    
+                    if (started && ServiceLocator.LogService != null)
+                    {
+                        ServiceLocator.LogService.LogInfo("Service manager started successfully during recovery");
+                    }
+                }
+
+                // Initialize timer jobs manager - restoration happens automatically during initialization
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager != null && ServiceLocator.LogService != null)
+                {
+                    ServiceLocator.LogService.LogInfo("Timer job manager initialized with job recovery");
+                }
+
+                // Wait a moment for jobs to fully initialize
+                System.Threading.Thread.Sleep(3000);
+
+                if (ServiceLocator.LogService != null)
+                {
+                    ServiceLocator.LogService.LogInfo("Startup recovery completed");
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ServiceLocator.LogService != null)
+                {
+                    ServiceLocator.LogService.LogError("Error during startup recovery: " + ex.Message);
+                }
+                else
+                {
+                    System.Diagnostics.EventLog.WriteEntry("FTPSyncer", 
+                        "Startup recovery error: " + ex.Message, 
+                        System.Diagnostics.EventLogEntryType.Warning);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Configure startup registry entry for automatic restart
+        /// </summary>
+        private static bool ConfigureStartupRegistry()
+        {
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+                {
+                    if (key != null)
+                    {
+                        string executablePath = Application.ExecutablePath;
+                        string startupValue = string.Format("\"{0}\" -startup", executablePath);
+                        key.SetValue("FTPSyncer", startupValue);
+                        return true;
+                    }
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                if (ServiceLocator.LogService != null)
+                {
+                    ServiceLocator.LogService.LogError("Error configuring startup registry: " + ex.Message);
+                }
+                return false;
             }
         }
     }

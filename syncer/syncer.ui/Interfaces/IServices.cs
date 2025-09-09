@@ -17,6 +17,9 @@ namespace syncer.ui
         bool StartJob(int id);
         bool StopJob(int id);
         string GetJobStatus(int id);
+        
+        // Restart recovery methods
+        void ReloadJobsFromPersistence();
     }
 
     /// <summary>
@@ -39,6 +42,9 @@ namespace syncer.ui
         bool ConnectionExists(string connectionName);
         List<string> GetConnectionNames();
         ConnectionSettings LoadConnectionForStartup();
+        
+        // Restart recovery methods
+        bool ForceReconnect();
     }
 
     /// <summary>

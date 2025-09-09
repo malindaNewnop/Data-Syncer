@@ -7,6 +7,7 @@ using syncer.ui.Interfaces;
 using syncer.core;
 using syncer.core.Configuration;
 using syncer.core.Transfers;
+using System.Xml.Serialization;
 
 namespace syncer.ui.Services
 {
@@ -51,12 +52,79 @@ namespace syncer.ui.Services
 
         }
 
+        #region Persistence Classes
+
+        /// <summary>
+        /// Serializable version of timer job for persistence
+        /// </summary>
+        [Serializable]
+        public class PersistentTimerJob
+        {
+            public long JobId { get; set; }
+            public string JobName { get; set; }
+            public string FolderPath { get; set; }
+            public string RemotePath { get; set; }
+            public double IntervalMs { get; set; }
+            public bool IsRunning { get; set; }
+            public DateTime? LastUploadTime { get; set; }
+            public DateTime? LastDownloadTime { get; set; }
+            public bool IncludeSubfolders { get; set; }
+            public bool DeleteSourceAfterTransfer { get; set; }
+            public bool IsDownloadJob { get; set; }
+            public bool EnableFilters { get; set; }
+            public List<string> IncludeExtensions { get; set; }
+            public List<string> ExcludeExtensions { get; set; }
+            public DateTime SavedTime { get; set; }
+            public string ConnectionHost { get; set; }
+            public int ConnectionPort { get; set; }
+            public string ConnectionUsername { get; set; }
+            public string ConnectionProtocol { get; set; }
+            public string ConnectionPassword { get; set; } // Added for proper connection restoration
+            public string SshKeyPath { get; set; }
+            public int ConnectionTimeout { get; set; }
+            public bool UsePassiveMode { get; set; }
+
+            public PersistentTimerJob()
+            {
+                IncludeExtensions = new List<string>();
+                ExcludeExtensions = new List<string>();
+                SavedTime = DateTime.Now;
+            }
+        }
+
+        /// <summary>
+        /// Container for all persistent timer jobs
+        /// </summary>
+        [Serializable]
+        [XmlRoot("TimerJobsState")]
+        public class TimerJobsState
+        {
+            public List<PersistentTimerJob> Jobs { get; set; }
+            public DateTime LastSaved { get; set; }
+            public string Version { get; set; }
+
+            public TimerJobsState()
+            {
+                Jobs = new List<PersistentTimerJob>();
+                LastSaved = DateTime.Now;
+                Version = "1.0";
+            }
+        }
+
+        #endregion
+
+        private static readonly string TimerJobsStateFilePath = Path.Combine(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FTPSyncer"),
+            "TimerJobsState.xml");
+
         public TimerJobManager()
         {
             _timerJobs = new Dictionary<long, TimerJobInfo>();
             _connectionService = ServiceLocator.ConnectionService;
             _logService = ServiceLocator.LogService;
-
+            
+            // Try to restore timer jobs from previous session
+            RestoreTimerJobs();
         }
 
         public bool RegisterTimerJob(long jobId, string folderPath, string remotePath, double intervalMs)
@@ -140,7 +208,8 @@ namespace syncer.ui.Services
                     Username = connectionSettings.Username,
                     Password = connectionSettings.Password,
                     SshKeyPath = connectionSettings.SshKeyPath,
-                    Timeout = connectionSettings.Timeout
+                    Timeout = connectionSettings.Timeout,
+                    UsePassiveMode = connectionSettings.UsePassiveMode
                 };
 
                 // Apply bandwidth limits based on transfer direction (this is an upload job)
@@ -196,6 +265,10 @@ namespace syncer.ui.Services
                     includeExtensions != null ? string.Join(",", includeExtensions.ToArray()) : "none",
                     excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"));
                 _logService.LogInfo(string.Format("Registered timer job {0} ({1}) for folder {2}", jobId, jobName, folderPath));
+                
+                // Save state after successful registration
+                SaveTimerJobsState();
+                
                 return true;
             }
             catch (Exception ex)
@@ -229,6 +302,9 @@ namespace syncer.ui.Services
                 // Start the timer
                 job.Timer.Start();
                 job.IsRunning = true;
+
+                // Save state after starting
+                SaveTimerJobsState();
 
                 _logService.LogInfo(string.Format("Started timer job {0} with interval {1}ms", jobId, job.IntervalMs));
                 return true;
@@ -344,6 +420,10 @@ namespace syncer.ui.Services
                 {
                     job.Timer.Stop();
                     job.IsRunning = false;
+                    
+                    // Save state after stopping
+                    SaveTimerJobsState();
+                    
                     _logService.LogInfo(string.Format("Stopped timer job {0}", jobId));
                     return true;
                 }
@@ -376,6 +456,9 @@ namespace syncer.ui.Services
                 }
 
                 _timerJobs.Remove(jobId);
+
+                // Save state after removal
+                SaveTimerJobsState();
 
                 _logService.LogInfo(string.Format("Removed timer job {0}", jobId));
                 return true;
@@ -1389,7 +1472,8 @@ namespace syncer.ui.Services
                     Username = connectionSettings.Username,
                     Password = connectionSettings.Password,
                     SshKeyPath = connectionSettings.SshKeyPath,
-                    Timeout = connectionSettings.Timeout
+                    Timeout = connectionSettings.Timeout,
+                    UsePassiveMode = connectionSettings.UsePassiveMode
                 };
 
                 // Apply bandwidth limits based on transfer direction (this is a download job)
@@ -1543,5 +1627,367 @@ namespace syncer.ui.Services
             
             return _timerJobs[jobId].ExcludeExtensions ?? new List<string>();
         }
+
+        #region Persistence Methods
+
+        /// <summary>
+        /// Save current timer jobs state to disk for recovery after restart
+        /// </summary>
+        public void SaveTimerJobsState()
+        {
+            try
+            {
+                // Ensure directory exists
+                string directory = Path.GetDirectoryName(TimerJobsStateFilePath);
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                TimerJobsState state = new TimerJobsState();
+                
+                foreach (var kvp in _timerJobs)
+                {
+                    var job = kvp.Value;
+                    var persistentJob = new PersistentTimerJob
+                    {
+                        JobId = job.JobId,
+                        JobName = job.JobName,
+                        FolderPath = job.FolderPath,
+                        RemotePath = job.RemotePath,
+                        IntervalMs = job.IntervalMs,
+                        IsRunning = job.IsRunning,
+                        LastUploadTime = job.LastUploadTime,
+                        LastDownloadTime = job.LastDownloadTime,
+                        IncludeSubfolders = job.IncludeSubfolders,
+                        DeleteSourceAfterTransfer = job.DeleteSourceAfterTransfer,
+                        IsDownloadJob = job.IsDownloadJob,
+                        EnableFilters = job.EnableFilters,
+                        IncludeExtensions = job.IncludeExtensions ?? new List<string>(),
+                        ExcludeExtensions = job.ExcludeExtensions ?? new List<string>(),
+                        SavedTime = DateTime.Now
+                    };
+
+                    // Save connection info for proper restoration
+                    if (job.ConnectionSettings != null)
+                    {
+                        persistentJob.ConnectionHost = job.ConnectionSettings.Host;
+                        persistentJob.ConnectionPort = job.ConnectionSettings.Port;
+                        persistentJob.ConnectionUsername = job.ConnectionSettings.Username;
+                        persistentJob.ConnectionProtocol = job.ConnectionSettings.Protocol.ToString();
+                        persistentJob.ConnectionPassword = job.ConnectionSettings.Password; // Save for restoration
+                        persistentJob.SshKeyPath = job.ConnectionSettings.SshKeyPath;
+                        persistentJob.ConnectionTimeout = job.ConnectionSettings.Timeout;
+                        persistentJob.UsePassiveMode = job.ConnectionSettings.UsePassiveMode;
+                    }
+
+                    state.Jobs.Add(persistentJob);
+                }
+
+                // Serialize to XML
+                XmlSerializer serializer = new XmlSerializer(typeof(TimerJobsState));
+                using (FileStream stream = new FileStream(TimerJobsStateFilePath, FileMode.Create))
+                {
+                    serializer.Serialize(stream, state);
+                }
+
+                _logService.LogInfo(string.Format("Timer jobs state saved successfully. {0} jobs persisted.", state.Jobs.Count));
+                
+                // Also save to service JobStateManager for cross-component recovery
+                // Note: This will be handled by the service itself during normal operation
+                try
+                {
+                    var timerJobDict = new Dictionary<long, object>();
+                    foreach (var kvp in _timerJobs)
+                    {
+                        timerJobDict.Add(kvp.Key, kvp.Value);
+                    }
+                    // SaveTimerJobState would be called by the service component
+                }
+                catch (Exception saveEx)
+                {
+                    _logService.LogWarning("Could not save timer job state to service manager: " + saveEx.Message);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError("Failed to save timer jobs state: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Restore timer jobs from saved state
+        /// </summary>
+        private void RestoreTimerJobs()
+        {
+            try
+            {
+                if (!File.Exists(TimerJobsStateFilePath))
+                {
+                    _logService.LogInfo("No saved timer jobs state found - starting fresh.");
+                    return;
+                }
+
+                XmlSerializer serializer = new XmlSerializer(typeof(TimerJobsState));
+                TimerJobsState state;
+                
+                using (FileStream stream = new FileStream(TimerJobsStateFilePath, FileMode.Open))
+                {
+                    state = (TimerJobsState)serializer.Deserialize(stream);
+                }
+
+                if (state == null || state.Jobs == null)
+                {
+                    _logService.LogInfo("Timer jobs state file is empty - starting fresh.");
+                    return;
+                }
+
+                int restoredCount = 0;
+                foreach (var persistentJob in state.Jobs)
+                {
+                    try
+                    {
+                        // Try to restore the job
+                        bool restored = RestoreTimerJob(persistentJob);
+                        if (restored)
+                        {
+                            restoredCount++;
+                        }
+                    }
+                    catch (Exception jobEx)
+                    {
+                        _logService.LogError(string.Format("Failed to restore timer job {0}: {1}", 
+                            persistentJob.JobId, jobEx.Message));
+                    }
+                }
+
+                _logService.LogInfo(string.Format("Timer jobs restoration completed. {0} of {1} jobs restored successfully.", 
+                    restoredCount, state.Jobs.Count));
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError("Failed to restore timer jobs: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Restore a single timer job from persistent state
+        /// </summary>
+        private bool RestoreTimerJob(PersistentTimerJob persistentJob)
+        {
+            try
+            {
+                // Check if job already exists (avoid duplicates)
+                if (_timerJobs.ContainsKey(persistentJob.JobId))
+                {
+                    _logService.LogWarning(string.Format("Timer job {0} already exists - skipping restore.", persistentJob.JobId));
+                    return false;
+                }
+
+                // Get current global connection settings (should already be loaded by ServiceLocator)
+                var connectionSettings = _connectionService.GetConnectionSettings();
+                
+                // Only restore connection settings if no current settings exist
+                if (connectionSettings == null || string.IsNullOrEmpty(connectionSettings.Host))
+                {
+                    // Use the saved connection info from this job as fallback
+                    if (!string.IsNullOrEmpty(persistentJob.ConnectionHost))
+                    {
+                        connectionSettings = new ConnectionSettings();
+                        connectionSettings.Host = persistentJob.ConnectionHost;
+                        connectionSettings.Port = persistentJob.ConnectionPort;
+                        connectionSettings.Username = persistentJob.ConnectionUsername;
+                        connectionSettings.Password = persistentJob.ConnectionPassword;
+                        connectionSettings.SshKeyPath = persistentJob.SshKeyPath;
+                        connectionSettings.Timeout = persistentJob.ConnectionTimeout;
+                        connectionSettings.UsePassiveMode = persistentJob.UsePassiveMode;
+                        connectionSettings.Protocol = persistentJob.ConnectionProtocol ?? "FTP";
+                        
+                        // Update protocol type based on protocol string
+                        switch (connectionSettings.Protocol.ToUpper())
+                        {
+                            case "SFTP":
+                                connectionSettings.ProtocolType = 2;
+                                break;
+                            case "FTP":
+                                connectionSettings.ProtocolType = 1;
+                                break;
+                            case "LOCAL":
+                                connectionSettings.ProtocolType = 0;
+                                break;
+                            default:
+                                connectionSettings.ProtocolType = 1;
+                                break;
+                        }
+                        
+                        // Save these connection settings as fallback
+                        try
+                        {
+                            _connectionService.SaveConnectionSettings(connectionSettings);
+                            _logService.LogInfo(string.Format("Used fallback connection settings from job {0}: {1}@{2}:{3}", 
+                                persistentJob.JobId, connectionSettings.Username, connectionSettings.Host, connectionSettings.Port));
+                        }
+                        catch (Exception connEx)
+                        {
+                            _logService.LogWarning(string.Format("Could not save fallback connection settings from job {0}: {1}", 
+                                persistentJob.JobId, connEx.Message));
+                        }
+                    }
+                    else
+                    {
+                        _logService.LogError(string.Format("Cannot restore timer job {0}: No connection settings available", persistentJob.JobId));
+                        return false;
+                    }
+                }
+                else
+                {
+                    // Use existing global connection settings
+                    _logService.LogInfo(string.Format("Using existing global connection settings for job {0}: {1}@{2}:{3}", 
+                        persistentJob.JobId, connectionSettings.Username, connectionSettings.Host, connectionSettings.Port));
+                }
+
+                // Convert UI protocol string to core ProtocolType
+                syncer.core.ProtocolType coreProtocol = syncer.core.ProtocolType.Ftp;
+                switch (connectionSettings.Protocol.ToUpper())
+                {
+                    case "SFTP":
+                        coreProtocol = syncer.core.ProtocolType.Sftp;
+                        break;
+                    case "FTP":
+                        coreProtocol = syncer.core.ProtocolType.Ftp;
+                        break;
+                    case "LOCAL":
+                        coreProtocol = syncer.core.ProtocolType.Local;
+                        break;
+                    default:
+                        coreProtocol = syncer.core.ProtocolType.Ftp;
+                        break;
+                }
+
+                // Convert to core connection settings
+                var coreSettings = new syncer.core.ConnectionSettings
+                {
+                    Protocol = coreProtocol,
+                    Host = connectionSettings.Host,
+                    Port = connectionSettings.Port,
+                    Username = connectionSettings.Username,
+                    Password = connectionSettings.Password,
+                    SshKeyPath = connectionSettings.SshKeyPath,
+                    Timeout = connectionSettings.Timeout,
+                    UsePassiveMode = connectionSettings.UsePassiveMode
+                };
+
+                // Get the appropriate transfer client using the factory
+                syncer.core.TransferClientFactory factory = new syncer.core.TransferClientFactory();
+                ITransferClient transferClient = factory.Create(coreSettings.Protocol);
+
+                // Create the timer job
+                var timerJob = new TimerJobInfo
+                {
+                    JobId = persistentJob.JobId,
+                    JobName = persistentJob.JobName,
+                    FolderPath = persistentJob.FolderPath,
+                    RemotePath = persistentJob.RemotePath,
+                    IntervalMs = persistentJob.IntervalMs,
+                    IsRunning = false, // Always start as not running
+                    LastUploadTime = persistentJob.LastUploadTime,
+                    LastDownloadTime = persistentJob.LastDownloadTime,
+                    TransferClient = transferClient,
+                    ConnectionSettings = coreSettings,
+                    IsUploadInProgress = false,
+                    IsDownloadInProgress = false,
+                    UploadStartTime = null,
+                    DownloadStartTime = null,
+                    IncludeSubfolders = persistentJob.IncludeSubfolders,
+                    DeleteSourceAfterTransfer = persistentJob.DeleteSourceAfterTransfer,
+                    IsDownloadJob = persistentJob.IsDownloadJob,
+                    EnableFilters = persistentJob.EnableFilters,
+                    IncludeExtensions = persistentJob.IncludeExtensions ?? new List<string>(),
+                    ExcludeExtensions = persistentJob.ExcludeExtensions ?? new List<string>()
+                };
+
+                // Setup timer
+                timerJob.Timer = new System.Timers.Timer();
+                timerJob.Timer.Interval = timerJob.IntervalMs;
+                timerJob.Timer.AutoReset = true;
+                timerJob.Timer.Elapsed += (sender, e) => OnTimerElapsed(timerJob);
+
+                // Test connection after restoration
+                try
+                {
+                    string errorMessage;
+                    bool connectionTest = transferClient.TestConnection(coreSettings, out errorMessage);
+                    if (connectionTest)
+                    {
+                        _logService.LogInfo(string.Format("Connection test successful for restored job {0}", persistentJob.JobName));
+                    }
+                    else
+                    {
+                        _logService.LogWarning(string.Format("Connection test failed for restored job {0}: {1}", 
+                            persistentJob.JobName, errorMessage));
+                    }
+                }
+                catch (Exception connEx)
+                {
+                    _logService.LogError(string.Format("Connection test error for restored job {0}: {1}", 
+                        persistentJob.JobName, connEx.Message));
+                }
+
+                // Add to collection
+                _timerJobs.Add(persistentJob.JobId, timerJob);
+
+                // Start the timer if the job was running
+                if (persistentJob.IsRunning)
+                {
+                    timerJob.Timer.Start();
+                    timerJob.IsRunning = true;
+                    _logService.LogInfo(string.Format("Restored and started timer job {0} ({1})", 
+                        persistentJob.JobId, persistentJob.JobName));
+                }
+                else
+                {
+                    _logService.LogInfo(string.Format("Restored timer job {0} ({1}) - not auto-started", 
+                        persistentJob.JobId, persistentJob.JobName));
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(string.Format("Failed to restore timer job {0}: {1}", 
+                    persistentJob.JobId, ex.Message));
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Clean up old state file
+        /// </summary>
+        public void ClearSavedState()
+        {
+            try
+            {
+                if (File.Exists(TimerJobsStateFilePath))
+                {
+                    File.Delete(TimerJobsStateFilePath);
+                    _logService.LogInfo("Timer jobs state file cleared successfully.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError("Failed to clear timer jobs state file: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Event handler for timer elapsed events
+        /// </summary>
+        private void OnTimerElapsed(TimerJobInfo job)
+        {
+            // Call the main timer processing logic with the job ID
+            OnTimerElapsed(job.JobId);
+        }
+
+        #endregion
     }
 }

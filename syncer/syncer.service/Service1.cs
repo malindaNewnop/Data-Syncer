@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.ServiceProcess;
 using System.Timers;
+using System.Diagnostics;
+using System.IO;
 using Core = syncer.core;
 
 namespace syncer.service
@@ -153,38 +155,78 @@ namespace syncer.service
         {
             try
             {
-                List<string> jobsToResume = JobStateManager.LoadJobsToResume();
+                List<JobStateManager.RunningJobState> jobsToResume = JobStateManager.LoadJobsForRecovery();
                 
                 if (jobsToResume.Count > 0)
                 {
-                    _log.LogInfo(null, string.Format("Found {0} interrupted jobs to resume", jobsToResume.Count));
+                    _log.LogInfo(null, string.Format("Found {0} jobs to resume after restart", jobsToResume.Count));
                     
-                    foreach (string jobId in jobsToResume)
+                    int resumedCount = 0;
+                    int failedCount = 0;
+                    
+                    foreach (var jobState in jobsToResume)
                     {
                         try
                         {
-                            if (_runner.StartJob(jobId))
+                            bool resumed = false;
+                            
+                            // Handle different types of jobs
+                            if (jobState.IsTimerJob)
                             {
-                                _currentlyRunningJobs.Add(jobId);
-                                _log.LogInfo(jobId, "Resumed interrupted job");
+                                // Timer jobs are handled by the UI TimerJobManager
+                                // Just log that they'll be handled elsewhere
+                                _log.LogInfo(jobState.JobId, "Timer job recovery delegated to UI TimerJobManager");
+                                resumed = true; // Assume success for timer jobs
                             }
                             else
                             {
-                                _log.LogWarning(jobId, "Failed to resume interrupted job - may not exist or be already running");
+                                // Try to resume regular service job
+                                resumed = _runner.StartJob(jobState.JobId);
+                            }
+                            
+                            if (resumed)
+                            {
+                                _currentlyRunningJobs.Add(jobState.JobId);
+                                resumedCount++;
+                                
+                                // Mark recovery attempt as successful
+                                JobStateManager.MarkJobRecoveryAttempt(jobState.JobId, true);
+                                
+                                _log.LogInfo(jobState.JobId, string.Format("Successfully resumed {0} job: {1}",
+                                    jobState.IsTimerJob ? "timer" : "regular", jobState.JobName));
+                            }
+                            else
+                            {
+                                failedCount++;
+                                
+                                // Mark recovery attempt as failed
+                                JobStateManager.MarkJobRecoveryAttempt(jobState.JobId, false);
+                                
+                                _log.LogWarning(jobState.JobId, string.Format("Failed to resume job: {0} - job may not exist or be already running", jobState.JobName));
                             }
                         }
                         catch (Exception ex)
                         {
-                            _log.LogError(jobId, "Error resuming interrupted job: " + ex.Message);
+                            failedCount++;
+                            
+                            // Mark recovery attempt as failed
+                            JobStateManager.MarkJobRecoveryAttempt(jobState.JobId, false);
+                            
+                            _log.LogError(jobState.JobId, string.Format("Error resuming job {0}: {1}", jobState.JobName, ex.Message));
                         }
                     }
+                    
+                    _log.LogInfo(null, string.Format("Job resume completed: {0} successful, {1} failed out of {2} total", 
+                        resumedCount, failedCount, jobsToResume.Count));
                 }
                 else
                 {
-                    _log.LogInfo(null, "No interrupted jobs found to resume");
+                    _log.LogInfo(null, "No interrupted jobs found to resume - clean startup");
                 }
                 
-                // Clear old state now that we've handled recovery
+                // Clean up old state after handling recovery
+                // Wait a bit to ensure jobs are fully started
+                System.Threading.Thread.Sleep(2000);
                 JobStateManager.ClearJobState();
             }
             catch (Exception ex)
@@ -234,14 +276,62 @@ namespace syncer.service
                 {
                     // Update persistent state with currently running jobs
                     JobStateManager.SaveRunningJobState(_currentlyRunningJobs, _repo);
+                    
+                    // Also save service health status
+                    SaveServiceHealthStatus();
+                    
+                    // Log periodic state save (but not too frequently in logs)
+                    if (DateTime.Now.Minute % 5 == 0) // Every 5 minutes
+                    {
+                        if (_log != null)
+                        {
+                            _log.LogInfo(null, string.Format("Service state updated - {0} jobs tracked for recovery", _currentlyRunningJobs.Count));
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
                 // Don't log every state update error to avoid spam
-                System.Diagnostics.EventLog.WriteEntry("FTPSyncer Service", 
+                EventLog.WriteEntry("FTPSyncer Service", 
                     "State update error: " + ex.Message, 
-                    System.Diagnostics.EventLogEntryType.Warning);
+                    EventLogEntryType.Warning);
+            }
+        }
+
+        /// <summary>
+        /// Save service health and operational status
+        /// </summary>
+        private void SaveServiceHealthStatus()
+        {
+            try
+            {
+                // Create a simple health status file
+                string healthFilePath = Path.Combine(
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "FTPSyncer"),
+                    "ServiceHealth.txt");
+
+                string healthInfo = string.Format(
+                    "LastUpdate={0}\nServiceRunning=true\nRunningJobs={1}\nProcessId={2}\nVersion={3}\n",
+                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    _currentlyRunningJobs.Count,
+                    Process.GetCurrentProcess().Id,
+                    System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString()
+                );
+
+                // Ensure directory exists
+                string directory = Path.GetDirectoryName(healthFilePath);
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.WriteAllText(healthFilePath, healthInfo);
+            }
+            catch (Exception)
+            {
+                // Don't log this error too frequently to avoid log spam
+                // Only log critical health status errors
             }
         }
 

@@ -462,5 +462,13 @@ namespace syncer.ui.Services
                 default: return "Custom extension";
             }
         }
+
+        public void ReloadJobsFromPersistence()
+        {
+            // This adapter doesn't use persistence like ServiceImplementations does
+            // The core job repository handles its own persistence
+            // This method is here to satisfy the interface but doesn't need implementation
+            DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", "ReloadJobsFromPersistence called - no action needed for core adapter");
+        }
     }
 }

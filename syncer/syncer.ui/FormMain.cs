@@ -188,6 +188,31 @@ namespace syncer.ui
                 ServiceLocator.LogService.LogError($"Error updating service status: {ex.Message}", "UI");
             }
         }
+        
+        /// <summary>
+        /// Called after ServiceLocator initialization and restart recovery is complete
+        /// </summary>
+        public void RefreshAfterStartup()
+        {
+            try
+            {
+                // Update connection status now that restart recovery is complete
+                UpdateConnectionStatus();
+                
+                // Also refresh the timer jobs grid to show restored jobs
+                RefreshTimerJobsGrid();
+                
+                // Log that UI refresh is complete
+                var logService = ServiceLocator.LogService;
+                logService?.LogInfo("UI refreshed after startup and restart recovery", "RestartRecovery");
+            }
+            catch (Exception ex)
+            {
+                // Don't let UI refresh errors crash the application
+                var logService = ServiceLocator.LogService;
+                logService?.LogError("Error during post-startup UI refresh: " + ex.Message, "RestartRecovery");
+            }
+        }
 
         private void UpdateConnectionStatus()
         {
@@ -196,6 +221,22 @@ namespace syncer.ui
                 if (_connectionService != null)
                 {
                     var connectionSettings = _connectionService.GetConnectionSettings();
+                    
+                    // Add debug logging to understand what the UI sees
+                    var logService = ServiceLocator.LogService;
+                    if (connectionSettings != null)
+                    {
+                        logService?.LogInfo(string.Format("UI UpdateConnectionStatus: Host='{0}', Protocol='{1}', ProtocolType={2}, IsRemote={3}", 
+                            connectionSettings.Host ?? "NULL", 
+                            connectionSettings.Protocol ?? "NULL", 
+                            connectionSettings.ProtocolType, 
+                            connectionSettings.IsRemoteConnection), "UI");
+                    }
+                    else
+                    {
+                        logService?.LogInfo("UI UpdateConnectionStatus: connectionSettings is NULL", "UI");
+                    }
+                    
                     if (connectionSettings != null && connectionSettings.IsRemoteConnection)
                     {
                         // Check if any jobs are currently running instead of testing connection directly

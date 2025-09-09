@@ -13,11 +13,18 @@ namespace syncer.ui.Services
     {
         private List<SyncJob> _jobs;
         private Dictionary<int, System.Timers.Timer> _jobTimers;
+        private static readonly string JobsStateFilePath = Path.Combine(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FTPSyncer"),
+            "SyncJobsState.xml");
 
         public SyncJobService()
         {
             _jobs = new List<SyncJob>();
             _jobTimers = new Dictionary<int, System.Timers.Timer>();
+            
+            // Restore jobs from previous session
+            LoadJobsFromPersistence();
+            
             ServiceLocator.LogService.LogInfo("SyncJobService initialized with scheduling support");
         }
 
@@ -47,6 +54,9 @@ namespace syncer.ui.Services
                 ScheduleJob(job);
             }
             
+            // Save jobs to persistence
+            SaveJobsToPersistence();
+            
             ServiceLocator.LogService.LogInfo(string.Format("Job '{0}' created with ID {1}", job.Name, job.Id));
             return job.Id;
         }
@@ -68,6 +78,9 @@ namespace syncer.ui.Services
                 ScheduleJob(job);
             }
             
+            // Save jobs to persistence
+            SaveJobsToPersistence();
+            
             ServiceLocator.LogService.LogInfo(string.Format("Job '{0}' updated", job.Name));
             return true;
         }
@@ -81,6 +94,10 @@ namespace syncer.ui.Services
             StopJobTimer(id);
             
             _jobs.Remove(job);
+            
+            // Save jobs to persistence
+            SaveJobsToPersistence();
+            
             ServiceLocator.LogService.LogInfo(string.Format("Job '{0}' deleted", job.Name));
             return true;
         }
@@ -92,6 +109,10 @@ namespace syncer.ui.Services
             
             job.IsEnabled = true;
             ScheduleJob(job);
+            
+            // Save jobs to persistence
+            SaveJobsToPersistence();
+            
             ServiceLocator.LogService.LogInfo(string.Format("Job '{0}' started", job.Name));
             return true;
         }
@@ -103,6 +124,10 @@ namespace syncer.ui.Services
             
             job.IsEnabled = false;
             StopJobTimer(id);
+            
+            // Save jobs to persistence
+            SaveJobsToPersistence();
+            
             ServiceLocator.LogService.LogInfo(string.Format("Job '{0}' stopped", job.Name));
             return true;
         }
@@ -683,10 +708,131 @@ namespace syncer.ui.Services
             }
         }
         
+        /// <summary>
+        /// Load jobs from persistent storage on startup
+        /// </summary>
+        private void LoadJobsFromPersistence()
+        {
+            try
+            {
+                if (!File.Exists(JobsStateFilePath))
+                {
+                    ServiceLocator.LogService.LogInfo("No saved sync jobs state found - starting fresh");
+                    return;
+                }
+
+                string xmlContent = File.ReadAllText(JobsStateFilePath);
+                if (StringExtensions.IsNullOrWhiteSpace(xmlContent))
+                {
+                    ServiceLocator.LogService.LogInfo("Sync jobs state file is empty - starting fresh");
+                    return;
+                }
+
+                var serializer = new System.Xml.Serialization.XmlSerializer(typeof(List<SyncJob>));
+                using (var reader = new StringReader(xmlContent))
+                {
+                    var restoredJobs = (List<SyncJob>)serializer.Deserialize(reader);
+                    if (restoredJobs != null && restoredJobs.Count > 0)
+                    {
+                        _jobs.AddRange(restoredJobs);
+                        
+                        // Restore enabled jobs with scheduling
+                        int restoredCount = 0;
+                        foreach (var job in restoredJobs)
+                        {
+                            if (job.IsEnabled)
+                            {
+                                try
+                                {
+                                    ScheduleJob(job);
+                                    restoredCount++;
+                                }
+                                catch (Exception scheduleEx)
+                                {
+                                    ServiceLocator.LogService.LogError(string.Format("Failed to reschedule job '{0}': {1}", job.Name, scheduleEx.Message));
+                                }
+                            }
+                        }
+                        
+                        ServiceLocator.LogService.LogInfo(string.Format("Restored {0} sync jobs from previous session ({1} scheduled)", 
+                            restoredJobs.Count, restoredCount));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Failed to load sync jobs from persistence: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Save jobs to persistent storage
+        /// </summary>
+        private void SaveJobsToPersistence()
+        {
+            try
+            {
+                // Ensure directory exists
+                string directory = Path.GetDirectoryName(JobsStateFilePath);
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                var serializer = new System.Xml.Serialization.XmlSerializer(typeof(List<SyncJob>));
+                using (var writer = new StreamWriter(JobsStateFilePath))
+                {
+                    serializer.Serialize(writer, _jobs);
+                }
+                
+                ServiceLocator.LogService.LogInfo(string.Format("Saved {0} sync jobs to persistent storage", _jobs.Count));
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Failed to save sync jobs to persistence: " + ex.Message);
+            }
+        }
+        
+        /// <summary>
+        /// Manually force jobs to be reloaded from persistence - useful for recovery scenarios
+        /// </summary>
+        public void ReloadJobsFromPersistence()
+        {
+            try
+            {
+                // Stop all current timers
+                foreach (var kvp in _jobTimers)
+                {
+                    try
+                    {
+                        kvp.Value.Stop();
+                        kvp.Value.Dispose();
+                    }
+                    catch { }
+                }
+                _jobTimers.Clear();
+                
+                // Clear current jobs
+                _jobs.Clear();
+                
+                // Reload from persistence
+                LoadJobsFromPersistence();
+                
+                ServiceLocator.LogService.LogInfo("Jobs manually reloaded from persistence for recovery");
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Failed to reload jobs from persistence: " + ex.Message);
+            }
+        }
+        
         public void StopScheduler()
         {
             try
             {
+                // Save jobs before stopping
+                SaveJobsToPersistence();
+                
                 // Stop all job timers
                 foreach (var kvp in _jobTimers)
                 {
@@ -698,7 +844,7 @@ namespace syncer.ui.Services
                     catch { }
                 }
                 _jobTimers.Clear();
-                ServiceLocator.LogService.LogInfo("Job scheduler stopped");
+                ServiceLocator.LogService.LogInfo("Job scheduler stopped and jobs saved");
             }
             catch (Exception ex)
             {
@@ -716,6 +862,19 @@ namespace syncer.ui.Services
         {
             // Try to load default connection on startup
             _settings = LoadDefaultConnectionFromRegistry() ?? new ConnectionSettings();
+            
+            // Ensure connection is properly restored for restart scenarios
+            if (_settings != null && !StringExtensions.IsNullOrWhiteSpace(_settings.Host))
+            {
+                // Mark as connected if we have valid connection details
+                _settings.IsConnected = true;
+                ServiceLocator.LogService.LogInfo(string.Format("Connection settings loaded and marked as connected on startup: {0}@{1}:{2}", 
+                    _settings.Username, _settings.Host, _settings.Port));
+            }
+            else
+            {
+                ServiceLocator.LogService.LogWarning("No valid connection settings found for startup restoration");
+            }
         }
 
         public ConnectionSettings GetConnectionSettings()
@@ -726,6 +885,28 @@ namespace syncer.ui.Services
         public bool SaveConnectionSettings(ConnectionSettings settings)
         {
             _settings = settings;
+            
+            // Mark as connected if we have valid settings
+            if (_settings != null && !StringExtensions.IsNullOrWhiteSpace(_settings.Host) && 
+                !StringExtensions.IsNullOrWhiteSpace(_settings.Username))
+            {
+                _settings.IsConnected = true;
+                
+                // Auto-save this connection to registry for restart recovery
+                try
+                {
+                    string connectionName = string.Format("{0}@{1}", _settings.Username, _settings.Host);
+                    SaveConnection(connectionName, _settings, true); // Set as default
+                }
+                catch (Exception ex)
+                {
+                    ServiceLocator.LogService.LogWarning("Failed to auto-save connection to registry: " + ex.Message);
+                }
+                
+                ServiceLocator.LogService.LogInfo(string.Format("Connection settings saved and marked as connected: {0}@{1}:{2}", 
+                    _settings.Username, _settings.Host, _settings.Port));
+            }
+            
             return true;
         }
 
@@ -763,12 +944,39 @@ namespace syncer.ui.Services
                         connectionKey.SetValue("Username", settings.Username ?? "");
                         connectionKey.SetValue("SshKeyPath", settings.SshKeyPath ?? "");
                         connectionKey.SetValue("Timeout", settings.Timeout);
+                        connectionKey.SetValue("UsePassiveMode", settings.UsePassiveMode);
+                        connectionKey.SetValue("IsConnected", settings.IsConnected);
+                        
+                        // Store encrypted password for restart recovery
+                        if (!StringExtensions.IsNullOrWhiteSpace(settings.Password))
+                        {
+                            try
+                            {
+                                // Simple base64 encoding for basic obfuscation (not secure encryption)
+                                string encodedPassword = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(settings.Password));
+                                connectionKey.SetValue("EncodedPassword", encodedPassword);
+                            }
+                            catch (Exception pwdEx)
+                            {
+                                ServiceLocator.LogService.LogWarning("Failed to store password: " + pwdEx.Message);
+                            }
+                        }
+                        
+                        // Set as default if requested
+                        if (setAsDefault)
+                        {
+                            connectionKey.SetValue("IsDefault", true);
+                            _settings = settings; // Update current settings
+                        }
                     }
                 }
+                
+                ServiceLocator.LogService.LogInfo(string.Format("Connection '{0}' saved successfully", connectionName));
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                ServiceLocator.LogService.LogError(string.Format("Failed to save connection '{0}': {1}", connectionName, ex.Message));
                 return false;
             }
         }
@@ -796,8 +1004,32 @@ namespace syncer.ui.Services
                                     Port = Convert.ToInt32(connectionKey.GetValue("Port", 21)),
                                     Username = connectionKey.GetValue("Username", "").ToString(),
                                     SshKeyPath = connectionKey.GetValue("SshKeyPath", "").ToString(),
-                                    Timeout = Convert.ToInt32(connectionKey.GetValue("Timeout", 30))
+                                    Timeout = Convert.ToInt32(connectionKey.GetValue("Timeout", 30)),
+                                    UsePassiveMode = Convert.ToBoolean(connectionKey.GetValue("UsePassiveMode", false)),
+                                    IsConnected = Convert.ToBoolean(connectionKey.GetValue("IsConnected", false))
                                 };
+                                
+                                // Retrieve and decode password
+                                try
+                                {
+                                    string encodedPassword = connectionKey.GetValue("EncodedPassword", "").ToString();
+                                    if (!StringExtensions.IsNullOrWhiteSpace(encodedPassword))
+                                    {
+                                        settings.Password = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encodedPassword));
+                                    }
+                                }
+                                catch (Exception pwdEx)
+                                {
+                                    ServiceLocator.LogService.LogWarning("Failed to decode stored password: " + pwdEx.Message);
+                                }
+                                
+                                // If not explicitly marked as connected in registry, check if we have valid details
+                                if (!settings.IsConnected && !StringExtensions.IsNullOrWhiteSpace(settings.Host) && 
+                                    !StringExtensions.IsNullOrWhiteSpace(settings.Username))
+                                {
+                                    settings.IsConnected = true;
+                                }
+                                
                                 return settings;
                             }
                         }
@@ -921,14 +1153,80 @@ namespace syncer.ui.Services
             }
             return _settings;
         }
+        
+        /// <summary>
+        /// Force reconnection and ensure IsConnected is properly set - useful for restart recovery
+        /// </summary>
+        public bool ForceReconnect()
+        {
+            try
+            {
+                if (_settings != null && !StringExtensions.IsNullOrWhiteSpace(_settings.Host) && 
+                    !StringExtensions.IsNullOrWhiteSpace(_settings.Username))
+                {
+                    // Test the connection
+                    if (TestConnection(_settings))
+                    {
+                        _settings.IsConnected = true;
+                        ServiceLocator.LogService.LogInfo(string.Format("Force reconnect successful: {0}@{1}:{2}", 
+                            _settings.Username, _settings.Host, _settings.Port));
+                        return true;
+                    }
+                    else
+                    {
+                        _settings.IsConnected = false;
+                        ServiceLocator.LogService.LogWarning(string.Format("Force reconnect failed - connection test unsuccessful: {0}@{1}:{2}", 
+                            _settings.Username, _settings.Host, _settings.Port));
+                        return false;
+                    }
+                }
+                else
+                {
+                    ServiceLocator.LogService.LogWarning("Force reconnect failed - insufficient connection details");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Error during force reconnect: " + ex.Message);
+                return false;
+            }
+        }
 
         private ConnectionSettings LoadDefaultConnectionFromRegistry()
         {
-            var connections = GetAllConnections();
-            if (connections.Count > 0)
+            try
             {
-                return connections[0].Settings;
+                var connections = GetAllConnections();
+                if (connections.Count > 0)
+                {
+                    // First try to find a connection explicitly marked as default
+                    foreach (var conn in connections)
+                    {
+                        try
+                        {
+                            using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\DataSyncer\\Connections\\" + conn.Name))
+                            {
+                                if (key != null && Convert.ToBoolean(key.GetValue("IsDefault", false)))
+                                {
+                                    ServiceLocator.LogService.LogInfo(string.Format("Loaded default connection: {0}", conn.Name));
+                                    return conn.Settings;
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                    
+                    // If no explicit default, return the first one
+                    ServiceLocator.LogService.LogInfo(string.Format("Using first available connection: {0} connections found", connections.Count));
+                    return connections[0].Settings;
+                }
             }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService.LogError("Failed to load default connection from registry: " + ex.Message);
+            }
+            
             return null;
         }
     }
@@ -1123,6 +1421,30 @@ namespace syncer.ui.Services
         { 
             try
             {
+                // First check if Windows service is available and start it if needed
+                try
+                {
+                    using (var service = new System.ServiceProcess.ServiceController("FTPSyncerService"))
+                    {
+                        service.Refresh();
+                        if (service.Status == System.ServiceProcess.ServiceControllerStatus.Stopped)
+                        {
+                            ServiceLocator.LogService?.LogInfo("Starting Windows service...");
+                            service.Start();
+                            service.WaitForStatus(System.ServiceProcess.ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
+                            ServiceLocator.LogService?.LogInfo("Windows service started successfully");
+                        }
+                        else if (service.Status == System.ServiceProcess.ServiceControllerStatus.Running)
+                        {
+                            ServiceLocator.LogService?.LogInfo("Windows service is already running");
+                        }
+                    }
+                }
+                catch (Exception serviceEx)
+                {
+                    ServiceLocator.LogService?.LogWarning("Could not start Windows service (running in local mode): " + serviceEx.Message);
+                }
+                
                 if (!_isRunning)
                 {
                     _isRunning = true;
@@ -1167,8 +1489,84 @@ namespace syncer.ui.Services
             }
         }
         
-        public bool IsServiceRunning() { return _isRunning; }
-        public string GetServiceStatus() { return _isRunning ? "Running" : "Stopped"; }
+        public bool IsServiceRunning() 
+        { 
+            // First check if we have the Windows service
+            try
+            {
+                using (var service = new System.ServiceProcess.ServiceController("FTPSyncerService"))
+                {
+                    service.Refresh();
+                    bool windowsServiceRunning = service.Status == System.ServiceProcess.ServiceControllerStatus.Running;
+                    
+                    // If Windows service is running, sync our local state
+                    if (windowsServiceRunning && !_isRunning)
+                    {
+                        _isRunning = true;
+                        ServiceLocator.LogService?.LogInfo("Synchronized with running Windows service");
+                    }
+                    else if (!windowsServiceRunning && _isRunning)
+                    {
+                        _isRunning = false;
+                        ServiceLocator.LogService?.LogInfo("Synchronized with stopped Windows service");
+                    }
+                    
+                    return windowsServiceRunning;
+                }
+            }
+            catch
+            {
+                // If Windows service is not available, fall back to local state
+                return _isRunning;
+            }
+        }
+        
+        public string GetServiceStatus() 
+        { 
+            // Check Windows service status first
+            try
+            {
+                using (var service = new System.ServiceProcess.ServiceController("FTPSyncerService"))
+                {
+                    service.Refresh();
+                    var status = service.Status;
+                    
+                    switch (status)
+                    {
+                        case System.ServiceProcess.ServiceControllerStatus.Running:
+                            // Get job count if possible
+                            var timerJobManager = ServiceLocator.TimerJobManager;
+                            if (timerJobManager != null)
+                            {
+                                var runningJobs = timerJobManager.GetRunningJobs();
+                                if (runningJobs.Count > 0)
+                                {
+                                    return string.Format("Running ({0} active jobs)", runningJobs.Count);
+                                }
+                                else
+                                {
+                                    return "Running (idle)";
+                                }
+                            }
+                            return "Running";
+                            
+                        case System.ServiceProcess.ServiceControllerStatus.Stopped:
+                            return "Stopped";
+                            
+                        case System.ServiceProcess.ServiceControllerStatus.Paused:
+                            return "Paused";
+                            
+                        default:
+                            return status.ToString();
+                    }
+                }
+            }
+            catch
+            {
+                // If Windows service is not available, fall back to local state
+                return _isRunning ? "Running (Local)" : "Stopped (Local)";
+            }
+        }
         
         public void Dispose()
         {
