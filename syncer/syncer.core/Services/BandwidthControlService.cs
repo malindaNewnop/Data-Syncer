@@ -372,10 +372,9 @@ namespace syncer.core.Services
                 
                 doc.Save(_configFilePath);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Log error but don't throw to prevent application crashes
-                System.Diagnostics.Debug.WriteLine($"Error saving bandwidth settings: {ex.Message}");
             }
         }
         
@@ -420,10 +419,9 @@ namespace syncer.core.Services
                     bool.TryParse(enabledNode.InnerText, out _isBandwidthControlEnabled);
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Log error and use defaults
-                System.Diagnostics.Debug.WriteLine($"Error loading bandwidth settings: {ex.Message}");
                 _globalUploadLimitBytesPerSecond = 0;
                 _globalDownloadLimitBytesPerSecond = 0;
                 _isBandwidthControlEnabled = false;

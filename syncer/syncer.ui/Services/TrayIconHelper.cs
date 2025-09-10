@@ -144,10 +144,9 @@ namespace syncer.ui.Services
 
                 notifyIcon.ShowBalloonTip(timeout, safeTitle, safeText, icon);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Log error but don't throw - notifications should not crash the app
-                Console.WriteLine("Error showing balloon tip: " + ex.Message);
             }
         }
     }

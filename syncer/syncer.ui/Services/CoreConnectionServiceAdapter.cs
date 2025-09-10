@@ -23,20 +23,10 @@ namespace syncer.ui.Services
                 if (savedSettings != null)
                 {
                     _settings = savedSettings;
-                    DebugLogger.LogServiceActivity("CoreConnectionServiceAdapter", 
-                        string.Format("Loaded connection settings: {0}@{1}:{2}", 
-                        _settings.Username, _settings.Host, _settings.Port));
                 }
-                else
-                {
-                    DebugLogger.LogServiceActivity("CoreConnectionServiceAdapter", "No saved connection settings found");
-                }
-                
-                DebugLogger.LogServiceActivity("CoreConnectionServiceAdapter", "Initialized successfully");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                DebugLogger.LogError(ex, "CoreConnectionServiceAdapter initialization");
                 throw;
             }
         }
@@ -58,9 +48,8 @@ namespace syncer.ui.Services
                     // Save as default connection for automatic restoration
                     return SaveConnection("Default", settings, true);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    DebugLogger.LogError(ex, "Failed to persist connection settings");
                     // Still return true since we saved to memory
                     return true;
                 }
@@ -317,17 +306,14 @@ namespace syncer.ui.Services
                 try
                 {
                     bool isConnected = TestConnection(_settings);
-                    DebugLogger.LogServiceActivity("CoreConnectionServiceAdapter", $"ForceReconnect result: {isConnected}");
                     return isConnected;
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    DebugLogger.LogError(ex, "CoreConnectionServiceAdapter ForceReconnect");
                     return false;
                 }
             }
             
-            DebugLogger.LogServiceActivity("CoreConnectionServiceAdapter", "ForceReconnect - no settings available");
             return false;
         }
     }

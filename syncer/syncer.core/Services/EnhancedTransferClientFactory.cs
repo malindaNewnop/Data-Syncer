@@ -79,10 +79,8 @@ namespace syncer.core.Services
             {
                 return Create(protocol);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to create client for {protocol}: {ex.Message}");
-                
                 // Fallback to same enhanced implementations (no basic fallback needed)
                 switch (protocol)
                 {

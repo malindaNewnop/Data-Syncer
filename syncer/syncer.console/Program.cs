@@ -11,7 +11,6 @@ namespace syncer.console
         private static void Main(string[] args)
         {
             Console.Title = "DataSyncer Console Runner";
-            Console.WriteLine("Starting DataSyncer (console mode) with multi-job support. Press Ctrl+C to stop...");
 
             // Wire Ctrl+C
             Console.CancelKeyPress += (s, e) =>

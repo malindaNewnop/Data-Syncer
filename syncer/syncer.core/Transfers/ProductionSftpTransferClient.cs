@@ -714,11 +714,10 @@ namespace syncer.core.Transfers
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Log error but continue with other files
                 // In production, you might want to use proper logging
-                System.Diagnostics.Debug.WriteLine($"Error listing directory {directory}: {ex.Message}");
             }
         }
 

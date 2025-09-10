@@ -60,10 +60,8 @@ namespace syncer.core
                         return true;
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Failed to connect to pipe server: {ex.Message}");
-                    
                     try
                     {
                         _pipeClient?.Close();
@@ -131,10 +129,8 @@ namespace syncer.core
                     
                     return true;
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Failed to send message: {ex.Message}");
-                    
                     // Connection might be broken, disconnect
                     Disconnect();
                     return false;
@@ -185,11 +181,11 @@ namespace syncer.core
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 if (_isConnected)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Reader loop error: {ex.Message}");
+                    // Connection error occurred
                 }
             }
             finally

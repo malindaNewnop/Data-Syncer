@@ -142,9 +142,6 @@ namespace syncer.ui.Forms
             };
             
             _jobs.Add(newJob);
-            
-            // Debug: Log job addition
-            System.Diagnostics.Debug.WriteLine($"FormCreateMultiJobConfiguration.AddNewJob: Added job '{newJob.Name}', Total jobs: {_jobs.Count}");
         }
 
         private void RefreshJobsList()
@@ -326,13 +323,6 @@ namespace syncer.ui.Forms
                     MessageBox.Show("Please enter a configuration name.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtConfigName.Focus();
                     return;
-                }
-                
-                // Debug: Log job count before validation
-                System.Diagnostics.Debug.WriteLine($"FormCreateMultiJobConfiguration.BtnCreate_Click: _jobs.Count = {_jobs.Count}");
-                for (int i = 0; i < _jobs.Count; i++)
-                {
-                    System.Diagnostics.Debug.WriteLine($"  Job {i}: Name={_jobs[i].Name}, Source={_jobs[i].SourcePath}, Dest={_jobs[i].DestinationPath}");
                 }
                 
                 // Validate that all jobs have source and destination paths

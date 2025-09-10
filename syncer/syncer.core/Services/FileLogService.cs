@@ -390,10 +390,9 @@ namespace syncer.core
                         CleanupOldBackups();
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // Can't log here as it would be recursive
-                    Console.WriteLine("Error rotating log file: " + ex.Message);
                 }
             }
         }
@@ -513,7 +512,9 @@ namespace syncer.core
 
         #region Real-time Logging Interface Implementation (No-op for FileLogService)
         
+#pragma warning disable 0067 // Event is never used - required for interface implementation
         public event EventHandler<LogEntryEventArgs> RealTimeLogEntry;
+#pragma warning restore 0067
 
         /// <summary>
         /// Enable real-time logging (no-op implementation for FileLogService)

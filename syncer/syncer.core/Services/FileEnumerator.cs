@@ -27,7 +27,6 @@ namespace syncer.core
                     : SearchOption.TopDirectoryOnly;
 
                 string[] files = Directory.GetFiles(rootPath, "*", searchOption);
-                Console.WriteLine("FileEnumerator: Found " + files.Length + " total files before filtering");
 
                 // Convert to list for easier processing
                 var allFiles = new List<string>(files);
@@ -36,7 +35,6 @@ namespace syncer.core
                 if (filters != null)
                 {
                     results = ApplyFileFilters(allFiles, filters);
-                    Console.WriteLine("FileEnumerator: Applied filters, {0} files remain", results.Count);
                 }
                 else
                 {
@@ -53,8 +51,6 @@ namespace syncer.core
                         }
                     }
                 }
-                
-                Console.WriteLine("FileEnumerator: Included " + results.Count + " files after filtering");
             }
             catch (Exception)
             {
@@ -130,9 +126,6 @@ namespace syncer.core
                         result.Add(file);
                     }
                 }
-                
-                Console.WriteLine("Applied include filter: {0} files match included extensions [{1}]", 
-                    result.Count, string.Join(", ", normalizedIncludes.ToArray()));
             }
             // If no include filter, apply exclude filter
             else if (filters.ExcludeExtensions != null && filters.ExcludeExtensions.Count > 0)
@@ -156,9 +149,6 @@ namespace syncer.core
                         result.Add(file);
                     }
                 }
-                
-                Console.WriteLine("Applied exclude filter: {0} files remain after excluding extensions [{1}]", 
-                    result.Count, string.Join(", ", normalizedExcludes.ToArray()));
             }
             else
             {

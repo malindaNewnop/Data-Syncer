@@ -119,10 +119,8 @@ namespace syncer.core.Services
                     _currentSettings = settings;
                     return true;
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Failed to save settings: {ex.Message}");
-                    
                     // Restore from backup if available
                     var backupFile = _settingsFilePath + ".backup";
                     if (File.Exists(backupFile))
@@ -359,9 +357,8 @@ namespace syncer.core.Services
                 // If all else fails, return defaults
                 return new AppSettingsEnhanced();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to load settings: {ex.Message}");
                 return new AppSettingsEnhanced(); // Return defaults on error
             }
         }

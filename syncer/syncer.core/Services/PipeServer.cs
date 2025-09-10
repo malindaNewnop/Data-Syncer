@@ -98,9 +98,8 @@ namespace syncer.core
                     
                     return true;
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Failed to send message: {ex.Message}");
                     return false;
                 }
             }
@@ -135,11 +134,10 @@ namespace syncer.core
                     // Notify client disconnected
                     OnClientDisconnected(new PipeClientEventArgs { ClientId = "Client" });
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     if (_isRunning)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Pipe server error: {ex.Message}");
                         Thread.Sleep(1000); // Wait before retrying
                     }
                 }
@@ -198,11 +196,11 @@ namespace syncer.core
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 if (_isRunning)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Client handling error: {ex.Message}");
+                    // Client handling error occurred
                 }
             }
         }

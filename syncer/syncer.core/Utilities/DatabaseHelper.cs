@@ -250,7 +250,6 @@ namespace syncer.core
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error creating database backup: {ex.Message}");
                     // Log but don't rethrow - we don't want to interrupt operations for a backup failure
                 }
             }
@@ -307,7 +306,6 @@ namespace syncer.core
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error performing database maintenance: {ex.Message}");
                     // Log but don't rethrow
                 }
             }

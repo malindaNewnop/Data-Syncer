@@ -56,9 +56,8 @@ namespace syncer.ui.Services
                     _notificationDuration = configService.GetSetting("NotificationDelay", 3000);
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine("Error initializing SystemTrayManager: " + ex.Message);
                 // Continue even if services aren't available - we'll just have limited functionality
             }
             
@@ -83,9 +82,9 @@ namespace syncer.ui.Services
                 if (_logService != null)
                     _logService.LogInfo("Tray status updater started", "UI");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine("Error starting status updater: " + ex.Message);
+                // Failed to start status updater - continue without it
             }
         }
 
@@ -175,9 +174,9 @@ namespace syncer.ui.Services
                     _logService.LogInfo(logMessage, "UI");
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine("Error showing notification: " + ex.Message);
+                // Error showing notification - continue silently
             }
         }
 
@@ -240,9 +239,9 @@ namespace syncer.ui.Services
                     _logService.LogInfo("Tray icon status updated - Service: " + status, "UI");
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine("Error updating tray status: " + ex.Message);
+                // Error updating tray status - continue silently
             }
         }
 
@@ -265,9 +264,9 @@ namespace syncer.ui.Services
                 
                 ShowNotification(title, fullMessage, icon);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine("Error showing sync notification: " + ex.Message);
+                // Error showing sync notification - continue silently
             }
         }
 
@@ -450,9 +449,9 @@ namespace syncer.ui.Services
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine("Error updating service menu text: " + ex.Message);
+                // Error updating service menu text - continue silently
             }
         }
 
@@ -475,9 +474,9 @@ namespace syncer.ui.Services
                 // Default action is to restore the main form
                 RestoreMainForm();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine("Error handling notification click: " + ex.Message);
+                // Error handling notification click - continue silently
             }
         }
 
@@ -633,9 +632,8 @@ namespace syncer.ui.Services
                 // Exit the application completely
                 Application.Exit();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine("Error exiting application: " + ex.Message);
                 Environment.Exit(1); // Force exit on error
             }
         }
@@ -1045,9 +1043,9 @@ namespace syncer.ui.Services
                         _logService.LogInfo("Main form restored from tray icon", "UI");
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine("Error restoring main form: " + ex.Message);
+                // Error restoring main form - continue silently
             }
         }
 

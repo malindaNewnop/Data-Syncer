@@ -286,7 +286,6 @@ namespace syncer.ui.Services
 
             // Get all files without filtering
             List<string> files = GetFilteredFiles(job.SourcePath, job.IncludeSubFolders);
-            Console.WriteLine("Found " + files.Count + " files after applying job-specific filters");
 
             // If no files found, log it but don't treat as error (empty directory is valid)
             if (files.Count == 0)

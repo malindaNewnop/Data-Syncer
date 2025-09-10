@@ -152,10 +152,9 @@ namespace syncer.ui.Forms
                 AddPreviewItem("Auto Start on Load", checkBoxAutoStartOnLoad.Checked ? "Yes" : "No");
                 AddPreviewItem("Show Notification", checkBoxShowNotificationOnStart.Checked ? "Yes" : "No");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Handle preview update errors silently
-                System.Diagnostics.Debug.WriteLine($"Preview update error: {ex.Message}");
             }
         }
 

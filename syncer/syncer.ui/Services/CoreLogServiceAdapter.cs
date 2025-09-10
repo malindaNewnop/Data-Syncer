@@ -28,11 +28,9 @@ namespace syncer.ui.Services
             try
             {
                 _coreLogService = new syncer.core.FileLogService();
-                DebugLogger.LogServiceActivity("CoreLogServiceAdapter", "Initialized with real-time logging support");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                DebugLogger.LogError(ex, "CoreLogServiceAdapter initialization");
                 throw;
             }
         }
@@ -170,12 +168,9 @@ namespace syncer.ui.Services
                     {
                         _realTimeCsvWriter.WriteLine("Timestamp,Level,Job,Source,Message,JobId,Exception,FileName,FileSize,Duration");
                     }
-                    
-                    DebugLogger.LogServiceActivity("CoreLogServiceAdapter", "Real-time logging enabled to: " + csvFilePath);
                 }
                 catch (Exception ex)
                 {
-                    DebugLogger.LogError(ex, "Failed to enable real-time logging");
                     throw new InvalidOperationException("Failed to enable real-time logging: " + ex.Message, ex);
                 }
             }
@@ -192,16 +187,15 @@ namespace syncer.ui.Services
                         _realTimeCsvWriter.Close();
                         _realTimeCsvWriter.Dispose();
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
-                        DebugLogger.LogError(ex, "Error closing real-time log file");
+                        // Error closing file - continue
                     }
                     _realTimeCsvWriter = null;
                 }
                 
                 _realTimeLoggingEnabled = false;
                 _realTimeLogPath = null;
-                DebugLogger.LogServiceActivity("CoreLogServiceAdapter", "Real-time logging disabled");
             }
         }
 
@@ -250,9 +244,8 @@ namespace syncer.ui.Services
                         Exception = ex
                     });
                 }
-                catch (Exception logEx)
+                catch (Exception)
                 {
-                    DebugLogger.LogError(logEx, "Error writing to real-time log");
                     // Disable real-time logging if we can't write
                     DisableRealTimeLogging();
                 }

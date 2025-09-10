@@ -81,7 +81,6 @@ namespace syncer.ui
                 if (ex.InnerException != null) {
                     errorMsg += "\r\nInner exception: " + ex.InnerException.Message;
                 }
-                Console.WriteLine(errorMsg);
                 
                 // Try to log to file if possible
                 try {
@@ -139,9 +138,9 @@ namespace syncer.ui
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine("Error setting up log rotation: " + ex.Message);
+                // Error setting up log rotation - continue without it
             }
         }
         
@@ -356,9 +355,7 @@ namespace syncer.ui
                 }
                 catch
                 {
-                    // Last resort - write to console/debug
-                    Console.WriteLine("Critical error during shutdown: " + ex.Message);
-                    System.Diagnostics.Debug.WriteLine("Critical error during shutdown: " + ex.Message);
+                    // Last resort - errors during shutdown, cannot log
                 }
             }
         }
@@ -432,8 +429,6 @@ namespace syncer.ui
             _configurationService = new ConfigurationService();
             _timerJobManager = new Services.TimerJobManager();
             _savedJobConfigService = new Services.SavedJobConfigurationService();
-            
-            Console.WriteLine("Initialized with stub implementations");
         }
         
         // Helper method to ensure required directories exist

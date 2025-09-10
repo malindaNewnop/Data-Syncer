@@ -26,12 +26,9 @@ namespace syncer.ui.Services
                 
                 // Initialize the next job ID based on existing jobs
                 InitializeJobIdSequence();
-                
-                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", "Initialized successfully with MultiJobRunner");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                DebugLogger.LogError(ex, "CoreSyncJobServiceAdapter initialization");
                 throw;
             }
         }
@@ -78,14 +75,10 @@ namespace syncer.ui.Services
                 // Save the job
                 _jobRepository.Save(coreJob);
                 
-                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", 
-                    string.Format("Created job '{0}' with ID {1}", coreJob.Name, coreJob.Id));
-                
                 return newJobId;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                DebugLogger.LogError(ex, "CoreSyncJobServiceAdapter.CreateJob");
                 throw;
             }
         }
@@ -107,13 +100,9 @@ namespace syncer.ui.Services
                 }
                 
                 _nextJobId = maxId + 1;
-                
-                DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", 
-                    string.Format("Initialized job ID sequence. Next ID: {0}", _nextJobId));
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                DebugLogger.LogError(ex, "CoreSyncJobServiceAdapter.InitializeJobIdSequence");
                 _nextJobId = 1; // Fallback to 1
             }
         }
@@ -156,9 +145,8 @@ namespace syncer.ui.Services
             {
                 return _jobRunner.StartJob(id.ToString());
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                DebugLogger.LogError(ex, $"Failed to start job {id}");
                 return false;
             }
         }
@@ -169,9 +157,8 @@ namespace syncer.ui.Services
             {
                 return _jobRunner.CancelJob(id.ToString());
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                DebugLogger.LogError(ex, $"Failed to stop job {id}");
                 return false;
             }
         }
@@ -468,7 +455,6 @@ namespace syncer.ui.Services
             // This adapter doesn't use persistence like ServiceImplementations does
             // The core job repository handles its own persistence
             // This method is here to satisfy the interface but doesn't need implementation
-            DebugLogger.LogServiceActivity("CoreSyncJobServiceAdapter", "ReloadJobsFromPersistence called - no action needed for core adapter");
         }
     }
 }

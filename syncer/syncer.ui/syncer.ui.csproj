@@ -71,8 +71,6 @@
     <Compile Include="Services\CoreLogServiceAdapter.cs" />
     <Compile Include="Services\CoreSyncJobServiceAdapter.cs" />
     <Compile Include="Services\CoreConnectionServiceAdapter.cs" />
-    <Compile Include="Services\ServiceVerifier.cs" />
-    <Compile Include="Services\DebugLogger.cs" />
     <Compile Include="Services\FileSystemPermissionChecker.cs" />
     <Compile Include="Services\SavedJobConfigurationService.cs" />
     <!-- Forms -->

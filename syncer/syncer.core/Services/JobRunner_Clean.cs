@@ -350,10 +350,9 @@ namespace syncer.core
                     _logService.LogTransfer(jobName, fileName, fileSize, success, error);
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Don't let logging errors affect the transfer process
-                Console.WriteLine("Error logging transfer: " + ex.Message);
             }
         }
     }

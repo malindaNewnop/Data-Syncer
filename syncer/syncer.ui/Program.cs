@@ -85,22 +85,6 @@ namespace syncer.ui
                         
                         // Configure startup for auto-restart functionality
                         ConfigureApplicationStartup();
-                        
-                        // Verify services
-                        if (!ServiceVerifier.VerifyServices())
-                        {
-                            DialogResult result = MessageBox.Show(
-                                "Warning: Some services could not be initialized correctly. The application may not function properly.\n\n" +
-                                "Do you want to continue with limited functionality?", 
-                                "Service Initialization Warning", 
-                                MessageBoxButtons.YesNo, 
-                                MessageBoxIcon.Warning);
-                                
-                            if (result == DialogResult.No)
-                            {
-                                return; // Exit application
-                            }
-                        }
                     }
                 }
                 catch (Exception initEx)

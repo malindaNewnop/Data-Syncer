@@ -331,10 +331,9 @@ namespace syncer.core
                         _profiles[profile.Name] = profile;
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // Log error but continue with empty profiles
-                    System.Diagnostics.Debug.WriteLine($"Failed to load profiles: {ex.Message}");
                 }
             }
         }
@@ -350,10 +349,9 @@ namespace syncer.core
                     var json = File.ReadAllText(_globalConfigFile);
                     _globalConfig = JsonConvert.DeserializeObject<SftpGlobalConfiguration>(json);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // Log error but continue with default config
-                    System.Diagnostics.Debug.WriteLine($"Failed to load global configuration: {ex.Message}");
                 }
             }
         }
