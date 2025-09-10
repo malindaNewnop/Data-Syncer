@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
+using System.IO;
 using syncer.core.Services;
 
 namespace syncer.ui.Services
@@ -387,12 +388,42 @@ namespace syncer.ui.Services
         {
             try
             {
-                // Try to get the application icon
+                // Try to load our custom FTP Syncer logo
+                string iconsFolder = Path.Combine(Application.StartupPath, "Icons");
+                string iconPath = Path.Combine(iconsFolder, "ftpsyncerLOGO.png");
+                if (File.Exists(iconPath))
+                {
+                    // Load PNG and convert to Icon
+                    using (var bitmap = new Bitmap(iconPath))
+                    {
+                        // Resize to 16x16 for tray icon (standard size)
+                        using (var resizedBitmap = new Bitmap(bitmap, new Size(16, 16)))
+                        {
+                            // Convert bitmap to icon
+                            IntPtr hIcon = resizedBitmap.GetHicon();
+                            Icon customIcon = Icon.FromHandle(hIcon);
+                            return customIcon;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't crash
+                if (ServiceLocator.LogService != null)
+                {
+                    ServiceLocator.LogService.LogError("Failed to load custom icon: " + ex.Message, "SystemTray");
+                }
+            }
+            
+            try
+            {
+                // Fallback: Try to get the application icon
                 return Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             }
             catch
             {
-                // Fall back to the system information icon if we can't get the application icon
+                // Final fallback to the system information icon
                 return SystemIcons.Information;
             }
         }
@@ -973,7 +1004,7 @@ namespace syncer.ui.Services
                 
                 if (_notificationsEnabled)
                 {
-                    ShowNotification("Data Syncer Running", 
+                    ShowNotification("FTP Syncer is running", 
                         "The application is still running in the background. Double-click the tray icon to restore.",
                         ToolTipIcon.Info);
                 }
@@ -991,7 +1022,7 @@ namespace syncer.ui.Services
                 
                 if (_notificationsEnabled)
                 {
-                    ShowNotification("Data Syncer Running", 
+                    ShowNotification("FTP Syncer is running", 
                         "The application is still running in the background. Double-click the tray icon to restore.",
                         ToolTipIcon.Info);
                 }

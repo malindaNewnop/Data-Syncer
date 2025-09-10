@@ -69,7 +69,7 @@ namespace syncer.ui
                 NotifyInitializationComplete();
                 
                 // Log initialization
-                _logService.LogInfo("Data Syncer UI started with core backend", "UI");
+                _logService.LogInfo("FTPSyncer UI started with core backend", "UI");
             }
             catch (Exception ex)
             {

@@ -7,7 +7,7 @@
     <ProjectGuid>{1E88E774-42EE-4E32-97B4-D83E8E185EE4}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <RootNamespace>syncer.ui</RootNamespace>
-    <AssemblyName>syncer.ui</AssemblyName>
+    <AssemblyName>FTPSyncer</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -184,6 +184,11 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
     <None Include="PublishProfile.pubxml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Icons\ftpsyncerLOGO.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

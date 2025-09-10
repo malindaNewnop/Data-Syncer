@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 using syncer.ui.Services;
 using syncer.ui.Interfaces;
 using syncer.ui.Forms;
@@ -36,6 +37,7 @@ namespace syncer.ui
             try
             {
                 InitializeComponent();
+                SetCustomIcon();
                 InitializeServices();
                 InitializeSystemTray();
                 InitializeCustomComponents();
@@ -3092,6 +3094,42 @@ namespace syncer.ui
                 txtName.SelectAll();
 
                 return inputForm.ShowDialog(this) == DialogResult.OK ? txtName.Text : null;
+            }
+        }
+
+        /// <summary>
+        /// Sets the custom FTPSyncer icon for the main form
+        /// </summary>
+        private void SetCustomIcon()
+        {
+            try
+            {
+                // Try to load our custom FTP Syncer logo
+                string iconsFolder = Path.Combine(Application.StartupPath, "Icons");
+                string iconPath = Path.Combine(iconsFolder, "ftpsyncerLOGO.png");
+                
+                if (File.Exists(iconPath))
+                {
+                    // Load PNG and convert to Icon for the form
+                    using (var bitmap = new Bitmap(iconPath))
+                    {
+                        // Resize to 32x32 for form icon (standard size)
+                        using (var resizedBitmap = new Bitmap(bitmap, new Size(32, 32)))
+                        {
+                            // Convert bitmap to icon
+                            IntPtr hIcon = resizedBitmap.GetHicon();
+                            this.Icon = Icon.FromHandle(hIcon);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't crash
+                if (ServiceLocator.LogService != null)
+                {
+                    ServiceLocator.LogService.LogError("Failed to load custom form icon: " + ex.Message, "FormMain");
+                }
             }
         }
 

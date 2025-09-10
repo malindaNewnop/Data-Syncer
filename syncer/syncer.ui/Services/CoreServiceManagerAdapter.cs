@@ -54,7 +54,7 @@ namespace syncer.ui.Services
                     var startedJobs = _multiJobRunner.StartDueJobs();
                     
                     _isRunning = true;
-                    ServiceLocator.LogService.LogInfo("Data Syncer service started successfully", "ServiceManager");
+                    ServiceLocator.LogService.LogInfo("FTPSyncer service started successfully", "ServiceManager");
                     
                     return true;
                 }
@@ -105,7 +105,7 @@ namespace syncer.ui.Services
                     System.Threading.Thread.Sleep(2000);
                     
                     _isRunning = false;
-                    ServiceLocator.LogService.LogInfo("Data Syncer service stopped successfully", "ServiceManager");
+                    ServiceLocator.LogService.LogInfo("FTPSyncer service stopped successfully", "ServiceManager");
                     
                     return true;
                 }

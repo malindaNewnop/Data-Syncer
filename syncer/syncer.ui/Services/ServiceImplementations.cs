@@ -1453,7 +1453,7 @@ namespace syncer.ui.Services
                     if (_jobService != null)
                     {
                         _jobService.StartScheduler();
-                        ServiceLocator.LogService.LogInfo("Data Syncer service started - job scheduling active");
+                        ServiceLocator.LogService.LogInfo("FTPSyncer service started - job scheduling active");
                     }
                 }
                 return true;
@@ -1477,7 +1477,7 @@ namespace syncer.ui.Services
                     if (_jobService != null)
                     {
                         _jobService.StopScheduler();
-                        ServiceLocator.LogService.LogInfo("Data Syncer service stopped - job scheduling inactive");
+                        ServiceLocator.LogService.LogInfo("FTPSyncer service stopped - job scheduling inactive");
                     }
                 }
                 return true;
