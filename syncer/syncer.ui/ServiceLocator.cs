@@ -204,15 +204,56 @@ namespace syncer.ui
                                 restoredSettings.Username, restoredSettings.Host, restoredSettings.Port,
                                 restoredSettings.Protocol, restoredSettings.ProtocolType, restoredSettings.IsRemoteConnection), "RestartRecovery");
                                 
-                            // Force reconnect to ensure IsConnected is properly set
-                            bool reconnected = _connectionService.ForceReconnect();
-                            if (reconnected)
+                            // Force reconnect with retry logic to ensure IsConnected is properly set
+                            bool reconnected = false;
+                            int retryCount = 0;
+                            int maxRetries = 3;
+                            
+                            while (!reconnected && retryCount < maxRetries)
                             {
-                                _logService.LogInfo("Connection successfully restored and verified for restart", "RestartRecovery");
+                                try
+                                {
+                                    reconnected = _connectionService.ForceReconnect();
+                                    if (reconnected)
+                                    {
+                                        _logService.LogInfo(string.Format("Connection successfully restored and verified for restart (attempt {0})", retryCount + 1), "RestartRecovery");
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        retryCount++;
+                                        if (retryCount < maxRetries)
+                                        {
+                                            _logService.LogWarning(string.Format("Connection verification failed, retrying... (attempt {0}/{1})", retryCount, maxRetries), "RestartRecovery");
+                                            System.Threading.Thread.Sleep(2000); // Wait 2 seconds between retries
+                                        }
+                                    }
+                                }
+                                catch (Exception retryEx)
+                                {
+                                    retryCount++;
+                                    _logService.LogError(string.Format("Connection retry {0} failed: {1}", retryCount, retryEx.Message), "RestartRecovery");
+                                    if (retryCount < maxRetries)
+                                    {
+                                        System.Threading.Thread.Sleep(2000); // Wait 2 seconds between retries
+                                    }
+                                }
                             }
-                            else
+                            
+                            if (!reconnected)
                             {
-                                _logService.LogWarning("Connection restored but verification failed - jobs may not run properly", "RestartRecovery");
+                                _logService.LogWarning("Connection restored but verification failed after all retries - jobs may not run properly", "RestartRecovery");
+                                
+                                // Save the connection anyway so UI shows it's configured
+                                try
+                                {
+                                    _connectionService.SaveConnectionSettings(restoredSettings);
+                                    _logService.LogInfo("Connection settings saved to ensure UI shows configured state", "RestartRecovery");
+                                }
+                                catch (Exception saveEx)
+                                {
+                                    _logService.LogError("Failed to save connection settings: " + saveEx.Message, "RestartRecovery");
+                                }
                             }
                         }
                         else

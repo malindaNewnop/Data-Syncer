@@ -1936,17 +1936,58 @@ namespace syncer.ui.Services
                 // Add to collection
                 _timerJobs.Add(persistentJob.JobId, timerJob);
 
-                // Start the timer if the job was running
+                // Start the timer if the job was running before shutdown
                 if (persistentJob.IsRunning)
                 {
+                    // Perform an additional connection test before starting
+                    bool connectionOk = false;
+                    try
+                    {
+                        string errorMessage;
+                        connectionOk = transferClient.TestConnection(coreSettings, out errorMessage);
+                        if (!connectionOk)
+                        {
+                            _logService.LogWarning(string.Format("Connection test failed for job {0} before restart: {1}. Will try to start anyway.", 
+                                persistentJob.JobName, errorMessage));
+                        }
+                    }
+                    catch (Exception testEx)
+                    {
+                        _logService.LogWarning(string.Format("Connection test error for job {0} before restart: {1}. Will try to start anyway.", 
+                            persistentJob.JobName, testEx.Message));
+                    }
+                    
+                    // Start the timer - connection issues will be handled during job execution
                     timerJob.Timer.Start();
                     timerJob.IsRunning = true;
-                    _logService.LogInfo(string.Format("Restored and started timer job {0} ({1})", 
+                    _logService.LogInfo(string.Format("Restored and auto-started timer job {0} ({1}) - was running before restart", 
                         persistentJob.JobId, persistentJob.JobName));
+                        
+                    // Also trigger an immediate execution after a short delay to verify it works
+                    var startupTimer = new System.Timers.Timer(5000); // 5 second delay
+                    startupTimer.AutoReset = false;
+                    startupTimer.Elapsed += (s, args) =>
+                    {
+                        try
+                        {
+                            _logService.LogInfo(string.Format("Triggering startup verification run for job {0}", persistentJob.JobName));
+                            OnTimerElapsed(timerJob.JobId);
+                        }
+                        catch (Exception startEx)
+                        {
+                            _logService.LogError(string.Format("Startup verification run failed for job {0}: {1}", 
+                                persistentJob.JobName, startEx.Message));
+                        }
+                        finally
+                        {
+                            startupTimer.Dispose();
+                        }
+                    };
+                    startupTimer.Start();
                 }
                 else
                 {
-                    _logService.LogInfo(string.Format("Restored timer job {0} ({1}) - not auto-started", 
+                    _logService.LogInfo(string.Format("Restored timer job {0} ({1}) - was not running before restart, keeping stopped", 
                         persistentJob.JobId, persistentJob.JobName));
                 }
 

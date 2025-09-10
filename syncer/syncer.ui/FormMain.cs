@@ -205,6 +205,43 @@ namespace syncer.ui
                 // Log that UI refresh is complete
                 var logService = ServiceLocator.LogService;
                 logService?.LogInfo("UI refreshed after startup and restart recovery", "RestartRecovery");
+                
+                // Give a small notification that the app has restored successfully
+                if (_notificationService != null)
+                {
+                    try
+                    {
+                        var connectionService = ServiceLocator.ConnectionService;
+                        var timerJobManager = ServiceLocator.TimerJobManager;
+                        
+                        string statusMessage = "FTPSyncer restored";
+                        
+                        if (connectionService != null)
+                        {
+                            var settings = connectionService.GetConnectionSettings();
+                            if (settings != null && settings.IsRemoteConnection)
+                            {
+                                statusMessage += string.Format(" - Connected to {0}", settings.Host);
+                            }
+                        }
+                        
+                        if (timerJobManager != null)
+                        {
+                            var runningJobs = timerJobManager.GetRunningJobs();
+                            if (runningJobs != null && runningJobs.Count > 0)
+                            {
+                                statusMessage += string.Format(" - {0} job{1} running", runningJobs.Count, runningJobs.Count == 1 ? "" : "s");
+                            }
+                        }
+                        
+                        _notificationService.ShowNotification("Startup Complete", statusMessage);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        // Don't let notification errors affect startup
+                        logService?.LogWarning("Failed to show startup notification: " + notifEx.Message, "UI");
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -242,13 +279,16 @@ namespace syncer.ui
                         // Check if any jobs are currently running instead of testing connection directly
                         var timerJobManager = ServiceLocator.TimerJobManager;
                         bool hasActiveJobs = false;
+                        bool hasRunningJobs = false;
+                        var runningJobs = new Dictionary<long, object>();
                         
                         if (timerJobManager != null)
                         {
                             try
                             {
-                                var runningJobs = timerJobManager.GetRunningJobs();
-                                hasActiveJobs = runningJobs != null && runningJobs.Count > 0;
+                                runningJobs = timerJobManager.GetRunningJobs();
+                                hasRunningJobs = runningJobs != null && runningJobs.Count > 0;
+                                hasActiveJobs = hasRunningJobs;
                                 
                                 // Also check if any jobs are actively uploading/downloading
                                 if (!hasActiveJobs)
@@ -271,6 +311,8 @@ namespace syncer.ui
                             catch
                             {
                                 hasActiveJobs = false;
+                                hasRunningJobs = false;
+                                runningJobs = new Dictionary<long, object>();
                             }
                         }
                         
@@ -279,12 +321,19 @@ namespace syncer.ui
                             lblConnectionStatus.Text = $"Connected to {connectionSettings.Host}:{connectionSettings.Port} (Job Running)";
                             lblConnectionStatus.ForeColor = Color.Green;
                         }
+                        else if (hasRunningJobs)
+                        {
+                            // Jobs are configured to run but not currently active - show as connected
+                            lblConnectionStatus.Text = $"Connected to {connectionSettings.Host}:{connectionSettings.Port} ({runningJobs?.Count ?? 0} job{((runningJobs?.Count ?? 0) == 1 ? "" : "s")} scheduled)";
+                            lblConnectionStatus.ForeColor = Color.Green;
+                        }
                         else
                         {
-                            // Only test connection if no jobs are running
+                            // No running jobs - test the connection but don't block UI
                             bool isConnected = false;
                             try
                             {
+                                // Use a quick timeout for the test to avoid UI freezing
                                 isConnected = _connectionService.TestConnection(connectionSettings);
                             }
                             catch
@@ -299,7 +348,8 @@ namespace syncer.ui
                             }
                             else
                             {
-                                lblConnectionStatus.Text = $"Connection available to {connectionSettings.Host}:{connectionSettings.Port}";
+                                // Connection settings exist but test failed - could be temporary
+                                lblConnectionStatus.Text = $"Connection configured to {connectionSettings.Host}:{connectionSettings.Port}";
                                 lblConnectionStatus.ForeColor = Color.Orange;
                             }
                         }
