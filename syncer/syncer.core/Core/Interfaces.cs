@@ -90,6 +90,8 @@ namespace syncer.core
         bool FileExists(ConnectionSettings settings, string remotePath, out bool exists, out string error);
         bool DeleteFile(ConnectionSettings settings, string remotePath, out string error);
         bool ListFiles(ConnectionSettings settings, string remoteDir, out List<string> files, out string error);
+        bool GetFileModifiedTime(ConnectionSettings settings, string remotePath, out DateTime modifiedTime, out string error);
+        bool GetFileSize(ConnectionSettings settings, string remotePath, out long fileSize, out string error);
         void SetProgressCallback(Action<int> progressCallback);
     }
 

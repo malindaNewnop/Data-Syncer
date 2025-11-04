@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
@@ -565,9 +565,9 @@ namespace syncer.ui
                 // Ask user whether to load from saved configurations or from file
                 var result = MessageBox.Show(
                     "How would you like to load the configuration?\n\n" +
-                    "• Click 'Yes' to browse saved configurations (internal database)\n" +
-                    "• Click 'No' to load from a custom file (*.json)\n" +
-                    "• Click 'Cancel' to return to main menu",
+                    "â€¢ Click 'Yes' to browse saved configurations (internal database)\n" +
+                    "â€¢ Click 'No' to load from a custom file (*.json)\n" +
+                    "â€¢ Click 'Cancel' to return to main menu",
                     "Load Configuration", 
                     MessageBoxButtons.YesNoCancel, 
                     MessageBoxIcon.Question);
@@ -936,7 +936,7 @@ namespace syncer.ui
 
         private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("FTPSyncer v1.0\nFile Synchronization Tool\n\nDeveloped for automated file transfers.", "About FTPSyncer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("FTPSyncer v5.0\nFile Synchronization Tool\n\nDeveloped for automated file transfers.", "About FTPSyncer", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void jobRecoveryToolStripMenuItem_Click(object sender, EventArgs e)
@@ -946,9 +946,9 @@ namespace syncer.ui
                 // Show information about automatic job recovery via Windows service
                 string message = "Job Recovery is handled automatically by the FTPSyncer Windows Service.\n\n" +
                                "Features:\n" +
-                               "• Jobs automatically resume after system restart\n" +
-                               "• No manual intervention required\n" +
-                               "• Service runs in background\n\n" +
+                               "â€¢ Jobs automatically resume after system restart\n" +
+                               "â€¢ No manual intervention required\n" +
+                               "â€¢ Service runs in background\n\n" +
                                "Service Status: " + GetServiceStatus();
                                
                 MessageBox.Show(message, "Automatic Job Recovery", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1868,9 +1868,9 @@ namespace syncer.ui
                         if (saveResult.Result == SaveConfigurationResult.Success)
                         {
                             MessageBox.Show($"Configuration saved successfully!\n\n" +
-                                $"• Name: {multiJobConfig.Name}\n" +
-                                $"• Jobs: {multiJobConfig.Jobs.Count} (will run in parallel)\n" +
-                                $"• Access from: File → Load Configuration or Quick Launch", 
+                                $"â€¢ Name: {multiJobConfig.Name}\n" +
+                                $"â€¢ Jobs: {multiJobConfig.Jobs.Count} (will run in parallel)\n" +
+                                $"â€¢ Access from: File â†’ Load Configuration or Quick Launch", 
                                 "Multi-Job Configuration Saved", 
                                 MessageBoxButtons.OK, MessageBoxIcon.Information);
                             
@@ -1893,7 +1893,7 @@ namespace syncer.ui
                                 if (configService.SaveConfigurationOverwrite(multiJobConfig))
                                 {
                                     MessageBox.Show($"Configuration '{configName}' updated successfully!\n\n" +
-                                        $"• Jobs: {multiJobConfig.Jobs.Count} (will run in parallel)",
+                                        $"â€¢ Jobs: {multiJobConfig.Jobs.Count} (will run in parallel)",
                                         "Configuration Updated", 
                                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     
@@ -1985,8 +1985,8 @@ namespace syncer.ui
                     var result = MessageBox.Show(
                         $"You have {dgvTimerJobs.Rows.Count} timer jobs in your list.\n\n" +
                         "For multiple timer jobs, we recommend using 'Save Configuration' instead of 'Save As' to create a proper multi-job configuration that will run all jobs in parallel.\n\n" +
-                        "• Click YES to continue with 'Save As' (will only save the first job to file)\n" +
-                        "• Click NO to cancel and use 'Save Configuration' instead",
+                        "â€¢ Click YES to continue with 'Save As' (will only save the first job to file)\n" +
+                        "â€¢ Click NO to cancel and use 'Save Configuration' instead",
                         "Multiple Timer Jobs - Consider Save Configuration",
                         MessageBoxButtons.YesNo, 
                         MessageBoxIcon.Information);
@@ -2516,7 +2516,7 @@ namespace syncer.ui
                         "To use Quick Launch, you need to:\n" +
                         "1. Set up your connection settings\n" +
                         "2. Create and configure timer jobs\n" +
-                        "3. Save your configuration using File → Save\n\n" +
+                        "3. Save your configuration using File â†’ Save\n\n" +
                         "After saving configurations, you can quickly access them here.",
                         "No Configurations Available", 
                         MessageBoxButtons.OK, 
@@ -2628,7 +2628,7 @@ namespace syncer.ui
                     }
                     else
                     {
-                        jobSummary = $"Loaded {jobCount} job from configuration '{configuration.Name}' (To add more jobs: Load Config → Edit → Add Job)";
+                        jobSummary = $"Loaded {jobCount} job from configuration '{configuration.Name}' (To add more jobs: Load Config â†’ Edit â†’ Add Job)";
                     }
                 }
                 else if (configuration?.JobSettings != null)
@@ -2651,12 +2651,12 @@ namespace syncer.ui
                     
                     if (configuration.Jobs != null && configuration.Jobs.Count > 1)
                     {
-                        message += "\n\n✓ All jobs are now running in PARALLEL";
+                        message += "\n\nâœ“ All jobs are now running in PARALLEL";
                         message += "\n\nJob Details:";
                         for (int i = 0; i < Math.Min(configuration.Jobs.Count, 5); i++) // Show first 5 jobs
                         {
                             var job = configuration.Jobs[i];
-                            message += $"\n• {job.Name ?? $"Job {i + 1}"}: {job.SourcePath} → {job.DestinationPath}";
+                            message += $"\nâ€¢ {job.Name ?? $"Job {i + 1}"}: {job.SourcePath} â†’ {job.DestinationPath}";
                         }
                         if (configuration.Jobs.Count > 5)
                         {
@@ -2667,12 +2667,12 @@ namespace syncer.ui
                     {
                         var job = configuration.Jobs[0];
                         message += $"\n\nCurrent Job:";
-                        message += $"\n• {job.Name ?? "Job 1"}: {job.SourcePath} → {job.DestinationPath}";
-                        message += $"\n• Interval: {job.IntervalValue} {job.IntervalType}";
+                        message += $"\nâ€¢ {job.Name ?? "Job 1"}: {job.SourcePath} â†’ {job.DestinationPath}";
+                        message += $"\nâ€¢ Interval: {job.IntervalValue} {job.IntervalType}";
                         message += "\n\nTo add more jobs for parallel execution:";
                         message += "\n1. Stop current job";
                         message += "\n2. Use 'Load Configuration' (not 'Load & Start')";
-                        message += "\n3. Right-click the configuration → 'Edit'";
+                        message += "\n3. Right-click the configuration â†’ 'Edit'";
                         message += "\n4. Click 'Add Job' to create additional jobs";
                         message += "\n5. Save and then 'Load & Start' again";
                     }
@@ -3138,3 +3138,4 @@ namespace syncer.ui
         #endregion
     }
 }
+

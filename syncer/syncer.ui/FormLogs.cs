@@ -41,11 +41,8 @@ namespace syncer.ui
         private void InitializeCustomComponents()
         {
             // Set default values for combo boxes
-            if (cmbLogLevel != null && cmbLogLevel.Items.Count > 0)
-            {
-                cmbLogLevel.SelectedIndex = 0; // Select "All" by default
-            }
-
+            // Removed: cmbLogLevel initialization
+            
             if (cmbJobs != null && cmbJobs.Items.Count > 0)
             {
                 cmbJobs.SelectedIndex = 0; // Select "All Jobs" by default
@@ -75,7 +72,7 @@ namespace syncer.ui
         }
 
         /// <summary>
-        /// Apply all filters (search text, log level, job, and time range) to the logs
+        /// Apply all filters (search text, job, and time range) to the logs
         /// </summary>
         private void ApplyFilters()
         {
@@ -113,19 +110,7 @@ namespace syncer.ui
                     }
                 }
 
-                // Log level filter
-                if (cmbLogLevel.SelectedIndex > 0) // Not "All"
-                {
-                    string selectedLevel = cmbLogLevel.SelectedItem.ToString();
-
-                    if (dt.Columns.Contains("Level"))
-                    {
-                        string levelFilter = $"Level = '{selectedLevel}'";
-
-                        filterExpression = string.IsNullOrEmpty(filterExpression) ?
-                            levelFilter : $"({filterExpression}) AND {levelFilter}";
-                    }
-                }
+                // Removed: Log level filter logic
 
                 // JobId filter
                 if (cmbJobs.SelectedIndex > 0) // Not "All Jobs"
@@ -814,7 +799,7 @@ namespace syncer.ui
             {
                 dialog.Filter = "CSV files (*.csv)|*.csv|Text files (*.txt)|*.txt";
                 dialog.DefaultExt = "csv";
-                dialog.FileName = "FTPSyncer_Logs_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                dialog.FileName = "DataSyncer_Logs_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
 
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
@@ -843,6 +828,8 @@ namespace syncer.ui
             }
         }
 
+        // REMOVED: Log Level filter functionality - replaced with Date & Time filter
+        /*
         private void cmbLogLevel_SelectedIndexChanged(object sender, EventArgs e)
         {
             try
@@ -893,6 +880,15 @@ namespace syncer.ui
                 MessageBox.Show("Error filtering logs: " + ex.Message, "Error",
                               MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+        */
+
+        // Note: Log Level filtering is now done through the Date & Time filter
+        // Users can still see log levels color-coded in the grid (Info, Warning, Error)
+        private void cmbLogLevel_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            // This method is kept for backward compatibility but does nothing
+            // Log Level combo box has been removed from the UI
         }
 
         private void dgvLogs_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
@@ -1046,7 +1042,7 @@ namespace syncer.ui
             
             // Set default file path suggestion
             string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string dataFolderPath = System.IO.Path.Combine(documentsPath, "FTPSyncerLogs");
+            string dataFolderPath = System.IO.Path.Combine(documentsPath, "DataSyncerLogs");
             string defaultPath = System.IO.Path.Combine(dataFolderPath, 
                 string.Format("syncer_realtime_{0:yyyyMMdd}.csv", DateTime.Now));
             txtRealTimeLogPath.Text = defaultPath;

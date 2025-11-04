@@ -107,7 +107,7 @@ namespace syncer.ui.Services
         /// <returns>A formatted status message</returns>
         public static string FormatStatusMessage(string serviceStatus, DateTime? lastSyncTime)
         {
-            string baseMessage = string.Format("Data Syncer - {0}", serviceStatus);
+            string baseMessage = string.Format("FTPSyncer - {0}", serviceStatus);
             
             if (lastSyncTime.HasValue)
             {

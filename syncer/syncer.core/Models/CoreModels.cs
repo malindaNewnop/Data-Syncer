@@ -65,7 +65,7 @@ namespace syncer.core
             EnableLogging = true;
             PipeName = "DataSyncerPipe";
             ServiceName = "DataSyncerService";
-            ServiceDisplayName = "Data Syncer Service";
+            ServiceDisplayName = "FTPSyncer Service";
             TempFolder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "\\DataSyncer\\Temp";
             LogFolder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "\\DataSyncer\\Logs";
 

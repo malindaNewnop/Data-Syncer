@@ -313,7 +313,7 @@ namespace syncer.core
             EnableLogging = true;
             PipeName = Paths.PipeName;
             ServiceName = "DataSyncerService";
-            ServiceDisplayName = "Data Syncer Service";
+            ServiceDisplayName = "FTPSyncer Service";
             TempFolder = Paths.TempFolder;
             
         }

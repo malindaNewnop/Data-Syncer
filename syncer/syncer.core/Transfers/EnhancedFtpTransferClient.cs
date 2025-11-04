@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Threading;
+using syncer.core.Utilities;
 
 namespace syncer.core.Transfers
 {
@@ -190,22 +191,64 @@ namespace syncer.core.Transfers
         public bool UploadFile(ConnectionSettings settings, string localPath, string remotePath, bool overwrite, out string error)
         {
             error = null;
+            string tempCopyPath = null;
+            bool usedTempCopy = false;
             
             for (int attempt = 0; attempt <= _defaultRetryCount; attempt++)
             {
                 if (_cancelRequested)
                 {
                     error = "Transfer was cancelled";
+                    
+                    // Clean up temp copy if created
+                    if (usedTempCopy && tempCopyPath != null)
+                    {
+                        LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                    }
+                    
                     return false;
                 }
 
                 try
                 {
-                    if (!File.Exists(localPath))
+                    // Only check for locked file on first attempt
+                    if (attempt == 0)
                     {
-                        error = $"Source file does not exist: {localPath}";
-                        return false;
+                        if (!File.Exists(localPath))
+                        {
+                            error = string.Format("Source file does not exist: {0}", localPath);
+                            return false;
+                        }
+
+                        // Check if source file is locked
+                        string lockError;
+                        if (LockedFileHandler.IsFileLocked(localPath, out lockError))
+                        {
+                            // File is locked - try to create a temporary copy
+                            tempCopyPath = LockedFileHandler.CreateTempCopy(localPath, out error);
+                            
+                            if (tempCopyPath == null)
+                            {
+                                error = string.Format("File is locked and temporary copy failed: {0}. Original error: {1}", 
+                                    error, lockError);
+                                return false;
+                            }
+                            
+                            // Verify the temp copy
+                            string verifyError;
+                            if (!LockedFileHandler.VerifyTempCopy(localPath, tempCopyPath, out verifyError))
+                            {
+                                LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                                error = string.Format("Temporary copy verification failed: {0}", verifyError);
+                                return false;
+                            }
+                            
+                            usedTempCopy = true;
+                        }
                     }
+                    
+                    // Use temp copy path if available, otherwise use original
+                    string sourceFilePath = usedTempCopy ? tempCopyPath : localPath;
 
                     // Normalize remote path
                     remotePath = remotePath.Replace('\\', '/');
@@ -213,7 +256,7 @@ namespace syncer.core.Transfers
                         remotePath = "/" + remotePath;
 
                     // Check if file exists and overwrite is false
-                    if (!overwrite)
+                    if (!overwrite && attempt == 0)
                     {
                         bool exists;
                         string checkError;
@@ -221,7 +264,14 @@ namespace syncer.core.Transfers
                         {
                             if (exists)
                             {
-                                error = $"Destination file already exists: {remotePath}";
+                                error = string.Format("Destination file already exists: {0}", remotePath);
+                                
+                                // Clean up temp copy if created
+                                if (usedTempCopy && tempCopyPath != null)
+                                {
+                                    LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                                }
+                                
                                 return false;
                             }
                         }
@@ -234,13 +284,20 @@ namespace syncer.core.Transfers
                         string dirError;
                         if (!EnsureDirectory(settings, remoteDir, out dirError))
                         {
-                            error = $"Failed to create remote directory: {dirError}";
+                            error = string.Format("Failed to create remote directory: {0}", dirError);
+                            
+                            // Clean up temp copy if created
+                            if (usedTempCopy && tempCopyPath != null)
+                            {
+                                LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                            }
+                            
                             return false;
                         }
                     }
 
                     // Get file size for progress tracking
-                    var fileInfo = new FileInfo(localPath);
+                    var fileInfo = new FileInfo(sourceFilePath);
                     _currentFileSize = fileInfo.Length;
                     _currentBytesTransferred = 0;
                     _transferStartTime = DateTime.Now;
@@ -252,7 +309,7 @@ namespace syncer.core.Transfers
                     request.ContentLength = _currentFileSize;
 
                     using (var requestStream = request.GetRequestStream())
-                    using (var fileStream = File.OpenRead(localPath))
+                    using (var fileStream = File.OpenRead(sourceFilePath))
                     {
                         byte[] buffer = new byte[8192]; // 8KB buffer for better performance
                         int bytesRead;
@@ -262,6 +319,13 @@ namespace syncer.core.Transfers
                             if (_cancelRequested)
                             {
                                 error = "Transfer was cancelled";
+                                
+                                // Clean up temp copy if created
+                                if (usedTempCopy && tempCopyPath != null)
+                                {
+                                    LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                                }
+                                
                                 return false;
                             }
 
@@ -282,43 +346,77 @@ namespace syncer.core.Transfers
                         if (response.StatusCode == FtpStatusCode.ClosingData ||
                             response.StatusCode == FtpStatusCode.FileActionOK)
                         {
+                            // Clean up temp copy if created
+                            if (usedTempCopy && tempCopyPath != null)
+                            {
+                                LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                            }
+                            
                             return true;
                         }
                         else
                         {
-                            error = $"Upload failed with status: {response.StatusCode} - {response.StatusDescription}";
+                            error = string.Format("Upload failed with status: {0} - {1}", 
+                                response.StatusCode, response.StatusDescription);
                             
                             if (attempt < _defaultRetryCount)
                             {
                                 Thread.Sleep(_defaultRetryDelayMs * (attempt + 1));
                                 continue;
                             }
+                            
+                            // Clean up temp copy if created
+                            if (usedTempCopy && tempCopyPath != null)
+                            {
+                                LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                            }
+                            
                             return false;
                         }
                     }
                 }
                 catch (WebException ex)
                 {
-                    error = $"Upload failed: {GetWebExceptionMessage(ex)}";
+                    error = string.Format("Upload failed: {0}", GetWebExceptionMessage(ex));
                     
                     if (attempt < _defaultRetryCount && !IsConnectionError(ex))
                     {
                         Thread.Sleep(_defaultRetryDelayMs * (attempt + 1));
                         continue;
                     }
+                    
+                    // Clean up temp copy if created
+                    if (usedTempCopy && tempCopyPath != null)
+                    {
+                        LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                    }
+                    
                     return false;
                 }
                 catch (Exception ex)
                 {
-                    error = $"Upload failed: {ex.Message}";
+                    error = string.Format("Upload failed: {0}", ex.Message);
                     
                     if (attempt < _defaultRetryCount)
                     {
                         Thread.Sleep(_defaultRetryDelayMs * (attempt + 1));
                         continue;
                     }
+                    
+                    // Clean up temp copy if created
+                    if (usedTempCopy && tempCopyPath != null)
+                    {
+                        LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                    }
+                    
                     return false;
                 }
+            }
+
+            // Clean up temp copy if created
+            if (usedTempCopy && tempCopyPath != null)
+            {
+                LockedFileHandler.CleanupTempCopy(tempCopyPath);
             }
 
             return false;
@@ -722,6 +820,98 @@ namespace syncer.core.Transfers
             return ex.Status == WebExceptionStatus.ConnectFailure ||
                    ex.Status == WebExceptionStatus.NameResolutionFailure ||
                    ex.Status == WebExceptionStatus.ProxyNameResolutionFailure;
+        }
+
+        /// <summary>
+        /// Get the last modified time of a remote file
+        /// </summary>
+        public bool GetFileModifiedTime(ConnectionSettings settings, string remotePath, out DateTime modifiedTime, out string error)
+        {
+            modifiedTime = DateTime.MinValue;
+            error = null;
+
+            try
+            {
+                if (string.IsNullOrEmpty(remotePath))
+                {
+                    error = "Remote file path cannot be empty";
+                    return false;
+                }
+
+                // Normalize path
+                remotePath = remotePath.Replace('\\', '/');
+                string ftpUrl = $"ftp://{settings.Host}:{settings.Port}{(remotePath.StartsWith("/") ? "" : "/")}{remotePath}";
+
+                FtpWebRequest request = (FtpWebRequest)WebRequest.Create(ftpUrl);
+                request.Method = WebRequestMethods.Ftp.GetDateTimestamp;
+                request.Credentials = new NetworkCredential(settings.Username, settings.Password);
+                request.UseBinary = true;
+                request.UsePassive = settings.UsePassiveMode;
+                request.KeepAlive = false;
+                request.Timeout = _connectionTimeoutMs;
+
+                using (FtpWebResponse response = (FtpWebResponse)request.GetResponse())
+                {
+                    modifiedTime = response.LastModified;
+                    return true;
+                }
+            }
+            catch (WebException ex)
+            {
+                error = $"Failed to get file modified time: {GetWebExceptionMessage(ex)}";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                error = $"Failed to get file modified time for '{remotePath}': {ex.Message}";
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Get the size of a remote file
+        /// </summary>
+        public bool GetFileSize(ConnectionSettings settings, string remotePath, out long fileSize, out string error)
+        {
+            fileSize = 0;
+            error = null;
+
+            try
+            {
+                if (string.IsNullOrEmpty(remotePath))
+                {
+                    error = "Remote file path cannot be empty";
+                    return false;
+                }
+
+                // Normalize path
+                remotePath = remotePath.Replace('\\', '/');
+                string ftpUrl = $"ftp://{settings.Host}:{settings.Port}{(remotePath.StartsWith("/") ? "" : "/")}{remotePath}";
+
+                FtpWebRequest request = (FtpWebRequest)WebRequest.Create(ftpUrl);
+                request.Method = WebRequestMethods.Ftp.GetFileSize;
+                request.Credentials = new NetworkCredential(settings.Username, settings.Password);
+                request.UseBinary = true;
+                request.UsePassive = settings.UsePassiveMode;
+                request.KeepAlive = false;
+                request.Timeout = _connectionTimeoutMs;
+
+                using (FtpWebResponse response = (FtpWebResponse)request.GetResponse())
+                {
+                    fileSize = response.ContentLength;
+                    return true;
+                }
+            }
+            catch (WebException ex)
+            {
+                error = $"Failed to get file size: {GetWebExceptionMessage(ex)}";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                error = $"Failed to get file size for '{remotePath}': {ex.Message}";
+                return false;
+            }
         }
     }
 }

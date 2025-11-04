@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using Renci.SshNet;
 using Renci.SshNet.Common;
+using syncer.core.Utilities;
 
 namespace syncer.core.Transfers
 {
@@ -215,12 +216,21 @@ namespace syncer.core.Transfers
         public bool UploadFile(ConnectionSettings settings, string localPath, string remotePath, bool overwrite, out string error)
         {
             error = null;
+            string tempCopyPath = null;
+            bool usedTempCopy = false;
             
             for (int attempt = 0; attempt <= _defaultRetryCount; attempt++)
             {
                 if (_cancelRequested)
                 {
                     error = "Transfer was cancelled";
+                    
+                    // Clean up temp copy if created
+                    if (usedTempCopy && tempCopyPath != null)
+                    {
+                        LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                    }
+                    
                     return false;
                 }
 
@@ -228,11 +238,44 @@ namespace syncer.core.Transfers
                 
                 try
                 {
-                    if (!File.Exists(localPath))
+                    // Only check for locked file on first attempt
+                    if (attempt == 0)
                     {
-                        error = $"Source file does not exist: {localPath}";
-                        return false;
+                        if (!File.Exists(localPath))
+                        {
+                            error = string.Format("Source file does not exist: {0}", localPath);
+                            return false;
+                        }
+
+                        // Check if source file is locked
+                        string lockError;
+                        if (LockedFileHandler.IsFileLocked(localPath, out lockError))
+                        {
+                            // File is locked - try to create a temporary copy
+                            tempCopyPath = LockedFileHandler.CreateTempCopy(localPath, out error);
+                            
+                            if (tempCopyPath == null)
+                            {
+                                error = string.Format("File is locked and temporary copy failed: {0}. Original error: {1}", 
+                                    error, lockError);
+                                return false;
+                            }
+                            
+                            // Verify the temp copy
+                            string verifyError;
+                            if (!LockedFileHandler.VerifyTempCopy(localPath, tempCopyPath, out verifyError))
+                            {
+                                LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                                error = string.Format("Temporary copy verification failed: {0}", verifyError);
+                                return false;
+                            }
+                            
+                            usedTempCopy = true;
+                        }
                     }
+                    
+                    // Use temp copy path if available, otherwise use original
+                    string sourceFilePath = usedTempCopy ? tempCopyPath : localPath;
 
                     // Normalize remote path for Unix/Linux systems
                     remotePath = remotePath.Replace('\\', '/');
@@ -246,7 +289,14 @@ namespace syncer.core.Transfers
                         var attrs = client.GetAttributes(remotePath);
                         if (attrs.IsRegularFile)
                         {
-                            error = $"Destination file already exists: {remotePath}";
+                            error = string.Format("Destination file already exists: {0}", remotePath);
+                            
+                            // Clean up temp copy if created
+                            if (usedTempCopy && tempCopyPath != null)
+                            {
+                                LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                            }
+                            
                             return false;
                         }
                     }
@@ -261,7 +311,14 @@ namespace syncer.core.Transfers
                         
                         if (!EnsureDirectory(settings, remoteDir, out dirError))
                         {
-                            error = $"Failed to create remote directory: {dirError}";
+                            error = string.Format("Failed to create remote directory: {0}", dirError);
+                            
+                            // Clean up temp copy if created
+                            if (usedTempCopy && tempCopyPath != null)
+                            {
+                                LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                            }
+                            
                             return false;
                         }
                         
@@ -271,13 +328,13 @@ namespace syncer.core.Transfers
                     }
 
                     // Get file size for progress tracking
-                    var fileInfo = new FileInfo(localPath);
+                    var fileInfo = new FileInfo(sourceFilePath);
                     _currentFileSize = fileInfo.Length;
                     _currentBytesTransferred = 0;
                     _transferStartTime = DateTime.Now;
 
                     // Upload with progress callback
-                    using (var fileStream = File.OpenRead(localPath))
+                    using (var fileStream = File.OpenRead(sourceFilePath))
                     {
                         client.UploadFile(fileStream, remotePath, overwrite, (bytesUploaded) =>
                         {
@@ -299,17 +356,31 @@ namespace syncer.core.Transfers
                         var remoteAttrs = client.GetAttributes(remotePath);
                         if (remoteAttrs.Size == _currentFileSize)
                         {
+                            // Clean up temp copy if created
+                            if (usedTempCopy && tempCopyPath != null)
+                            {
+                                LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                            }
+                            
                             return true;
                         }
                         else
                         {
-                            error = $"Upload verification failed: file sizes do not match (local: {_currentFileSize}, remote: {remoteAttrs.Size})";
+                            error = string.Format("Upload verification failed: file sizes do not match (local: {0}, remote: {1})", 
+                                _currentFileSize, remoteAttrs.Size);
                             
                             if (attempt < _defaultRetryCount)
                             {
                                 Thread.Sleep(_defaultRetryDelayMs * (attempt + 1));
                                 continue;
                             }
+                            
+                            // Clean up temp copy if created
+                            if (usedTempCopy && tempCopyPath != null)
+                            {
+                                LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                            }
+                            
                             return false;
                         }
                     }
@@ -322,39 +393,74 @@ namespace syncer.core.Transfers
                             Thread.Sleep(_defaultRetryDelayMs * (attempt + 1));
                             continue;
                         }
+                        
+                        // Clean up temp copy if created
+                        if (usedTempCopy && tempCopyPath != null)
+                        {
+                            LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                        }
+                        
                         return false;
                     }
                 }
                 catch (SshConnectionException ex)
                 {
-                    error = $"SFTP connection failed during upload: {ex.Message}";
+                    error = string.Format("SFTP connection failed during upload: {0}", ex.Message);
                     
                     if (attempt < _defaultRetryCount)
                     {
                         Thread.Sleep(_defaultRetryDelayMs * (attempt + 1));
                         continue;
                     }
+                    
+                    // Clean up temp copy if created
+                    if (usedTempCopy && tempCopyPath != null)
+                    {
+                        LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                    }
+                    
                     return false;
                 }
                 catch (SftpPermissionDeniedException ex)
                 {
-                    error = $"Permission denied during upload: {ex.Message}";
+                    error = string.Format("Permission denied during upload: {0}", ex.Message);
+                    
+                    // Clean up temp copy if created
+                    if (usedTempCopy && tempCopyPath != null)
+                    {
+                        LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                    }
+                    
                     return false; // Don't retry permission errors
                 }
                 catch (SftpPathNotFoundException ex)
                 {
-                    error = $"Remote path not found during upload: {ex.Message}";
+                    error = string.Format("Remote path not found during upload: {0}", ex.Message);
+                    
+                    // Clean up temp copy if created
+                    if (usedTempCopy && tempCopyPath != null)
+                    {
+                        LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                    }
+                    
                     return false; // Don't retry path errors
                 }
                 catch (Exception ex)
                 {
-                    error = $"Upload failed: {ex.Message}";
+                    error = string.Format("Upload failed: {0}", ex.Message);
                     
                     if (attempt < _defaultRetryCount)
                     {
                         Thread.Sleep(_defaultRetryDelayMs * (attempt + 1));
                         continue;
                     }
+                    
+                    // Clean up temp copy if created
+                    if (usedTempCopy && tempCopyPath != null)
+                    {
+                        LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                    }
+                    
                     return false;
                 }
                 finally
@@ -365,6 +471,12 @@ namespace syncer.core.Transfers
                         client.Dispose();
                     }
                 }
+            }
+
+            // Clean up temp copy if created
+            if (usedTempCopy && tempCopyPath != null)
+            {
+                LockedFileHandler.CleanupTempCopy(tempCopyPath);
             }
 
             return false;
@@ -794,6 +906,140 @@ namespace syncer.core.Transfers
                 return filePath.Substring(0, lastSlash);
             }
             return string.Empty;
+        }
+
+        /// <summary>
+        /// Get the last modified time of a remote file
+        /// </summary>
+        public bool GetFileModifiedTime(ConnectionSettings settings, string remotePath, out DateTime modifiedTime, out string error)
+        {
+            modifiedTime = DateTime.MinValue;
+            error = null;
+            SftpClient client = null;
+
+            try
+            {
+                if (string.IsNullOrEmpty(remotePath))
+                {
+                    error = "Remote file path cannot be empty";
+                    return false;
+                }
+
+                client = CreateSftpClient(settings);
+                client.Connect();
+
+                // Normalize path separators
+                remotePath = remotePath.Replace('\\', '/');
+
+                // Check if file exists
+                if (!client.Exists(remotePath))
+                {
+                    error = $"Remote file not found: {remotePath}";
+                    return false;
+                }
+
+                // Get file attributes
+                var attrs = client.GetAttributes(remotePath);
+                if (!attrs.IsRegularFile)
+                {
+                    error = $"Path is not a file: {remotePath}";
+                    return false;
+                }
+
+                // Get last write time
+                modifiedTime = attrs.LastWriteTime;
+                return true;
+            }
+            catch (SshConnectionException ex)
+            {
+                error = $"SFTP connection failed while getting file modified time: {ex.Message}";
+                return false;
+            }
+            catch (SftpPathNotFoundException ex)
+            {
+                error = $"File not found: {ex.Message}";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                error = $"Failed to get file modified time for '{remotePath}': {ex.Message}";
+                return false;
+            }
+            finally
+            {
+                if (client != null && client.IsConnected)
+                {
+                    try { client.Disconnect(); } catch { }
+                    client.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Get the size of a remote file
+        /// </summary>
+        public bool GetFileSize(ConnectionSettings settings, string remotePath, out long fileSize, out string error)
+        {
+            fileSize = 0;
+            error = null;
+            SftpClient client = null;
+
+            try
+            {
+                if (string.IsNullOrEmpty(remotePath))
+                {
+                    error = "Remote file path cannot be empty";
+                    return false;
+                }
+
+                client = CreateSftpClient(settings);
+                client.Connect();
+
+                // Normalize path separators
+                remotePath = remotePath.Replace('\\', '/');
+
+                // Check if file exists
+                if (!client.Exists(remotePath))
+                {
+                    error = $"Remote file not found: {remotePath}";
+                    return false;
+                }
+
+                // Get file attributes
+                var attrs = client.GetAttributes(remotePath);
+                if (!attrs.IsRegularFile)
+                {
+                    error = $"Path is not a file: {remotePath}";
+                    return false;
+                }
+
+                // Get file size
+                fileSize = attrs.Size;
+                return true;
+            }
+            catch (SshConnectionException ex)
+            {
+                error = $"SFTP connection failed while getting file size: {ex.Message}";
+                return false;
+            }
+            catch (SftpPathNotFoundException ex)
+            {
+                error = $"File not found: {ex.Message}";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                error = $"Failed to get file size for '{remotePath}': {ex.Message}";
+                return false;
+            }
+            finally
+            {
+                if (client != null && client.IsConnected)
+                {
+                    try { client.Disconnect(); } catch { }
+                    client.Dispose();
+                }
+            }
         }
     }
 }

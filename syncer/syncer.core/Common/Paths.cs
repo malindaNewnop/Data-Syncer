@@ -4,7 +4,7 @@ using System.IO;
 namespace syncer.core
 {
     /// <summary>
-    /// Path utilities for the Data Syncer application
+    /// Path utilities for the FTPSyncer application
     /// .NET 3.5 Compatible
     /// </summary>
     public static class Paths

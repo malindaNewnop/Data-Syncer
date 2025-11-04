@@ -19,7 +19,7 @@ namespace syncer.ui.Forms
                 
                 // Initialize auto-start service
                 var coreLogService = new syncer.core.FileLogService();
-                _autoStartService = new AutoStartService("Data Syncer", coreLogService);
+                _autoStartService = new AutoStartService("FTPSyncer", coreLogService);
                 
                 LoadSettings();
             }

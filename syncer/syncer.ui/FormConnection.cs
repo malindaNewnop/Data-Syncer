@@ -971,7 +971,7 @@ namespace syncer.ui
                 // Save connection to Windows Registry or config file
                 // This is a simplified implementation - in production you'd want encrypted storage
                 
-                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey("Software\\FTPSyncer\\Connections"))
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey("Software\\DataSyncer\\Connections"))
                 {
                     using (Microsoft.Win32.RegistryKey connectionKey = key.CreateSubKey(connectionName))
                     {

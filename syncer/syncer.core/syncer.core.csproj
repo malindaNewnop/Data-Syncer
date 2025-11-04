@@ -66,6 +66,7 @@
     <Compile Include="Services\EnhancedSettingsService.cs" />
     <Compile Include="Services\EnhancedTransferClientFactory.cs" />
     <Compile Include="Services\TransferEngine.cs" />
+    <Compile Include="Utilities\LockedFileHandler.cs" />
     <Compile Include="Utilities\SimpleJsonSerializer.cs" />
     <Compile Include="StringExtensions.cs" />
     <Compile Include="Transfers\LocalTransferClient.cs" />

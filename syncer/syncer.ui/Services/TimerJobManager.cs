@@ -50,6 +50,12 @@ namespace syncer.ui.Services
             public List<string> IncludeExtensions { get; set; } // Extensions to include (takes priority)
             public List<string> ExcludeExtensions { get; set; } // Extensions to exclude
 
+            // File state tracking for incremental transfers
+            public FileStateTracker FileStateTracker { get; set; } // Tracks file modifications to enable incremental transfers
+            
+            // Locked file retry management
+            public FileRetryManager FileRetryManager { get; set; } // Manages retry logic for locked files
+
         }
 
         #region Persistence Classes
@@ -83,11 +89,19 @@ namespace syncer.ui.Services
             public string SshKeyPath { get; set; }
             public int ConnectionTimeout { get; set; }
             public bool UsePassiveMode { get; set; }
+            
+            // File state tracking for incremental transfers
+            public Dictionary<string, FileState> FileStates { get; set; }
+            
+            // Locked file retry tracking
+            public Dictionary<string, LockedFileInfo> LockedFiles { get; set; }
 
             public PersistentTimerJob()
             {
                 IncludeExtensions = new List<string>();
                 ExcludeExtensions = new List<string>();
+                FileStates = new Dictionary<string, FileState>();
+                LockedFiles = new Dictionary<string, LockedFileInfo>();
                 SavedTime = DateTime.Now;
             }
         }
@@ -114,7 +128,7 @@ namespace syncer.ui.Services
         #endregion
 
         private static readonly string TimerJobsStateFilePath = Path.Combine(
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FTPSyncer"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataSyncer"),
             "TimerJobsState.xml");
 
         public TimerJobManager()
@@ -176,6 +190,8 @@ namespace syncer.ui.Services
                     // Initialize new properties if they don't exist
                     if (!job.IsUploadInProgress) job.IsUploadInProgress = false;
                     if (job.UploadStartTime == null) job.UploadStartTime = null;
+                    if (job.FileStateTracker == null) job.FileStateTracker = new FileStateTracker(); // Initialize file state tracker if missing
+                    if (job.FileRetryManager == null) job.FileRetryManager = new FileRetryManager(); // Initialize file retry manager if missing
 
                     // Update timer interval if running
                     if (job.Timer != null && job.IsRunning)
@@ -256,6 +272,8 @@ namespace syncer.ui.Services
                     EnableFilters = enableFilters,
                     IncludeExtensions = includeExtensions != null ? new List<string>(includeExtensions) : new List<string>(),
                     ExcludeExtensions = excludeExtensions != null ? new List<string>(excludeExtensions) : new List<string>(),
+                    FileStateTracker = new FileStateTracker(), // Initialize file state tracker for incremental transfers
+                    FileRetryManager = new FileRetryManager(), // Initialize file retry manager for locked files
                 };
 
                 _timerJobs.Add(jobId, newJob);
@@ -731,181 +749,6 @@ namespace syncer.ui.Services
             });
         }
 
-        private void HandleUploadJob(TimerJobInfo job, long jobId)
-        {
-            try
-            {
-                // Prevent overlapping uploads
-                if (job.IsUploadInProgress)
-                {
-                    TimeSpan uploadDuration = DateTime.Now - (job.UploadStartTime ?? DateTime.Now);
-                    _logService.LogWarning(string.Format("Skipping timer cycle for job {0} - previous upload still in progress (running for {1:mm\\:ss})",
-                        jobId, uploadDuration));
-                    return;
-                }
-
-                _logService.LogInfo(string.Format("Timer elapsed for job {0} - starting folder upload", jobId));
-
-                // Get files based on subfolder inclusion setting
-                SearchOption searchOption = job.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-                string[] allFiles = Directory.GetFiles(job.FolderPath, "*", searchOption);
-
-                // Apply filtering if enabled
-                string[] currentFiles;
-                if (job.EnableFilters && (job.IncludeExtensions.Count > 0 || job.ExcludeExtensions.Count > 0))
-                {
-                    var filteredFiles = new List<string>();
-
-                    foreach (string file in allFiles)
-                    {
-                        string fileName = Path.GetFileName(file);
-                        string fileExt = Path.GetExtension(file);
-                        if (!string.IsNullOrEmpty(fileExt))
-                        {
-                            fileExt = fileExt.TrimStart('.').ToLowerInvariant();
-                        }
-
-                        bool shouldInclude = true;
-
-                        // Apply include filter (if any)
-                        if (job.IncludeExtensions.Count > 0)
-                        {
-                            shouldInclude = false; // Default to exclude if include list exists
-                            foreach (string includeExt in job.IncludeExtensions)
-                            {
-                                if (string.Equals(fileExt, includeExt.TrimStart('.').ToLowerInvariant(), StringComparison.OrdinalIgnoreCase))
-                                {
-                                    shouldInclude = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        // Apply exclude filter (only if not already excluded by include filter)
-                        if (shouldInclude && job.ExcludeExtensions.Count > 0)
-                        {
-                            foreach (string excludeExt in job.ExcludeExtensions)
-                            {
-                                if (string.Equals(fileExt, excludeExt.TrimStart('.').ToLowerInvariant(), StringComparison.OrdinalIgnoreCase))
-                                {
-                                    shouldInclude = false;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (shouldInclude)
-                        {
-                            filteredFiles.Add(file);
-                        }
-                    }
-
-                    currentFiles = filteredFiles.ToArray();
-                    _logService.LogInfo(string.Format("TIMER JOB FILTER RESULT: {0} files out of {1} total files match the filter criteria",
-                        currentFiles.Length, allFiles.Length));
-                }
-                else
-                {
-                    // No filtering enabled - use all files
-                    currentFiles = allFiles;
-                    _logService.LogInfo("TIMER JOB: No file filtering applied - including all files");
-                }
-
-                // Also ensure empty directories are created on remote (only if including subfolders)
-                string[] allDirectories = job.IncludeSubfolders ?
-                    Directory.GetDirectories(job.FolderPath, "*", SearchOption.AllDirectories) :
-                    new string[0]; // No subdirectories if not including subfolders
-
-                _logService.LogInfo(string.Format("Found {0} files and {1} directories in folder {2} (subfolders: {3})",
-                    currentFiles.Length, allDirectories.Length, job.FolderPath, job.IncludeSubfolders ? "included" : "excluded"));
-
-                // Create empty directories first
-                foreach (string directory in allDirectories)
-                {
-                    try
-                    {
-                        string relativeDirPath = directory.Substring(job.FolderPath.Length);
-                        if (relativeDirPath.StartsWith("\\") || relativeDirPath.StartsWith("/"))
-                        {
-                            relativeDirPath = relativeDirPath.Substring(1);
-                        }
-
-                        string normalizedRemotePath = job.RemotePath.Replace('\\', '/');
-                        if (!normalizedRemotePath.EndsWith("/")) normalizedRemotePath += "/";
-
-                        string remoteDirectory = normalizedRemotePath + relativeDirPath.Replace('\\', '/');
-
-                        string dirError = null;
-                        if (job.TransferClient.EnsureDirectory(job.ConnectionSettings, remoteDirectory, out dirError))
-                        {
-                            _logService.LogInfo(string.Format("Created/ensured remote directory: {0}", remoteDirectory));
-                        }
-                        else
-                        {
-                            _logService.LogWarning(string.Format("Failed to create remote directory {0}: {1}",
-                                remoteDirectory, dirError ?? "Unknown error"));
-                        }
-                    }
-                    catch (Exception dirEx)
-                    {
-                        _logService.LogError(string.Format("Error processing directory {0}: {1}", directory, dirEx.Message));
-                    }
-                }
-
-                if (currentFiles.Length == 0 && allDirectories.Length == 0)
-                {
-                    _logService.LogWarning(string.Format("No files or directories found in folder {0} for timer job {1}", job.FolderPath, jobId));
-                    return;
-                }
-
-                if (currentFiles.Length == 0)
-                {
-                    _logService.LogInfo(string.Format("No files to upload, but {0} empty directories were processed for timer job {1}", allDirectories.Length, jobId));
-                    return;
-                }
-
-                // Mark upload as in progress and start background upload
-                job.IsUploadInProgress = true;
-                job.UploadStartTime = DateTime.Now;
-
-                // Perform the upload asynchronously to prevent blocking the timer
-                System.Threading.ThreadPool.QueueUserWorkItem(state =>
-                {
-                    try
-                    {
-                        PerformFolderUpload(job, currentFiles);
-
-                        // Update last upload time
-                        job.LastUploadTime = DateTime.Now;
-
-                        TimeSpan totalDuration = DateTime.Now - job.UploadStartTime.Value;
-                        _logService.LogInfo(string.Format("Upload cycle completed for job {0} in {1:mm\\:ss}",
-                            jobId, totalDuration));
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(string.Format("Error in background upload for job {0}: {1}", jobId, ex.Message));
-                    }
-                    finally
-                    {
-                        // Always reset the upload in progress flag
-                        job.IsUploadInProgress = false;
-                        job.UploadStartTime = null;
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(string.Format("Error in timer job {0}: {1}", jobId, ex.Message));
-
-                // Ensure we reset the flag even if there's an error
-                if (_timerJobs.ContainsKey(jobId))
-                {
-                    _timerJobs[jobId].IsUploadInProgress = false;
-                    _timerJobs[jobId].UploadStartTime = null;
-                }
-            }
-        }
 
         /// <summary>
         /// Apply file filtering based on job settings
@@ -1054,8 +897,37 @@ namespace syncer.ui.Services
                                 _logService.LogInfo(string.Format("Created local directory: {0}", localDir));
                             }
 
+                            // Get remote file information to check if it should be transferred
+                            DateTime remoteModifiedTime = DateTime.MinValue;
+                            long remoteFileSize = 0;
+                            string fileInfoError;
+                            
+                            bool hasModTime = job.TransferClient.GetFileModifiedTime(job.ConnectionSettings, remoteFile, out remoteModifiedTime, out fileInfoError);
+                            bool hasSize = job.TransferClient.GetFileSize(job.ConnectionSettings, remoteFile, out remoteFileSize, out fileInfoError);
+                            
+                            if (!hasModTime || !hasSize)
+                            {
+                                _logService.LogWarning(string.Format("Could not get remote file info for {0}, will transfer anyway", fileName));
+                                // Set defaults if we can't get file info - transfer the file
+                                remoteModifiedTime = DateTime.Now;
+                                remoteFileSize = 0;
+                            }
+
+                            // Check if file should be transferred (new or modified)
+                            bool shouldTransfer = job.FileStateTracker.ShouldTransferFile(remoteFile, remoteModifiedTime, remoteFileSize);
+                            
+                            if (!shouldTransfer)
+                            {
+                                _logService.LogInfo(string.Format("Skipping unchanged remote file: {0} (last modified: {1}, size: {2} bytes)", 
+                                    fileName, remoteModifiedTime.ToString("yyyy-MM-dd HH:mm:ss"), remoteFileSize));
+                                skippedFiles++;
+                                continue;
+                            }
+
                             // Download the file
-                            _logService.LogInfo(string.Format("Downloading: {0} -> {1}", remoteFile, localFile));
+                            _logService.LogInfo(string.Format("Downloading {0}: {1} -> {2}", 
+                                shouldTransfer && job.FileStateTracker.GetFileState(remoteFile) != null ? "modified" : "new", 
+                                remoteFile, localFile));
 
                             string error = null;
                             DateTime transferStart = DateTime.Now;
@@ -1077,6 +949,10 @@ namespace syncer.ui.Services
                                 FileInfo localFileInfo = new FileInfo(localFile);
                                 _logService.LogInfo(string.Format("Successfully downloaded: {0} ({1} bytes)", fileName, localFileInfo.Length));
                                 successfulDownloads++;
+
+                                // Update file state tracker after successful download
+                                job.FileStateTracker.UpdateFileState(remoteFile, remoteModifiedTime, remoteFileSize);
+                                _logService.LogInfo(string.Format("File state updated for remote file: {0}", fileName));
 
                                 // Update bandwidth tracking for download speed
                                 try
@@ -1104,6 +980,9 @@ namespace syncer.ui.Services
                                         if (job.TransferClient.DeleteFile(job.ConnectionSettings, remoteFile, out deleteError))
                                         {
                                             _logService.LogInfo(string.Format("Source file deleted after successful download: {0}", remoteFile));
+                                            
+                                            // Remove from file state tracker since file is deleted
+                                            job.FileStateTracker.RemoveFileState(remoteFile);
                                         }
                                         else
                                         {
@@ -1202,21 +1081,6 @@ namespace syncer.ui.Services
                                 continue;
                             }
 
-                            // Skip files that are currently being written to or locked
-                            try
-                            {
-                                using (FileStream stream = File.Open(localFile, FileMode.Open, FileAccess.Read, FileShare.Read))
-                                {
-                                    // File is accessible
-                                }
-                            }
-                            catch (IOException)
-                            {
-                                _logService.LogWarning(string.Format("File is locked or being used: {0}", localFile));
-                                skippedFiles++;
-                                continue;
-                            }
-
                             // Calculate relative path from base folder
                             string relativePath = localFile.Substring(job.FolderPath.Length);
                             if (relativePath.StartsWith("\\") || relativePath.StartsWith("/"))
@@ -1267,12 +1131,31 @@ namespace syncer.ui.Services
                             // Calculate the remote file path
                             string remoteFile = normalizedRemotePath + relativePath.Replace('\\', '/');
 
-                            // Upload the file
+                            // Get file information
                             string fileName = Path.GetFileName(localFile);
-                            _logService.LogInfo(string.Format("Uploading: {0} -> {1}", localFile, remoteFile));
-
                             FileInfo fileInfo = new FileInfo(localFile);
-                            _logService.LogInfo(string.Format("Local file size: {0} bytes", fileInfo.Length));
+                            DateTime fileModifiedTime = fileInfo.LastWriteTime;
+                            long fileSize = fileInfo.Length;
+
+                            // Check if file should be transferred (new or modified)
+                            bool shouldTransfer = job.FileStateTracker.ShouldTransferFile(localFile, fileModifiedTime, fileSize);
+                            
+                            if (!shouldTransfer)
+                            {
+                                _logService.LogInfo(string.Format("Skipping unchanged file: {0} (last modified: {1}, size: {2} bytes)", 
+                                    fileName, fileModifiedTime.ToString("yyyy-MM-dd HH:mm:ss"), fileSize));
+                                skippedFiles++;
+                                
+                                // Remove from locked files tracker if it was previously locked
+                                job.FileRetryManager.MarkFileTransferred(localFile);
+                                continue;
+                            }
+
+                            // Upload the file - the transfer client will handle locked files by creating temp copies
+                            _logService.LogInfo(string.Format("Uploading {0}: {1} -> {2}", 
+                                shouldTransfer && job.FileStateTracker.GetFileState(localFile) != null ? "modified" : "new", 
+                                localFile, remoteFile));
+                            _logService.LogInfo(string.Format("Local file size: {0} bytes", fileSize));
 
                             string error = null;
                             DateTime transferStart = DateTime.Now;
@@ -1286,13 +1169,28 @@ namespace syncer.ui.Services
                                 _logService.LogError(errorMsg);
                                 failedUploads++;
 
+                                // Check if the error is due to file locking
+                                if (error != null && (error.Contains("locked") || error.Contains("being used") || error.Contains("temporary copy failed")))
+                                {
+                                    // Track this file for retry in next iteration
+                                    job.FileRetryManager.TrackLockedFile(localFile, error);
+                                    _logService.LogWarning(string.Format("File '{0}' appears to be locked. Tracked for retry in next iteration.", fileName));
+                                }
+
                                 // Don't break here - continue trying to upload other files
                                 // This ensures all files get an attempt even if some fail
                             }
                             else
                             {
-                                _logService.LogInfo(string.Format("Successfully uploaded: {0} ({1} bytes)", fileName, fileInfo.Length));
+                                _logService.LogInfo(string.Format("Successfully uploaded: {0} ({1} bytes)", fileName, fileSize));
                                 successfulUploads++;
+
+                                // Update file state tracker after successful upload
+                                job.FileStateTracker.UpdateFileState(localFile, fileModifiedTime, fileSize);
+                                _logService.LogInfo(string.Format("File state updated for: {0}", fileName));
+
+                                // Mark file as successfully transferred (remove from locked files if it was tracked)
+                                job.FileRetryManager.MarkFileTransferred(localFile);
 
                                 // Update bandwidth tracking for upload speed
                                 try
@@ -1301,9 +1199,9 @@ namespace syncer.ui.Services
                                     double transferDurationSeconds = (transferEnd - transferStart).TotalSeconds;
                                     if (transferDurationSeconds > 0)
                                     {
-                                        bandwidthService.UpdateUploadSpeed(fileInfo.Length, transferDurationSeconds);
+                                        bandwidthService.UpdateUploadSpeed(fileSize, transferDurationSeconds);
                                         _logService.LogInfo(string.Format("Upload speed updated: {0} bytes in {1:F2} seconds ({2:F0} bytes/second)", 
-                                            fileInfo.Length, transferDurationSeconds, fileInfo.Length / transferDurationSeconds));
+                                            fileSize, transferDurationSeconds, fileSize / transferDurationSeconds));
                                     }
                                 }
                                 catch (Exception speedEx)
@@ -1318,6 +1216,9 @@ namespace syncer.ui.Services
                                     {
                                         File.Delete(localFile);
                                         _logService.LogInfo(string.Format("Source file deleted after successful upload: {0}", localFile));
+                                        
+                                        // Remove from file state tracker since file is deleted
+                                        job.FileStateTracker.RemoveFileState(localFile);
                                     }
                                     catch (Exception deleteEx)
                                     {
@@ -1364,6 +1265,21 @@ namespace syncer.ui.Services
 
                 _logService.LogInfo(string.Format("Folder upload completed for job {0}. Results: {1} successful, {2} failed, {3} skipped out of {4} total files",
                     job.JobId, successfulUploads, failedUploads, skippedFiles, localFilePaths.Length));
+                
+                // Report on locked files that will be retried in next iteration
+                int lockedFileCount = job.FileRetryManager.GetLockedFileCount();
+                if (lockedFileCount > 0)
+                {
+                    _logService.LogWarning(string.Format("Job {0}: {1} file(s) remain locked and will be retried in the next iteration", 
+                        job.JobId, lockedFileCount));
+                    
+                    var lockedFiles = job.FileRetryManager.GetAllLockedFiles();
+                    foreach (var lockedFile in lockedFiles)
+                    {
+                        _logService.LogInfo(string.Format("  - {0} (retry count: {1}, last error: {2})", 
+                            Path.GetFileName(lockedFile.FilePath), lockedFile.RetryCount, lockedFile.LastError));
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -1440,6 +1356,7 @@ namespace syncer.ui.Services
                     // Initialize download-specific properties if they don't exist
                     if (!job.IsDownloadInProgress) job.IsDownloadInProgress = false;
                     if (job.DownloadStartTime == null) job.DownloadStartTime = null;
+                    if (job.FileStateTracker == null) job.FileStateTracker = new FileStateTracker(); // Initialize file state tracker if missing
                     
                     // Update timer interval if running
                     if (job.Timer != null && job.IsRunning)
@@ -1520,6 +1437,8 @@ namespace syncer.ui.Services
                     EnableFilters = enableFilters,
                     IncludeExtensions = includeExtensions != null ? new List<string>(includeExtensions) : new List<string>(),
                     ExcludeExtensions = excludeExtensions != null ? new List<string>(excludeExtensions) : new List<string>(),
+                    FileStateTracker = new FileStateTracker(), // Initialize file state tracker for incremental transfers
+                    FileRetryManager = new FileRetryManager(), // Initialize file retry manager for locked files
                 };
                 
                 _timerJobs.Add(jobId, newJob);
@@ -1679,6 +1598,23 @@ namespace syncer.ui.Services
                         persistentJob.SshKeyPath = job.ConnectionSettings.SshKeyPath;
                         persistentJob.ConnectionTimeout = job.ConnectionSettings.Timeout;
                         persistentJob.UsePassiveMode = job.ConnectionSettings.UsePassiveMode;
+                    }
+
+                    // Save file state tracking data
+                    if (job.FileStateTracker != null)
+                    {
+                        persistentJob.FileStates = job.FileStateTracker.GetAllFileStates();
+                        _logService.LogInfo(string.Format("Saved {0} file states for job {1}", persistentJob.FileStates.Count, job.JobId));
+                    }
+
+                    // Save locked file tracking data
+                    if (job.FileRetryManager != null)
+                    {
+                        persistentJob.LockedFiles = job.FileRetryManager.GetAllLockedFileStates();
+                        if (persistentJob.LockedFiles.Count > 0)
+                        {
+                            _logService.LogInfo(string.Format("Saved {0} locked file states for job {1}", persistentJob.LockedFiles.Count, job.JobId));
+                        }
                     }
 
                     state.Jobs.Add(persistentJob);
@@ -1903,8 +1839,23 @@ namespace syncer.ui.Services
                     IsDownloadJob = persistentJob.IsDownloadJob,
                     EnableFilters = persistentJob.EnableFilters,
                     IncludeExtensions = persistentJob.IncludeExtensions ?? new List<string>(),
-                    ExcludeExtensions = persistentJob.ExcludeExtensions ?? new List<string>()
+                    ExcludeExtensions = persistentJob.ExcludeExtensions ?? new List<string>(),
+                    FileStateTracker = new FileStateTracker() // Initialize file state tracker
                 };
+
+                // Restore file state tracking data
+                if (persistentJob.FileStates != null && persistentJob.FileStates.Count > 0)
+                {
+                    timerJob.FileStateTracker.SetAllFileStates(persistentJob.FileStates);
+                    _logService.LogInfo(string.Format("Restored {0} file states for job {1}", persistentJob.FileStates.Count, persistentJob.JobId));
+                }
+
+                // Restore locked file tracking data
+                if (persistentJob.LockedFiles != null && persistentJob.LockedFiles.Count > 0)
+                {
+                    timerJob.FileRetryManager.SetAllLockedFileStates(persistentJob.LockedFiles);
+                    _logService.LogInfo(string.Format("Restored {0} locked file states for job {1}", persistentJob.LockedFiles.Count, persistentJob.JobId));
+                }
 
                 // Setup timer
                 timerJob.Timer = new System.Timers.Timer();
@@ -2030,5 +1981,265 @@ namespace syncer.ui.Services
         }
 
         #endregion
+
+        /// <summary>
+        /// Check if a file should be skipped (temporary files, lock files, etc.)
+        /// </summary>
+        private bool ShouldSkipFile(string filePath)
+        {
+            try
+            {
+                string fileName = Path.GetFileName(filePath);
+                
+                if (string.IsNullOrEmpty(fileName))
+                    return true;
+                
+                // Skip Microsoft Office temporary/lock files
+                if (fileName.StartsWith("~$"))
+                {
+                    _logService.LogInfo(string.Format("Skipping Office lock file: {0}", fileName));
+                    return true;
+                }
+                
+                // Skip temporary files
+                if (fileName.StartsWith("~") && fileName.EndsWith(".tmp"))
+                {
+                    _logService.LogInfo(string.Format("Skipping temporary file: {0}", fileName));
+                    return true;
+                }
+                
+                // Skip hidden/system files
+                FileAttributes attributes = File.GetAttributes(filePath);
+                if ((attributes & FileAttributes.Hidden) == FileAttributes.Hidden ||
+                    (attributes & FileAttributes.System) == FileAttributes.System ||
+                    (attributes & FileAttributes.Temporary) == FileAttributes.Temporary)
+                {
+                    _logService.LogInfo(string.Format("Skipping hidden/system/temp file: {0}", fileName));
+                    return true;
+                }
+                
+                return false;
+            }
+            catch (Exception ex)
+            {
+                // If we can't determine, don't skip
+                _logService.LogWarning(string.Format("Error checking if file should be skipped '{0}': {1}", filePath, ex.Message));
+                return false;
+            }
+        }
+
+        private void HandleUploadJob(TimerJobInfo job, long jobId)
+        {
+            try
+            {
+                // Prevent overlapping uploads
+                if (job.IsUploadInProgress)
+                {
+                    TimeSpan uploadDuration = DateTime.Now - (job.UploadStartTime ?? DateTime.Now);
+                    _logService.LogWarning(string.Format("Skipping timer cycle for job {0} - previous upload still in progress (running for {1:mm\\:ss})",
+                        jobId, uploadDuration));
+                    return;
+                }
+
+                _logService.LogInfo(string.Format("Timer elapsed for job {0} - starting folder upload", jobId));
+
+                // Get files based on subfolder inclusion setting
+                SearchOption searchOption = job.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+                string[] allFiles = Directory.GetFiles(job.FolderPath, "*", searchOption);
+
+                // Filter out unwanted files (like lock files)
+                var filesToUpload = new List<string>();
+                foreach (var file in allFiles)
+                {
+                    if (!ShouldSkipFile(file))
+                    {
+                        filesToUpload.Add(file);
+                    }
+                }
+
+                // Apply filtering if enabled
+                string[] currentFiles;
+                if (job.EnableFilters && (job.IncludeExtensions.Count > 0 || job.ExcludeExtensions.Count > 0))
+                {
+                    var filteredFiles = new List<string>();
+
+                    foreach (string file in filesToUpload)
+                    {
+                        string fileName = Path.GetFileName(file);
+                        string fileExt = Path.GetExtension(file);
+                        if (!string.IsNullOrEmpty(fileExt))
+                        {
+                            fileExt = fileExt.TrimStart('.').ToLowerInvariant();
+                        }
+
+                        bool shouldInclude = true;
+
+                        // Apply include filter (if any)
+                        if (job.IncludeExtensions.Count > 0)
+                        {
+                            shouldInclude = false; // Default to exclude if include list exists
+                            foreach (string includeExt in job.IncludeExtensions)
+                            {
+                                if (string.Equals(fileExt, includeExt.TrimStart('.').ToLowerInvariant(), StringComparison.OrdinalIgnoreCase))
+                                {
+                                    shouldInclude = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Apply exclude filter (only if not already excluded by include filter)
+                        if (shouldInclude && job.ExcludeExtensions.Count > 0)
+                        {
+                            foreach (string excludeExt in job.ExcludeExtensions)
+                            {
+                                if (string.Equals(fileExt, excludeExt.TrimStart('.').ToLowerInvariant(), StringComparison.OrdinalIgnoreCase))
+                                {
+                                    shouldInclude = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (shouldInclude)
+                        {
+                            filteredFiles.Add(file);
+                        }
+                    }
+
+                    currentFiles = filteredFiles.ToArray();
+                    _logService.LogInfo(string.Format("TIMER JOB FILTER RESULT: {0} files out of {1} total files match the filter criteria",
+                        currentFiles.Length, filesToUpload.Count));
+                }
+                else
+                {
+                    // No filtering enabled - use all files
+                    currentFiles = filesToUpload.ToArray();
+                    _logService.LogInfo("TIMER JOB: No file filtering applied - including all files");
+                }
+
+                // Prioritize previously locked files by moving them to the front of the queue
+                var lockedFilesToRetry = job.FileRetryManager.GetFilesToRetryInNextIteration();
+                if (lockedFilesToRetry.Count > 0)
+                {
+                    _logService.LogInfo(string.Format("Found {0} previously locked files to prioritize for retry", lockedFilesToRetry.Count));
+                    
+                    var prioritizedFiles = new List<string>();
+                    var remainingFiles = new List<string>();
+                    
+                    foreach (var file in currentFiles)
+                    {
+                        if (lockedFilesToRetry.Contains(file))
+                        {
+                            prioritizedFiles.Add(file);
+                        }
+                        else
+                        {
+                            remainingFiles.Add(file);
+                        }
+                    }
+                    
+                    // Combine: prioritized first, then remaining
+                    prioritizedFiles.AddRange(remainingFiles);
+                    currentFiles = prioritizedFiles.ToArray();
+                    
+                    _logService.LogInfo(string.Format("Prioritized {0} previously locked files at the start of transfer queue", lockedFilesToRetry.Count));
+                }
+
+                // Also ensure empty directories are created on remote (only if including subfolders)
+                string[] allDirectories = job.IncludeSubfolders ?
+                    Directory.GetDirectories(job.FolderPath, "*", SearchOption.AllDirectories) :
+                    new string[0]; // No subdirectories if not including subfolders
+
+                _logService.LogInfo(string.Format("Found {0} files and {1} directories in folder {2} (subfolders: {3})",
+                    currentFiles.Length, allDirectories.Length, job.FolderPath, job.IncludeSubfolders ? "included" : "excluded"));
+
+                // Create empty directories first
+                foreach (string directory in allDirectories)
+                {
+                    try
+                    {
+                        string relativeDirPath = directory.Substring(job.FolderPath.Length);
+                        if (relativeDirPath.StartsWith("\\") || relativeDirPath.StartsWith("/"))
+                        {
+                            relativeDirPath = relativeDirPath.Substring(1);
+                        }
+
+                        string normalizedRemotePath = job.RemotePath.Replace('\\', '/');
+                        if (!normalizedRemotePath.EndsWith("/")) normalizedRemotePath += "/";
+
+                        string remoteDirectory = normalizedRemotePath + relativeDirPath.Replace('\\', '/');
+
+                        string dirError = null;
+                        if (job.TransferClient.EnsureDirectory(job.ConnectionSettings, remoteDirectory, out dirError))
+                        {
+                            _logService.LogInfo(string.Format("Created/ensured remote directory: {0}", remoteDirectory));
+                        }
+                        else
+                        {
+                            _logService.LogWarning(string.Format("Failed to create remote directory {0}: {1}",
+                                remoteDirectory, dirError ?? "Unknown error"));
+                        }
+                    }
+                    catch (Exception dirEx)
+                    {
+                        _logService.LogError(string.Format("Error processing directory {0}: {1}", directory, dirEx.Message));
+                    }
+                }
+
+                if (currentFiles.Length == 0 && allDirectories.Length == 0)
+                {
+                    _logService.LogWarning(string.Format("No files or directories found in folder {0} for timer job {1}", job.FolderPath, jobId));
+                    return;
+                }
+
+                if (currentFiles.Length == 0)
+                {
+                    _logService.LogInfo(string.Format("No files to upload, but {0} empty directories were processed for timer job {1}", allDirectories.Length, jobId));
+                    return;
+                }
+
+                // Mark upload as in progress and start background upload
+                job.IsUploadInProgress = true;
+                job.UploadStartTime = DateTime.Now;
+
+                // Perform the upload asynchronously to prevent blocking the timer
+                System.Threading.ThreadPool.QueueUserWorkItem(state =>
+                {
+                    try
+                    {
+                        PerformFolderUpload(job, currentFiles);
+
+                        // Update last upload time
+                        job.LastUploadTime = DateTime.Now;
+
+                        TimeSpan totalDuration = DateTime.Now - job.UploadStartTime.Value;
+                        _logService.LogInfo(string.Format("Upload cycle completed for job {0} in {1:mm\\:ss}",
+                            jobId, totalDuration));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(string.Format("Error in background upload for job {0}: {1}", jobId, ex.Message));
+                    }
+                    finally
+                    {
+                        // Always reset the upload in progress flag
+                        job.IsUploadInProgress = false;
+                        job.UploadStartTime = null;
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(string.Format("Error in timer job {0}: {1}", jobId, ex.Message));
+
+                // Ensure we reset the flag even if there's an error
+                if (_timerJobs.ContainsKey(jobId))
+                {
+                    _timerJobs[jobId].IsUploadInProgress = false;
+                    _timerJobs[jobId].UploadStartTime = null;
+                }
+            }
+        }
     }
 }

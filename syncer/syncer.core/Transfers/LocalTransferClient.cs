@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using syncer.core.Utilities;
 
 namespace syncer.core
 {
@@ -56,17 +57,20 @@ namespace syncer.core
         public bool UploadFile(ConnectionSettings settings, string localPath, string remotePath, bool overwrite, out string error)
         {
             error = null;
+            string tempCopyPath = null;
+            bool usedTempCopy = false;
+
             try
             {
                 if (!File.Exists(localPath))
                 {
-                    error = $"Source file does not exist: {localPath}";
+                    error = string.Format("Source file does not exist: {0}", localPath);
                     return false;
                 }
 
                 if (!overwrite && File.Exists(remotePath))
                 {
-                    error = $"Destination file already exists: {remotePath}";
+                    error = string.Format("Destination file already exists: {0}", remotePath);
                     return false;
                 }
 
@@ -77,32 +81,74 @@ namespace syncer.core
                     Directory.CreateDirectory(destDir);
                 }
 
-                // Copy with progress reporting for large files
-                CopyFileWithProgress(localPath, remotePath, overwrite);
+                // Check if source file is locked
+                string lockError;
+                if (LockedFileHandler.IsFileLocked(localPath, out lockError))
+                {
+                    // File is locked - try to create a temporary copy
+                    tempCopyPath = LockedFileHandler.CreateTempCopy(localPath, out error);
+                    
+                    if (tempCopyPath == null)
+                    {
+                        error = string.Format("File is locked and temporary copy failed: {0}. Original error: {1}", 
+                            error, lockError);
+                        return false;
+                    }
+                    
+                    // Verify the temp copy
+                    string verifyError;
+                    if (!LockedFileHandler.VerifyTempCopy(localPath, tempCopyPath, out verifyError))
+                    {
+                        LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                        error = string.Format("Temporary copy verification failed: {0}", verifyError);
+                        return false;
+                    }
+                    
+                    usedTempCopy = true;
+                    
+                    // Use the temp copy for transfer
+                    CopyFileWithProgress(tempCopyPath, remotePath, overwrite);
+                }
+                else
+                {
+                    // File is not locked - proceed with normal copy
+                    CopyFileWithProgress(localPath, remotePath, overwrite);
+                }
                 
                 return true;
             }
             catch (Exception ex)
             {
-                error = $"Upload failed: {ex.Message}";
+                error = string.Format("Upload failed: {0}", ex.Message);
                 return false;
+            }
+            finally
+            {
+                // Clean up temporary copy if one was created
+                if (usedTempCopy && tempCopyPath != null)
+                {
+                    LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                }
             }
         }
 
         public bool DownloadFile(ConnectionSettings settings, string remotePath, string localPath, bool overwrite, out string error)
         {
             error = null;
+            string tempCopyPath = null;
+            bool usedTempCopy = false;
+
             try
             {
                 if (!File.Exists(remotePath))
                 {
-                    error = $"Source file does not exist: {remotePath}";
+                    error = string.Format("Source file does not exist: {0}", remotePath);
                     return false;
                 }
 
                 if (!overwrite && File.Exists(localPath))
                 {
-                    error = $"Destination file already exists: {localPath}";
+                    error = string.Format("Destination file already exists: {0}", localPath);
                     return false;
                 }
 
@@ -113,15 +159,54 @@ namespace syncer.core
                     Directory.CreateDirectory(localDir);
                 }
 
-                // Copy with progress reporting for large files (remote to local in local transfer means file copy)
-                CopyFileWithProgress(remotePath, localPath, overwrite);
+                // Check if source file is locked (remote in this case is also local)
+                string lockError;
+                if (LockedFileHandler.IsFileLocked(remotePath, out lockError))
+                {
+                    // File is locked - try to create a temporary copy
+                    tempCopyPath = LockedFileHandler.CreateTempCopy(remotePath, out error);
+                    
+                    if (tempCopyPath == null)
+                    {
+                        error = string.Format("File is locked and temporary copy failed: {0}. Original error: {1}", 
+                            error, lockError);
+                        return false;
+                    }
+                    
+                    // Verify the temp copy
+                    string verifyError;
+                    if (!LockedFileHandler.VerifyTempCopy(remotePath, tempCopyPath, out verifyError))
+                    {
+                        LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                        error = string.Format("Temporary copy verification failed: {0}", verifyError);
+                        return false;
+                    }
+                    
+                    usedTempCopy = true;
+                    
+                    // Use the temp copy for transfer
+                    CopyFileWithProgress(tempCopyPath, localPath, overwrite);
+                }
+                else
+                {
+                    // File is not locked - proceed with normal copy
+                    CopyFileWithProgress(remotePath, localPath, overwrite);
+                }
                 
                 return true;
             }
             catch (Exception ex)
             {
-                error = $"Download failed: {ex.Message}";
+                error = string.Format("Download failed: {0}", ex.Message);
                 return false;
+            }
+            finally
+            {
+                // Clean up temporary copy if one was created
+                if (usedTempCopy && tempCopyPath != null)
+                {
+                    LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                }
             }
         }
 
@@ -221,6 +306,72 @@ namespace syncer.core
             File.SetCreationTime(destPath, sourceInfo.CreationTime);
             File.SetLastWriteTime(destPath, sourceInfo.LastWriteTime);
             File.SetLastAccessTime(destPath, sourceInfo.LastAccessTime);
+        }
+
+        /// <summary>
+        /// Get the last modified time of a file
+        /// </summary>
+        public bool GetFileModifiedTime(ConnectionSettings settings, string remotePath, out DateTime modifiedTime, out string error)
+        {
+            modifiedTime = DateTime.MinValue;
+            error = null;
+
+            try
+            {
+                if (string.IsNullOrEmpty(remotePath))
+                {
+                    error = "File path cannot be empty";
+                    return false;
+                }
+
+                if (!File.Exists(remotePath))
+                {
+                    error = $"File not found: {remotePath}";
+                    return false;
+                }
+
+                FileInfo fileInfo = new FileInfo(remotePath);
+                modifiedTime = fileInfo.LastWriteTime;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = $"Failed to get file modified time for '{remotePath}': {ex.Message}";
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Get the size of a file
+        /// </summary>
+        public bool GetFileSize(ConnectionSettings settings, string remotePath, out long fileSize, out string error)
+        {
+            fileSize = 0;
+            error = null;
+
+            try
+            {
+                if (string.IsNullOrEmpty(remotePath))
+                {
+                    error = "File path cannot be empty";
+                    return false;
+                }
+
+                if (!File.Exists(remotePath))
+                {
+                    error = $"File not found: {remotePath}";
+                    return false;
+                }
+
+                FileInfo fileInfo = new FileInfo(remotePath);
+                fileSize = fileInfo.Length;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = $"Failed to get file size for '{remotePath}': {ex.Message}";
+                return false;
+            }
         }
     }
 }
