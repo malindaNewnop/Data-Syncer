@@ -281,6 +281,8 @@ namespace syncer.ui
             // chkEnableTimer
             // 
             this.chkEnableTimer.AutoSize = true;
+            this.chkEnableTimer.Checked = true;
+            this.chkEnableTimer.CheckState = System.Windows.Forms.CheckState.Checked;
             this.chkEnableTimer.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.chkEnableTimer.Location = new System.Drawing.Point(20, 30);
             this.chkEnableTimer.Name = "chkEnableTimer";

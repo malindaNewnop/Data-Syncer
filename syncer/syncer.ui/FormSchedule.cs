@@ -837,7 +837,7 @@ namespace syncer.ui
         private void SetDefaultValues()
         {
             if (chkEnableJob != null) chkEnableJob.Checked = true;
-            if (chkEnableTimer != null) chkEnableTimer.Checked = false;
+            if (chkEnableTimer != null) chkEnableTimer.Checked = true;
             if (numTimerInterval != null) numTimerInterval.Value = 5;
             if (cmbTimerUnit != null) cmbTimerUnit.SelectedIndex = 1; // Minutes
             if (lblTimerStatus != null) lblTimerStatus.Text = "Timer stopped";

@@ -31,6 +31,9 @@ namespace syncer.ui
         // Bandwidth control
         private BandwidthControlService _bandwidthService;
         private Timer _speedUpdateTimer;
+        
+        // Exit flag to distinguish between minimize-to-tray and actual exit
+        private bool _isExitingApplication = false;
 
         public FormMain()
         {
@@ -742,6 +745,41 @@ namespace syncer.ui
                             Timeout = GetIntValue(connDict, "Timeout", 30),
                             OperationTimeout = GetIntValue(connDict, "OperationTimeout", 60)
                         };
+                        
+                        // Decode password if present
+                        string encodedPassword = GetStringValue(connDict, "Password");
+                        if (!string.IsNullOrEmpty(encodedPassword))
+                        {
+                            try
+                            {
+                                connectionSettings.Password = System.Text.Encoding.UTF8.GetString(
+                                    Convert.FromBase64String(encodedPassword));
+                            }
+                            catch (Exception pwdEx)
+                            {
+                                ServiceLocator.LogService?.LogWarning("Failed to decode password from configuration file: " + pwdEx.Message);
+                            }
+                        }
+                        
+                        // If password is still empty and not using SSH key authentication, prompt for it
+                        if (string.IsNullOrEmpty(connectionSettings.Password) && 
+                            !connectionSettings.UseKeyAuthentication &&
+                            !string.IsNullOrEmpty(connectionSettings.Host))
+                        {
+                            // Prompt user for password using simple input dialog
+                            string promptMessage = string.Format("Please enter password for {0}@{1}:", 
+                                connectionSettings.Username, connectionSettings.Host);
+                            string enteredPassword = PromptForPassword(promptMessage, "Password Required");
+                            
+                            if (!string.IsNullOrEmpty(enteredPassword))
+                            {
+                                connectionSettings.Password = enteredPassword;
+                            }
+                            else
+                            {
+                                throw new Exception("Password is required to load this configuration. Configuration load cancelled.");
+                            }
+                        }
                     }
                 }
 
@@ -793,26 +831,69 @@ namespace syncer.ui
                 var connectionService = ServiceLocator.ConnectionService;
                 var timerJobManager = ServiceLocator.TimerJobManager;
 
-                // Save connection settings (equivalent to setting them)
+                // Ensure connection has IsConnected flag set and protocol is correct
+                if (connection != null && !string.IsNullOrEmpty(connection.Host))
+                {
+                    connection.IsConnected = true;
+                    
+                    // Determine protocol type if not set
+                    if (string.IsNullOrEmpty(connection.Protocol))
+                    {
+                        connection.Protocol = connection.UseSftp ? "SFTP" : "FTP";
+                    }
+                    
+                    // Set ProtocolType based on Protocol string
+                    if (connection.Protocol.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
+                    {
+                        connection.ProtocolType = 2;
+                    }
+                    else if (connection.Protocol.Equals("FTP", StringComparison.OrdinalIgnoreCase))
+                    {
+                        connection.ProtocolType = 1;
+                    }
+                    else
+                    {
+                        connection.ProtocolType = 0; // LOCAL
+                    }
+                }
+                
+                // Save connection settings to make them active
                 connectionService.SaveConnectionSettings(connection);
                 
-                // Test connection
+                ServiceLocator.LogService?.LogInfo($"Connection settings applied: {connection.Username}@{connection.Host}:{connection.Port} (Protocol: {connection.Protocol})");
+                
+                // Test connection and warn if it fails
                 var isConnected = connectionService.TestConnection(connection);
                 if (!isConnected)
                 {
-                    MessageBox.Show("Warning: Could not establish connection with the loaded settings. " +
-                        "Please verify the connection details in the Connection Settings.", 
-                        "Connection Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    DialogResult result = MessageBox.Show(
+                        "Warning: Could not establish connection with the loaded settings. " +
+                        "The configuration will be loaded but you may need to verify the connection details.\n\n" +
+                        "Do you want to continue loading the configuration?", 
+                        "Connection Warning", 
+                        MessageBoxButtons.YesNo, 
+                        MessageBoxIcon.Warning);
+                        
+                    if (result == DialogResult.No)
+                    {
+                        throw new Exception("Configuration load cancelled by user due to connection failure.");
+                    }
                 }
 
-                // Create and add timer job using RegisterTimerJob method
+                // Create and register timer job
                 long jobId = DateTime.Now.Ticks; // Generate unique job ID
-                bool isUpload = job.TransferMode.Contains("Upload") || job.TransferMode.Contains("Local");
+                bool isUpload = string.IsNullOrEmpty(job.TransferMode) || 
+                                job.TransferMode.Contains("Upload") || 
+                                job.TransferMode.Contains("Local") ||
+                                job.TransferMode.Contains("Copy");
                 double intervalMs = ConvertToMilliseconds(job.IntervalValue, job.IntervalType);
                 
+                ServiceLocator.LogService?.LogInfo($"Registering job: {job.Name} (JobId: {jobId}, IsUpload: {isUpload}, Interval: {intervalMs}ms)");
+                
+                bool registered = false;
                 if (isUpload)
                 {
-                    timerJobManager.RegisterTimerJob(
+                    registered = timerJobManager.RegisterTimerJob(
                         jobId,
                         job.Name ?? "Loaded Configuration",
                         job.SourcePath,
@@ -824,23 +905,60 @@ namespace syncer.ui
                 }
                 else
                 {
-                    // For download jobs, we might need different handling
-                    // For now, treat them as upload jobs with reversed paths
-                    timerJobManager.RegisterTimerJob(
+                    // For download jobs, register as download with empty filter lists
+                    registered = timerJobManager.RegisterDownloadTimerJob(
                         jobId,
                         job.Name ?? "Loaded Configuration",
-                        job.SourcePath,
-                        job.DestinationPath,
+                        job.SourcePath,      // Remote source
+                        job.DestinationPath, // Local destination
                         intervalMs,
                         job.IncludeSubFolders,
-                        job.DeleteSourceAfterTransfer
+                        job.DeleteSourceAfterTransfer,
+                        false,               // enableFilters
+                        new List<string>(),  // includeExtensions
+                        new List<string>()   // excludeExtensions
                     );
                 }
-
-                ServiceLocator.LogService?.LogInfo($"Configuration loaded from file: {job.Name}");
+                
+                if (!registered)
+                {
+                    throw new Exception("Failed to register timer job. Check logs for details.");
+                }
+                
+                ServiceLocator.LogService?.LogInfo($"Job registered successfully: {job.Name}");
+                
+                // Start the timer job if it's enabled
+                if (job.IsEnabled)
+                {
+                    bool started = timerJobManager.StartTimerJob(jobId);
+                    if (started)
+                    {
+                        ServiceLocator.LogService?.LogInfo($"Timer job started successfully: {job.Name}");
+                    }
+                    else
+                    {
+                        ServiceLocator.LogService?.LogWarning($"Failed to start timer job: {job.Name}. Job is registered but not running.");
+                        MessageBox.Show(
+                            $"Configuration loaded successfully but the timer job '{job.Name}' could not be started automatically.\n\n" +
+                            "You can start it manually from the main dashboard.", 
+                            "Job Start Warning", 
+                            MessageBoxButtons.OK, 
+                            MessageBoxIcon.Warning);
+                    }
+                }
+                else
+                {
+                    ServiceLocator.LogService?.LogInfo($"Job is disabled, not starting timer: {job.Name}");
+                }
+                
+                // Update connection status in UI
+                UpdateConnectionStatus();
+                
+                ServiceLocator.LogService?.LogInfo($"Configuration loaded and applied from file: {job.Name}");
             }
             catch (Exception ex)
             {
+                ServiceLocator.LogService?.LogError($"Failed to apply loaded configuration: {ex.Message}");
                 throw new Exception($"Failed to apply loaded configuration: {ex.Message}", ex);
             }
         }
@@ -930,13 +1048,15 @@ namespace syncer.ui
 
         private void exitToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            // Set flag to indicate we're exiting the application completely
+            _isExitingApplication = true;
             // This will close the application completely
             Close();
         }
 
         private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("FTPSyncer v5.0\nFile Synchronization Tool\n\nDeveloped for automated file transfers.", "About FTPSyncer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("FTPSyncer v0.6\nFile Synchronization Tool\n\nDeveloped for automated file transfers.", "About FTPSyncer", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void jobRecoveryToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1086,6 +1206,15 @@ namespace syncer.ui
         // Handle form closing to minimize to system tray instead of exiting
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            // If File->Exit was clicked, always exit completely
+            if (_isExitingApplication)
+            {
+                // Stop service and cleanup resources
+                StopServiceAndCleanup();
+                base.OnFormClosing(e);
+                return;
+            }
+            
             // We only want to intercept user-initiated closing
             if (e.CloseReason == CloseReason.UserClosing)
             {
@@ -1253,12 +1382,16 @@ namespace syncer.ui
                     // Ignore logging errors during shutdown
                 }
                 
-                // Exit the application
+                // Exit the application - use both methods to ensure complete shutdown
                 Application.Exit();
+                // Force exit if Application.Exit() doesn't terminate all threads
+                Environment.Exit(0);
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Error during application exit: " + ex.Message);
+                // Force exit even if there's an error
+                Environment.Exit(1);
             }
         }
         
@@ -2060,7 +2193,9 @@ namespace syncer.ui
                         Host = connection.Host,
                         Port = connection.Port,
                         Username = connection.Username,
-                        // Don't save password in plain text for security
+                        // Encode password with base64 for basic obfuscation (not secure encryption, but better than plain text)
+                        Password = !string.IsNullOrEmpty(connection.Password) ? 
+                            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(connection.Password)) : "",
                         UsePassiveMode = connection.UsePassiveMode,
                         UseSftp = connection.UseSftp,
                         UseKeyAuthentication = connection.UseKeyAuthentication,
@@ -3094,6 +3229,64 @@ namespace syncer.ui
                 txtName.SelectAll();
 
                 return inputForm.ShowDialog(this) == DialogResult.OK ? txtName.Text : null;
+            }
+        }
+
+        /// <summary>
+        /// Prompts the user for a password using a simple dialog
+        /// </summary>
+        private string PromptForPassword(string promptMessage, string title)
+        {
+            using (Form inputForm = new Form())
+            {
+                inputForm.Text = title;
+                inputForm.Size = new System.Drawing.Size(500, 180);
+                inputForm.StartPosition = FormStartPosition.CenterParent;
+                inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                inputForm.MaximizeBox = false;
+                inputForm.MinimizeBox = false;
+
+                Label lblPrompt = new Label
+                {
+                    Text = promptMessage,
+                    Location = new System.Drawing.Point(20, 20),
+                    Size = new System.Drawing.Size(450, 40),
+                    AutoSize = false
+                };
+                inputForm.Controls.Add(lblPrompt);
+
+                TextBox txtPassword = new TextBox
+                {
+                    Location = new System.Drawing.Point(20, 65),
+                    Size = new System.Drawing.Size(450, 25),
+                    UseSystemPasswordChar = true
+                };
+                inputForm.Controls.Add(txtPassword);
+
+                Button btnOK = new Button
+                {
+                    Text = "OK",
+                    DialogResult = DialogResult.OK,
+                    Location = new System.Drawing.Point(300, 100),
+                    Size = new System.Drawing.Size(80, 30)
+                };
+                inputForm.Controls.Add(btnOK);
+
+                Button btnCancel = new Button
+                {
+                    Text = "Cancel",
+                    DialogResult = DialogResult.Cancel,
+                    Location = new System.Drawing.Point(395, 100),
+                    Size = new System.Drawing.Size(80, 30)
+                };
+                inputForm.Controls.Add(btnCancel);
+
+                inputForm.AcceptButton = btnOK;
+                inputForm.CancelButton = btnCancel;
+
+                txtPassword.Focus();
+
+                return inputForm.ShowDialog(this) == DialogResult.OK ? txtPassword.Text : null;
             }
         }
 
