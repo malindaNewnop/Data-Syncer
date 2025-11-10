@@ -179,6 +179,9 @@ namespace syncer.ui.Services
                 {
                     // Try to restore timer jobs from previous session
                     RestoreTimerJobs();
+                    
+                    // Notify UI to refresh after jobs are restored
+                    NotifyUIAfterRestoration();
                 }
                 catch (Exception ex)
                 {
@@ -196,6 +199,49 @@ namespace syncer.ui.Services
                     }
                 }
             }, null, 1000, System.Threading.Timeout.Infinite); // 1 second delay, fire once
+        }
+        
+        /// <summary>
+        /// Notify the UI to refresh after jobs have been restored
+        /// </summary>
+        private void NotifyUIAfterRestoration()
+        {
+            try
+            {
+                // Find the main form and tell it to refresh
+                foreach (Form form in System.Windows.Forms.Application.OpenForms)
+                {
+                    if (form is FormMain)
+                    {
+                        FormMain mainForm = (FormMain)form;
+                        // Use Invoke to ensure we're on the UI thread
+                        if (mainForm.InvokeRequired)
+                        {
+                            mainForm.Invoke((Action)(() =>
+                            {
+                                mainForm.RefreshAfterStartup();
+                            }));
+                        }
+                        else
+                        {
+                            mainForm.RefreshAfterStartup();
+                        }
+                        break;
+                    }
+                }
+                
+                if (_logService != null)
+                {
+                    _logService.LogInfo("Notified UI to refresh after job restoration", "TimerJobManager");
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_logService != null)
+                {
+                    _logService.LogError("Error notifying UI after restoration: " + ex.Message, "TimerJobManager");
+                }
+            }
         }
         
         /// <summary>
@@ -1226,12 +1272,12 @@ namespace syncer.ui.Services
                             DateTime fileModifiedTime = fileInfo.LastWriteTime;
                             long fileSize = fileInfo.Length;
 
-                            // Check if file should be transferred (new or modified)
-                            bool shouldTransfer = job.FileStateTracker.ShouldTransferFile(localFile, fileModifiedTime, fileSize);
+                            // First check if file should be transferred based on local state tracking (new or modified locally)
+                            bool shouldTransferByLocalState = job.FileStateTracker.ShouldTransferFile(localFile, fileModifiedTime, fileSize);
                             
-                            if (!shouldTransfer)
+                            if (!shouldTransferByLocalState)
                             {
-                                _logService.LogInfo(string.Format("Skipping unchanged file: {0} (last modified: {1}, size: {2} bytes)", 
+                                _logService.LogInfo(string.Format("File unchanged locally since last upload: {0} (last modified: {1}, size: {2} bytes)", 
                                     fileName, fileModifiedTime.ToString("yyyy-MM-dd HH:mm:ss"), fileSize));
                                 skippedFiles++;
                                 
@@ -1240,11 +1286,29 @@ namespace syncer.ui.Services
                                 continue;
                             }
 
+                            // File has changed locally or is new - now check if remote file already has the same content
+                            string uploadDecisionReason;
+                            bool shouldUploadToRemote = ShouldUploadFile(job, localFile, remoteFile, out uploadDecisionReason);
+                            
+                            if (!shouldUploadToRemote)
+                            {
+                                _logService.LogInfo(string.Format("Skipping upload - remote file already up-to-date: {0} ({1})", 
+                                    fileName, uploadDecisionReason));
+                                skippedFiles++;
+                                
+                                // Update file state tracker since file matches remote (prevent checking again next time)
+                                job.FileStateTracker.UpdateFileState(localFile, fileModifiedTime, fileSize);
+                                
+                                // Remove from locked files tracker if it was previously locked
+                                job.FileRetryManager.MarkFileTransferred(localFile);
+                                continue;
+                            }
+
                             // Upload the file - the transfer client will handle locked files by creating temp copies
-                            _logService.LogInfo(string.Format("Uploading {0}: {1} -> {2}", 
-                                shouldTransfer && job.FileStateTracker.GetFileState(localFile) != null ? "modified" : "new", 
-                                localFile, remoteFile));
-                            _logService.LogInfo(string.Format("Local file size: {0} bytes", fileSize));
+                            _logService.LogInfo(string.Format("Uploading file: {0} -> {1} ({2})", 
+                                localFile, remoteFile, uploadDecisionReason));
+                            _logService.LogInfo(string.Format("Local file size: {0} bytes, modified: {1}", 
+                                fileSize, fileModifiedTime.ToString("yyyy-MM-dd HH:mm:ss")));
 
                             string error = null;
                             DateTime transferStart = DateTime.Now;
@@ -1352,8 +1416,13 @@ namespace syncer.ui.Services
                     }
                 }
 
-                _logService.LogInfo(string.Format("Folder upload completed for job {0}. Results: {1} successful, {2} failed, {3} skipped out of {4} total files",
+                _logService.LogInfo(string.Format("Folder upload completed for job {0}. Results: {1} successful, {2} failed, {3} skipped (already up-to-date on remote or unchanged locally) out of {4} total files",
                     job.JobId, successfulUploads, failedUploads, skippedFiles, localFilePaths.Length));
+                
+                if (skippedFiles > 0)
+                {
+                    _logService.LogInfo(string.Format("Note: {0} file(s) were skipped because they already exist on remote with identical content or haven't changed locally since last upload", skippedFiles));
+                }
                 
                 // Report on locked files that will be retried in next iteration
                 int lockedFileCount = job.FileRetryManager.GetLockedFileCount();
@@ -2397,6 +2466,101 @@ namespace syncer.ui.Services
                 // If we can't determine, don't skip
                 _logService.LogWarning(string.Format("Error checking if file should be skipped '{0}': {1}", filePath, ex.Message));
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Checks if a local file needs to be uploaded to remote by comparing with remote file
+        /// </summary>
+        /// <param name="job">The timer job containing the transfer client and connection settings</param>
+        /// <param name="localFilePath">Full path to the local file</param>
+        /// <param name="remoteFilePath">Full path to the remote file</param>
+        /// <param name="reason">Output parameter explaining why upload is needed or skipped</param>
+        /// <returns>True if the file should be uploaded, false if it can be skipped</returns>
+        private bool ShouldUploadFile(TimerJobInfo job, string localFilePath, string remoteFilePath, out string reason)
+        {
+            try
+            {
+                string fileName = Path.GetFileName(localFilePath);
+
+                // Get local file information
+                FileInfo localFileInfo = new FileInfo(localFilePath);
+                if (!localFileInfo.Exists)
+                {
+                    reason = "local file does not exist";
+                    return false;
+                }
+
+                DateTime localModifiedTime = localFileInfo.LastWriteTime;
+                long localFileSize = localFileInfo.Length;
+
+                // Check if remote file exists
+                bool remoteExists = false;
+                string fileExistsError = null;
+                if (!job.TransferClient.FileExists(job.ConnectionSettings, remoteFilePath, out remoteExists, out fileExistsError))
+                {
+                    // If we can't check if remote file exists, assume we need to upload
+                    reason = string.Format("cannot verify remote file existence ({0}), will upload", fileExistsError ?? "unknown error");
+                    _logService.LogWarning(string.Format("Cannot check if remote file exists '{0}': {1} - will upload anyway", 
+                        remoteFilePath, fileExistsError ?? "unknown error"));
+                    return true;
+                }
+
+                // If remote file doesn't exist, we need to upload
+                if (!remoteExists)
+                {
+                    reason = "file does not exist on remote";
+                    return true;
+                }
+
+                // Remote file exists - get its properties to compare
+                DateTime remoteModifiedTime = DateTime.MinValue;
+                long remoteFileSize = 0;
+                string remoteInfoError = null;
+
+                bool hasRemoteModTime = job.TransferClient.GetFileModifiedTime(job.ConnectionSettings, remoteFilePath, 
+                    out remoteModifiedTime, out remoteInfoError);
+                bool hasRemoteSize = job.TransferClient.GetFileSize(job.ConnectionSettings, remoteFilePath, 
+                    out remoteFileSize, out remoteInfoError);
+
+                // If we can't get remote file info, upload to be safe
+                if (!hasRemoteModTime || !hasRemoteSize)
+                {
+                    reason = string.Format("cannot get remote file info ({0}), will upload", remoteInfoError ?? "unknown error");
+                    _logService.LogWarning(string.Format("Cannot get remote file info for '{0}': {1} - will upload anyway", 
+                        remoteFilePath, remoteInfoError ?? "unknown error"));
+                    return true;
+                }
+
+                // Compare file sizes
+                if (localFileSize != remoteFileSize)
+                {
+                    reason = string.Format("file size differs (local: {0} bytes, remote: {1} bytes)", localFileSize, remoteFileSize);
+                    return true;
+                }
+
+                // Compare modification times (upload if local is newer)
+                // Add a small tolerance (1 second) to account for filesystem timestamp precision differences
+                TimeSpan timeDifference = localModifiedTime - remoteModifiedTime;
+                if (timeDifference.TotalSeconds > 1.0)
+                {
+                    reason = string.Format("local file is newer (local: {0}, remote: {1})", 
+                        localModifiedTime.ToString("yyyy-MM-dd HH:mm:ss"), 
+                        remoteModifiedTime.ToString("yyyy-MM-dd HH:mm:ss"));
+                    return true;
+                }
+
+                // Files are identical - no need to upload
+                reason = string.Format("file already exists with same size ({0} bytes) and timestamp", localFileSize);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                // If any error occurs during comparison, upload to be safe
+                reason = string.Format("error during comparison ({0}), will upload", ex.Message);
+                _logService.LogError(string.Format("Error checking if file should be uploaded '{0}': {1} - will upload anyway", 
+                    localFilePath, ex.Message));
+                return true;
             }
         }
 

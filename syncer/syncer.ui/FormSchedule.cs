@@ -2659,6 +2659,57 @@ namespace syncer.ui
 
         private SyncJob CreateSyncJobFromForm()
         {
+            // Determine the current job status
+            string currentStatus = "Ready to run";
+            
+            // Try to get actual status from timer job manager if job is already running
+            try
+            {
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager != null && _currentJob != null && _currentJob.Id > 0)
+                {
+                    // Check if this job is registered as a timer job
+                    var runningJobs = timerJobManager.GetRegisteredTimerJobs();
+                    if (runningJobs != null && runningJobs.Contains(_currentJob.Id))
+                    {
+                        bool isRunning = timerJobManager.IsTimerJobRunning(_currentJob.Id);
+                        bool isUploading = timerJobManager.IsTimerJobUploading(_currentJob.Id);
+                        bool isDownloading = timerJobManager.IsTimerJobDownloading(_currentJob.Id);
+                        
+                        if (isUploading)
+                        {
+                            currentStatus = "Uploading";
+                        }
+                        else if (isDownloading)
+                        {
+                            currentStatus = "Downloading";
+                        }
+                        else if (isRunning)
+                        {
+                            currentStatus = "Running";
+                        }
+                        else
+                        {
+                            currentStatus = "Stopped";
+                        }
+                    }
+                }
+                // If job is enabled in the checkbox but not running, set appropriate status
+                else if (chkEnableJob.Checked)
+                {
+                    currentStatus = "Ready to run";
+                }
+                else
+                {
+                    currentStatus = "Disabled";
+                }
+            }
+            catch
+            {
+                // If we can't determine status, use default
+                currentStatus = chkEnableJob.Checked ? "Ready to run" : "Disabled";
+            }
+            
             var job = new SyncJob
             {
                 Name = txtJobName.Text.Trim(),
@@ -2672,7 +2723,7 @@ namespace syncer.ui
                 IntervalType = cmbTimerUnit?.SelectedItem?.ToString() ?? "Minutes", // Get actual selected unit from combo box
                 TransferMode = "Upload", // This is a timer upload job
                 CreatedDate = DateTime.Now,
-                LastStatus = "Ready to run",
+                LastStatus = currentStatus,
                 ShowTransferProgress = true,
                 ValidateTransfer = true,
                 MaxRetries = 3,

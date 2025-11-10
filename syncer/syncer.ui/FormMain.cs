@@ -2356,6 +2356,7 @@ namespace syncer.ui
                         IncludeSubFolders = job.IncludeSubFolders,
                         OverwriteExisting = job.OverwriteExisting,
                         IsEnabled = job.IsEnabled,
+                        LastStatus = job.LastStatus ?? "Stopped",
                         StartTime = job.StartTime,
                         DeleteSourceAfterTransfer = job.DeleteSourceAfterTransfer
                     },
@@ -2408,11 +2409,17 @@ namespace syncer.ui
                     var sourcePath = firstRow.Cells["FolderPath"].Value?.ToString() ?? "";
                     var remotePath = firstRow.Cells["RemotePath"].Value?.ToString() ?? "";
                     var intervalText = firstRow.Cells["Interval"].Value?.ToString() ?? "30 Minutes";
+                    var status = firstRow.Cells["Status"].Value?.ToString() ?? "Stopped";
                     
                     // Parse interval
                     string intervalType = "Minutes";
                     int intervalValue = 30;
                     ParseIntervalText(intervalText, out intervalValue, out intervalType);
+                    
+                    // Determine if job is enabled based on status
+                    // Jobs that are "Running" or "Uploading" are considered enabled
+                    // Jobs that are "Stopped" are considered disabled
+                    bool isEnabled = status.Contains("Running") || status.Contains("Uploading") || status.Contains("Downloading");
                     
                     return new SyncJob
                     {
@@ -2427,7 +2434,8 @@ namespace syncer.ui
                         TransferMode = "Copy (Keep both files)",
                         IncludeSubFolders = true,
                         OverwriteExisting = true,
-                        IsEnabled = true
+                        IsEnabled = isEnabled,
+                        LastStatus = status
                     };
                 }
                 
@@ -2443,7 +2451,8 @@ namespace syncer.ui
                     TransferMode = "Copy (Keep both files)",
                     IncludeSubFolders = true,
                     OverwriteExisting = true,
-                    IsEnabled = true
+                    IsEnabled = false,
+                    LastStatus = "Stopped"
                 };
             }
             catch (Exception ex)
