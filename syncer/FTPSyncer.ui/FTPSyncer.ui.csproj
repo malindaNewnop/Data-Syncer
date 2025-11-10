@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{1E88E774-42EE-4E32-97B4-D83E8E185EE4}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>FTPSyncer.ui</RootNamespace>
+    <AssemblyName>FTPSyncer</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.ServiceProcess" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Deployment" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.13.0.3\lib\net35\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FTPSyncer.core\FTPSyncer.core.csproj">
+      <Project>{6a6f9a95-9ccc-4fd3-997f-5ea9b53cb133}</Project>
+      <Name>FTPSyncer.core</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <!-- Core UI and services -->
+    <Compile Include="Interfaces\IServices.cs" />
+    <Compile Include="Interfaces\ITimerJobManager.cs" />
+    <Compile Include="Models.cs" />
+    <Compile Include="Services\NotificationService.cs" />
+    <Compile Include="Services\SystemTrayManager.cs" />
+    <Compile Include="Services\TimerJobManager.cs" />
+    <Compile Include="Services\FileStateTracker.cs" />
+    <Compile Include="Services\FileRetryManager.cs" />
+    <Compile Include="StringExtensions.cs" />
+    <Compile Include="ServiceLocator.cs" />
+    <Compile Include="Services\ServiceImplementations.cs" />
+    <Compile Include="Services\JobIdGenerator.cs" />
+    <Compile Include="Services\CoreLogServiceAdapter.cs" />
+    <Compile Include="Services\CoreSyncJobServiceAdapter.cs" />
+    <Compile Include="Services\CoreConnectionServiceAdapter.cs" />
+    <Compile Include="Services\FileSystemPermissionChecker.cs" />
+    <Compile Include="Services\SavedJobConfigurationService.cs" />
+    <!-- Forms -->
+    <Compile Include="FormMain.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormMain.Designer.cs">
+      <DependentUpon>FormMain.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FormConnection.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormConnection.Designer.cs">
+      <DependentUpon>FormConnection.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FormSchedule.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormSchedule.Designer.cs">
+      <DependentUpon>FormSchedule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FormLogs.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormLogs.Designer.cs">
+      <DependentUpon>FormLogs.cs</DependentUpon>
+    </Compile>
+    <!-- Connection Manager Form -->
+    <Compile Include="Forms\FormConnectionManager.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <!-- Enhanced Connection Form -->
+    <Compile Include="Forms\FormComprehensiveConnection.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FormComprehensiveConnection.Designer.cs">
+      <DependentUpon>FormComprehensiveConnection.cs</DependentUpon>
+    </Compile>
+    <!-- Simple Directory Browser -->
+    <Compile Include="Forms\FormSimpleDirectoryBrowser.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FormSimpleDirectoryBrowser.Designer.cs">
+      <DependentUpon>FormSimpleDirectoryBrowser.cs</DependentUpon>
+    </Compile>
+    <!-- Job Configuration Forms -->
+    <Compile Include="Forms\FormSaveJobConfiguration.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FormSaveJobConfiguration.Designer.cs">
+      <DependentUpon>FormSaveJobConfiguration.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FormSimpleLoadConfiguration.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FormSimpleLoadConfiguration.Designer.cs">
+      <DependentUpon>FormSimpleLoadConfiguration.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FormEditConfiguration.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FormEditConfiguration.Designer.cs">
+      <DependentUpon>FormEditConfiguration.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FormQuickLaunch.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FormQuickLaunch.Designer.cs">
+      <DependentUpon>FormQuickLaunch.cs</DependentUpon>
+    </Compile>
+    <!-- Job Details Popup -->
+    <Compile Include="Forms\JobDetailsPopup.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\JobDetailsPopup.Designer.cs">
+      <DependentUpon>JobDetailsPopup.cs</DependentUpon>
+    </Compile>
+    <!-- Job Recovery is handled automatically by Windows Service -->
+    <Compile Include="Examples\ConnectionFormUsageExample.cs" />
+    <EmbeddedResource Include="FormConnection.resx">
+      <DependentUpon>FormConnection.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FormSchedule.resx">
+      <DependentUpon>FormSchedule.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FormConnectionManager.resx">
+      <DependentUpon>FormConnectionManager.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FormSimpleLoadConfiguration.resx">
+      <DependentUpon>FormSimpleLoadConfiguration.cs</DependentUpon>
+    </EmbeddedResource>
+    <!-- Resources -->
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <None Include="PublishProfile.pubxml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Icons\ftpsyncerLOGO.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
