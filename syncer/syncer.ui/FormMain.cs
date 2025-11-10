@@ -887,15 +887,16 @@ namespace syncer.ui
                     }
                 }
 
-                // Create and register timer job
-                long jobId = DateTime.Now.Ticks; // Generate unique job ID
+                // Create and register timer job using centralized Job ID generator
+                long jobId = JobIdGenerator.Instance.GenerateNumericJobId(); // Generate unique job ID in format MMDD-XXX
+                string formattedJobId = JobIdGenerator.ToFormattedId(jobId);
                 bool isUpload = string.IsNullOrEmpty(job.TransferMode) || 
                                 job.TransferMode.Contains("Upload") || 
                                 job.TransferMode.Contains("Local") ||
                                 job.TransferMode.Contains("Copy");
                 double intervalMs = ConvertToMilliseconds(job.IntervalValue, job.IntervalType);
                 
-                ServiceLocator.LogService?.LogInfo($"Registering job: {job.Name} (JobId: {jobId}, IsUpload: {isUpload}, Interval: {intervalMs}ms)");
+                ServiceLocator.LogService?.LogInfo($"Registering job: {job.Name} (JobId: {formattedJobId}, IsUpload: {isUpload}, Interval: {intervalMs}ms)");
                 
                 bool registered = false;
                 if (isUpload)
@@ -2628,9 +2629,10 @@ namespace syncer.ui
                                 continue;
                             }
 
-                            // Register the timer job first
+                            // Register the timer job first using centralized Job ID generator
                             var intervalMs = GetIntervalInMilliseconds(job.IntervalValue, job.IntervalType);
-                            var jobId = DateTime.Now.Ticks + jobsToStart.Count; // Use timestamp + counter as unique ID
+                            var jobId = JobIdGenerator.Instance.GenerateNumericJobId(); // Generate unique job ID in format MMDD-XXX
+                            var formattedJobId = JobIdGenerator.ToFormattedId(jobId);
                             
                             if (timerJobManager.RegisterTimerJob(
                                 jobId,
@@ -2643,7 +2645,7 @@ namespace syncer.ui
                             {
                                 jobsToStart.Add(jobId);
                                 jobIdMapping[jobId] = job;
-                                ServiceLocator.LogService.LogInfo($"Registered job '{job.Name}' for parallel start", "UI");
+                                ServiceLocator.LogService.LogInfo($"Registered job '{job.Name}' (ID: {formattedJobId}) for parallel start", "UI");
                             }
                             else
                             {

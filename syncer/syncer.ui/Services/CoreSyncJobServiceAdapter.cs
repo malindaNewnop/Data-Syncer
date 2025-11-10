@@ -12,7 +12,6 @@ namespace syncer.ui.Services
         private readonly syncer.core.IJobRepository _jobRepository;
         private readonly syncer.core.IJobRunner _jobRunner;
         private readonly syncer.core.ILogService _logService;
-        private static int _nextJobId = 1;
 
         public CoreSyncJobServiceAdapter()
         {
@@ -23,9 +22,6 @@ namespace syncer.ui.Services
                 
                 // Use the MultiJobRunner for concurrent job execution
                 _jobRunner = syncer.core.ServiceFactory.CreateJobRunnerFromConfiguration();
-                
-                // Initialize the next job ID based on existing jobs
-                InitializeJobIdSequence();
             }
             catch (Exception)
             {
@@ -65,9 +61,9 @@ namespace syncer.ui.Services
             {
                 var coreJob = ConvertUIJobToCoreJob(job);
                 
-                // Generate a unique sequential integer ID
-                int newJobId = GetNextJobId();
-                coreJob.Id = newJobId.ToString();
+                // Generate a unique job ID using centralized generator
+                long numericJobId = JobIdGenerator.Instance.GenerateNumericJobId();
+                coreJob.Id = numericJobId.ToString();
                 
                 // Set creation date
                 coreJob.CreatedDate = DateTime.Now;
@@ -75,7 +71,8 @@ namespace syncer.ui.Services
                 // Save the job
                 _jobRepository.Save(coreJob);
                 
-                return newJobId;
+                // Return as int for backward compatibility
+                return (int)numericJobId;
             }
             catch (Exception)
             {
@@ -83,35 +80,7 @@ namespace syncer.ui.Services
             }
         }
         
-        private void InitializeJobIdSequence()
-        {
-            try
-            {
-                var existingJobs = _jobRepository.GetAll();
-                int maxId = 0;
-                
-                foreach (var job in existingJobs)
-                {
-                    int id;
-                    if (int.TryParse(job.Id, out id) && id > maxId)
-                    {
-                        maxId = id;
-                    }
-                }
-                
-                _nextJobId = maxId + 1;
-            }
-            catch (Exception)
-            {
-                _nextJobId = 1; // Fallback to 1
-            }
-        }
         
-        private int GetNextJobId()
-        {
-            return _nextJobId++;
-        }
-
         public bool UpdateJob(SyncJob job)
         {
             try

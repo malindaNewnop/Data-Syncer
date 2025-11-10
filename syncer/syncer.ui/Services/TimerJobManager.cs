@@ -422,12 +422,13 @@ namespace syncer.ui.Services
 
                 _timerJobs.Add(jobId, newJob);
 
-                _logService.LogInfo(string.Format("Created NEW timer job {0} with FilterSettings - EnableFilters: {1}, Include: {2}, Exclude: {3}",
-                    jobId, enableFilters,
+                string formattedJobId = JobIdGenerator.ToFormattedId(jobId);
+                _logService.LogInfo(string.Format("Created NEW timer job {0} ({1}) with FilterSettings - EnableFilters: {2}, Include: {3}, Exclude: {4}",
+                    formattedJobId, jobName, enableFilters,
                     includeExtensions != null ? string.Join(",", includeExtensions.ToArray()) : "none",
                     excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"),
                     "TimerJobManager", jobId.ToString());
-                _logService.LogInfo(string.Format("Registered timer job {0} ({1}) for folder {2}", jobId, jobName, folderPath), "TimerJobManager", jobId.ToString());
+                _logService.LogInfo(string.Format("Registered timer job {0} ({1}) for folder {2}", formattedJobId, jobName, folderPath), "TimerJobManager", jobId.ToString());
                 
                 // Save state after successful registration
                 SaveTimerJobsState();
@@ -1653,11 +1654,12 @@ namespace syncer.ui.Services
                 
                 _timerJobs.Add(jobId, newJob);
                 
-                _logService.LogInfo(string.Format("Created NEW download timer job {0} with FilterSettings - EnableFilters: {1}, Include: {2}, Exclude: {3}", 
-                    jobId, enableFilters, 
+                string formattedJobId = JobIdGenerator.ToFormattedId(jobId);
+                _logService.LogInfo(string.Format("Created NEW download timer job {0} ({1}) with FilterSettings - EnableFilters: {2}, Include: {3}, Exclude: {4}", 
+                    formattedJobId, jobName, enableFilters, 
                     includeExtensions != null ? string.Join(",", includeExtensions.ToArray()) : "none",
                     excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"), "TimerJobManager", jobId.ToString());
-                _logService.LogInfo(string.Format("Registered download timer job {0} ({1}) for remote folder {2} to local {3}", jobId, jobName, remoteFolderPath, localDestinationPath), "TimerJobManager", jobId.ToString());
+                _logService.LogInfo(string.Format("Registered download timer job {0} ({1}) for remote folder {2} to local {3}", formattedJobId, jobName, remoteFolderPath, localDestinationPath), "TimerJobManager", jobId.ToString());
                 return true;
             }
             catch (Exception ex)
