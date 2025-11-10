@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Xml.Serialization;
 
 namespace syncer.ui.Services
 {
@@ -10,12 +11,22 @@ namespace syncer.ui.Services
     /// Tracks files that failed to transfer due to locking and manages retry attempts
     /// </summary>
     [Serializable]
+    [XmlRoot("LockedFileInfo")]
     public class LockedFileInfo
     {
+        [XmlElement("FilePath")]
         public string FilePath { get; set; }
+        
+        [XmlElement("RetryCount")]
         public int RetryCount { get; set; }
+        
+        [XmlElement("LastRetryTime")]
         public DateTime LastRetryTime { get; set; }
+        
+        [XmlElement("FirstLockedTime")]
         public DateTime FirstLockedTime { get; set; }
+        
+        [XmlElement("LastError")]
         public string LastError { get; set; }
 
         public LockedFileInfo()

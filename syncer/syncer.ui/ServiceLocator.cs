@@ -308,6 +308,28 @@ namespace syncer.ui
             {
                 _logService.LogInfo("Shutting down services and saving state for restart...", "Shutdown");
 
+                // FIRST: Save timer jobs state BEFORE stopping them (to preserve running state)
+                if (_timerJobManager != null)
+                {
+                    try
+                    {
+                        _timerJobManager.SaveTimerJobsState();
+                        _logService.LogInfo("Timer jobs state saved before shutdown", "Shutdown");
+                        
+                        // Call Dispose if available to cleanup resources
+                        var disposeMethod = _timerJobManager.GetType().GetMethod("Dispose");
+                        if (disposeMethod != null)
+                        {
+                            disposeMethod.Invoke(_timerJobManager, null);
+                            _logService.LogInfo("TimerJobManager disposed successfully", "Shutdown");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError("Error saving timer jobs state before shutdown: " + ex.Message, "Shutdown");
+                    }
+                }
+
                 // Stop sync job scheduler and save jobs
                 if (_syncJobService != null)
                 {
@@ -326,16 +348,47 @@ namespace syncer.ui
                     }
                 }
 
-                // Stop timer jobs and save their state
+                // Now stop timer jobs (state already saved with running=true)
                 if (_timerJobManager != null)
                 {
                     try
                     {
                         var timerJobIds = _timerJobManager.GetRegisteredTimerJobs();
-                        foreach (var jobId in timerJobIds)
+                        
+                        // Stop timers directly without saving state again
+                        // We use reflection to access the private _timerJobs dictionary
+                        var managerType = _timerJobManager.GetType();
+                        var timerJobsField = managerType.GetField("_timerJobs", 
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        
+                        if (timerJobsField != null)
                         {
-                            _timerJobManager.StopTimerJob(jobId);
+                            var timerJobsDict = timerJobsField.GetValue(_timerJobManager);
+                            if (timerJobsDict != null)
+                            {
+                                var dictType = timerJobsDict.GetType();
+                                var valuesProperty = dictType.GetProperty("Values");
+                                if (valuesProperty != null)
+                                {
+                                    var values = valuesProperty.GetValue(timerJobsDict, null);
+                                    foreach (var jobObj in (System.Collections.IEnumerable)values)
+                                    {
+                                        // Get Timer property from job
+                                        var jobType = jobObj.GetType();
+                                        var timerProperty = jobType.GetProperty("Timer");
+                                        if (timerProperty != null)
+                                        {
+                                            var timer = timerProperty.GetValue(jobObj, null) as System.Timers.Timer;
+                                            if (timer != null)
+                                            {
+                                                timer.Stop();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
+                        
                         _logService.LogInfo(string.Format("Stopped {0} timer jobs for shutdown", timerJobIds.Count), "Shutdown");
                     }
                     catch (Exception ex)

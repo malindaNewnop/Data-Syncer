@@ -19,6 +19,10 @@ namespace syncer.ui.Services
         private Dictionary<long, TimerJobInfo> _timerJobs;
         private IConnectionService _connectionService;
         private ILogService _logService;
+        
+        // Periodic auto-save timer to save state every 5 seconds
+        private System.Timers.Timer _autoSaveTimer;
+        private const double AUTO_SAVE_INTERVAL_MS = 5000; // 5 seconds
 
 
         /// <summary>
@@ -56,6 +60,9 @@ namespace syncer.ui.Services
             // Locked file retry management
             public FileRetryManager FileRetryManager { get; set; } // Manages retry logic for locked files
 
+            // Auto-start setting
+            public bool RunOnStartup { get; set; } // Whether to auto-start this job on application startup
+
         }
 
         #region Persistence Classes
@@ -91,18 +98,26 @@ namespace syncer.ui.Services
             public bool UsePassiveMode { get; set; }
             
             // File state tracking for incremental transfers
-            public Dictionary<string, FileState> FileStates { get; set; }
+            [XmlArray("FileStates")]
+            [XmlArrayItem("FileState")]
+            public List<FileState> FileStatesList { get; set; }
             
             // Locked file retry tracking
-            public Dictionary<string, LockedFileInfo> LockedFiles { get; set; }
+            [XmlArray("LockedFiles")]
+            [XmlArrayItem("LockedFileInfo")]
+            public List<LockedFileInfo> LockedFilesList { get; set; }
+
+            // Auto-start setting
+            public bool RunOnStartup { get; set; } // Whether to auto-start this job on application startup
 
             public PersistentTimerJob()
             {
                 IncludeExtensions = new List<string>();
                 ExcludeExtensions = new List<string>();
-                FileStates = new Dictionary<string, FileState>();
-                LockedFiles = new Dictionary<string, LockedFileInfo>();
+                FileStatesList = new List<FileState>();
+                LockedFilesList = new List<LockedFileInfo>();
                 SavedTime = DateTime.Now;
+                RunOnStartup = false; // Default to false
             }
         }
 
@@ -137,8 +152,82 @@ namespace syncer.ui.Services
             _connectionService = ServiceLocator.ConnectionService;
             _logService = ServiceLocator.LogService;
             
-            // Try to restore timer jobs from previous session
-            RestoreTimerJobs();
+            // Log the initialization
+            if (_logService != null)
+            {
+                _logService.LogInfo("TimerJobManager initializing...", "TimerJobManager");
+                _logService.LogInfo("State file path: " + TimerJobsStateFilePath, "TimerJobManager");
+            }
+            
+            // Set up periodic auto-save timer (saves state every 5 seconds)
+            _autoSaveTimer = new System.Timers.Timer(AUTO_SAVE_INTERVAL_MS);
+            _autoSaveTimer.AutoReset = true;
+            _autoSaveTimer.Elapsed += AutoSaveTimer_Elapsed;
+            _autoSaveTimer.Start();
+            
+            if (_logService != null)
+            {
+                _logService.LogInfo("Auto-save timer started (saves every 5 seconds)", "TimerJobManager");
+            }
+            
+            // Delay restoration to ensure all services are ready
+            // We'll restore after a short delay to allow ServiceLocator to complete initialization
+            System.Threading.Timer delayedRestore = null;
+            delayedRestore = new System.Threading.Timer((state) =>
+            {
+                try
+                {
+                    // Try to restore timer jobs from previous session
+                    RestoreTimerJobs();
+                }
+                catch (Exception ex)
+                {
+                    if (_logService != null)
+                    {
+                        _logService.LogError("Error in delayed restore: " + ex.Message, "TimerJobManager");
+                    }
+                }
+                finally
+                {
+                    // Dispose the timer after it fires once
+                    if (delayedRestore != null)
+                    {
+                        delayedRestore.Dispose();
+                    }
+                }
+            }, null, 1000, System.Threading.Timeout.Infinite); // 1 second delay, fire once
+        }
+        
+        /// <summary>
+        /// Auto-save timer elapsed event - saves state periodically
+        /// </summary>
+        private void AutoSaveTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            try
+            {
+                // Only save if there are active jobs
+                if (_timerJobs != null && _timerJobs.Count > 0)
+                {
+                    // Count running jobs manually (LINQ Count with predicate not available in .NET 3.5)
+                    int runningCount = 0;
+                    foreach (var job in _timerJobs.Values)
+                    {
+                        if (job.IsRunning)
+                            runningCount++;
+                    }
+                    
+                    if (runningCount > 0)
+                    {
+                        _logService.LogInfo(string.Format("Auto-save: Saving state for {0} job(s) ({1} running)", 
+                            _timerJobs.Count, runningCount), "TimerJobManager");
+                        SaveTimerJobsState();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError("Error in auto-save timer: " + ex.Message, "TimerJobManager");
+            }
         }
 
         public bool RegisterTimerJob(long jobId, string folderPath, string remotePath, double intervalMs)
@@ -1546,6 +1635,53 @@ namespace syncer.ui.Services
             
             return _timerJobs[jobId].ExcludeExtensions ?? new List<string>();
         }
+        
+        public bool GetTimerJobRunOnStartup(long jobId)
+        {
+            if (!_timerJobs.ContainsKey(jobId))
+            {
+                return false; // Default value
+            }
+            
+            return _timerJobs[jobId].RunOnStartup;
+        }
+        
+        public bool SetTimerJobRunOnStartup(long jobId, bool runOnStartup)
+        {
+            try
+            {
+                if (!_timerJobs.ContainsKey(jobId))
+                {
+                    _logService.LogError(string.Format("Cannot set RunOnStartup - Timer job {0} not found", jobId));
+                    return false;
+                }
+                
+                _timerJobs[jobId].RunOnStartup = runOnStartup;
+                _logService.LogInfo(string.Format("Set RunOnStartup to {0} for job {1}", runOnStartup, jobId), "TimerJobManager");
+                
+                // Save the state to persist the change
+                SaveTimerJobsState();
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(string.Format("Error setting RunOnStartup for job {0}: {1}", jobId, ex.Message));
+                return false;
+            }
+        }
+        
+        /// <summary>
+        /// Gets timer job info for a specific job (for internal use)
+        /// </summary>
+        public object GetTimerJobInfo(long jobId)
+        {
+            if (_timerJobs.ContainsKey(jobId))
+            {
+                return _timerJobs[jobId];
+            }
+            return null;
+        }
 
         #region Persistence Methods
 
@@ -1556,18 +1692,50 @@ namespace syncer.ui.Services
         {
             try
             {
+                if (_logService == null)
+                {
+                    // Log service not available - try to continue anyway
+                    System.Diagnostics.Debug.WriteLine("SaveTimerJobsState: LogService is null");
+                }
+                else
+                {
+                    _logService.LogInfo("SaveTimerJobsState called - preparing to save state...", "TimerJobManager");
+                }
+                
                 // Ensure directory exists
                 string directory = Path.GetDirectoryName(TimerJobsStateFilePath);
+                if (_logService != null)
+                {
+                    _logService.LogInfo("State file directory: " + directory, "TimerJobManager");
+                    _logService.LogInfo("State file path: " + TimerJobsStateFilePath, "TimerJobManager");
+                }
+                
                 if (!Directory.Exists(directory))
                 {
+                    if (_logService != null)
+                    {
+                        _logService.LogInfo("Creating directory: " + directory, "TimerJobManager");
+                    }
                     Directory.CreateDirectory(directory);
                 }
 
                 TimerJobsState state = new TimerJobsState();
                 
+                if (_logService != null)
+                {
+                    _logService.LogInfo(string.Format("Saving {0} timer job(s) to state file...", _timerJobs.Count), "TimerJobManager");
+                }
+                
                 foreach (var kvp in _timerJobs)
                 {
                     var job = kvp.Value;
+                    
+                    if (_logService != null)
+                    {
+                        _logService.LogInfo(string.Format("Preparing job {0} ({1}) for save - IsRunning: {2}", 
+                            job.JobId, job.JobName, job.IsRunning), "TimerJobManager");
+                    }
+                    
                     var persistentJob = new PersistentTimerJob
                     {
                         JobId = job.JobId,
@@ -1584,6 +1752,7 @@ namespace syncer.ui.Services
                         EnableFilters = job.EnableFilters,
                         IncludeExtensions = job.IncludeExtensions ?? new List<string>(),
                         ExcludeExtensions = job.ExcludeExtensions ?? new List<string>(),
+                        RunOnStartup = job.RunOnStartup,
                         SavedTime = DateTime.Now
                     };
 
@@ -1600,34 +1769,187 @@ namespace syncer.ui.Services
                         persistentJob.UsePassiveMode = job.ConnectionSettings.UsePassiveMode;
                     }
 
-                    // Save file state tracking data
+                    // Save file state tracking data (skip if it causes serialization issues)
                     if (job.FileStateTracker != null)
                     {
-                        persistentJob.FileStates = job.FileStateTracker.GetAllFileStates();
-                        _logService.LogInfo(string.Format("Saved {0} file states for job {1}", persistentJob.FileStates.Count, job.JobId));
+                        try
+                        {
+                            var fileStatesDict = job.FileStateTracker.GetAllFileStates();
+                            // Convert Dictionary to List for XML serialization
+                            persistentJob.FileStatesList = new List<FileState>(fileStatesDict.Values);
+                            
+                            if (_logService != null && persistentJob.FileStatesList != null)
+                            {
+                                _logService.LogInfo(string.Format("Saved {0} file states for job {1}", persistentJob.FileStatesList.Count, job.JobId), "TimerJobManager");
+                            }
+                        }
+                        catch (Exception fsEx)
+                        {
+                            if (_logService != null)
+                            {
+                                _logService.LogWarning(string.Format("Could not save file states for job {0}: {1}", job.JobId, fsEx.Message), "TimerJobManager");
+                            }
+                            persistentJob.FileStatesList = new List<FileState>(); // Empty list if error
+                        }
+                    }
+                    else
+                    {
+                        persistentJob.FileStatesList = new List<FileState>();
                     }
 
-                    // Save locked file tracking data
+                    // Save locked file tracking data (skip if it causes serialization issues)
                     if (job.FileRetryManager != null)
                     {
-                        persistentJob.LockedFiles = job.FileRetryManager.GetAllLockedFileStates();
-                        if (persistentJob.LockedFiles.Count > 0)
+                        try
                         {
-                            _logService.LogInfo(string.Format("Saved {0} locked file states for job {1}", persistentJob.LockedFiles.Count, job.JobId));
+                            var lockedFilesDict = job.FileRetryManager.GetAllLockedFileStates();
+                            // Convert Dictionary to List for XML serialization
+                            persistentJob.LockedFilesList = new List<LockedFileInfo>(lockedFilesDict.Values);
+                            
+                            if (persistentJob.LockedFilesList != null && persistentJob.LockedFilesList.Count > 0 && _logService != null)
+                            {
+                                _logService.LogInfo(string.Format("Saved {0} locked file states for job {1}", persistentJob.LockedFilesList.Count, job.JobId), "TimerJobManager");
+                            }
                         }
+                        catch (Exception lfEx)
+                        {
+                            if (_logService != null)
+                            {
+                                _logService.LogWarning(string.Format("Could not save locked files for job {0}: {1}", job.JobId, lfEx.Message), "TimerJobManager");
+                            }
+                            persistentJob.LockedFilesList = new List<LockedFileInfo>(); // Empty list if error
+                        }
+                    }
+                    else
+                    {
+                        persistentJob.LockedFilesList = new List<LockedFileInfo>();
                     }
 
                     state.Jobs.Add(persistentJob);
                 }
 
                 // Serialize to XML
-                XmlSerializer serializer = new XmlSerializer(typeof(TimerJobsState));
-                using (FileStream stream = new FileStream(TimerJobsStateFilePath, FileMode.Create))
+                if (_logService != null)
                 {
-                    serializer.Serialize(stream, state);
+                    _logService.LogInfo("Serializing to XML at: " + TimerJobsStateFilePath, "TimerJobManager");
+                    _logService.LogInfo(string.Format("About to serialize {0} jobs", state.Jobs.Count), "TimerJobManager");
                 }
-
-                _logService.LogInfo(string.Format("Timer jobs state saved successfully. {0} jobs persisted.", state.Jobs.Count));
+                
+                // Try to write to a temp file first, then move it
+                string tempPath = TimerJobsStateFilePath + ".tmp";
+                
+                try
+                {
+                    if (_logService != null)
+                    {
+                        _logService.LogInfo("Creating XmlSerializer for TimerJobsState...", "TimerJobManager");
+                    }
+                    
+                    XmlSerializer serializer = new XmlSerializer(typeof(TimerJobsState));
+                    
+                    if (_logService != null)
+                    {
+                        _logService.LogInfo("XmlSerializer created successfully", "TimerJobManager");
+                        _logService.LogInfo("Opening file stream for: " + tempPath, "TimerJobManager");
+                    }
+                    
+                    using (FileStream stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        if (_logService != null)
+                        {
+                            _logService.LogInfo("File stream opened, starting serialization...", "TimerJobManager");
+                        }
+                        
+                        serializer.Serialize(stream, state);
+                        
+                        if (_logService != null)
+                        {
+                            _logService.LogInfo("Serialization completed, flushing stream...", "TimerJobManager");
+                        }
+                        
+                        stream.Flush();
+                        stream.Close();
+                        
+                        if (_logService != null)
+                        {
+                            _logService.LogInfo("Stream closed successfully", "TimerJobManager");
+                        }
+                    }
+                    
+                    if (_logService != null)
+                    {
+                        _logService.LogInfo("Temp file written, now moving to final location...", "TimerJobManager");
+                    }
+                    
+                    // Delete old file if it exists
+                    if (File.Exists(TimerJobsStateFilePath))
+                    {
+                        if (_logService != null)
+                        {
+                            _logService.LogInfo("Deleting existing state file...", "TimerJobManager");
+                        }
+                        File.Delete(TimerJobsStateFilePath);
+                    }
+                    
+                    // Move temp file to actual location
+                    if (_logService != null)
+                    {
+                        _logService.LogInfo(string.Format("Moving {0} to {1}", tempPath, TimerJobsStateFilePath), "TimerJobManager");
+                    }
+                    
+                    File.Move(tempPath, TimerJobsStateFilePath);
+                    
+                    if (_logService != null)
+                    {
+                        _logService.LogInfo(string.Format("Timer jobs state saved successfully. {0} jobs persisted to {1}", state.Jobs.Count, TimerJobsStateFilePath), "TimerJobManager");
+                    }
+                }
+                catch (Exception writeEx)
+                {
+                    string detailedError = string.Format("Error writing state file: {0}\nType: {1}\nStack: {2}", 
+                        writeEx.Message, writeEx.GetType().Name, writeEx.StackTrace);
+                    
+                    if (_logService != null)
+                    {
+                        _logService.LogError(detailedError, "TimerJobManager");
+                        
+                        if (writeEx.InnerException != null)
+                        {
+                            _logService.LogError(string.Format("Inner exception: {0}\nInner stack: {1}", 
+                                writeEx.InnerException.Message, writeEx.InnerException.StackTrace), "TimerJobManager");
+                        }
+                    }
+                    
+                    // Also write to debug
+                    System.Diagnostics.Debug.WriteLine(detailedError);
+                    
+                    // Clean up temp file if it exists
+                    if (File.Exists(tempPath))
+                    {
+                        try { File.Delete(tempPath); } catch { }
+                    }
+                    
+                    throw;
+                }
+                
+                // Verify file was created
+                if (File.Exists(TimerJobsStateFilePath))
+                {
+                    FileInfo fi = new FileInfo(TimerJobsStateFilePath);
+                    if (_logService != null)
+                    {
+                        _logService.LogInfo(string.Format("State file verified - Size: {0} bytes, Last Modified: {1}", 
+                            fi.Length, fi.LastWriteTime), "TimerJobManager");
+                    }
+                }
+                else
+                {
+                    if (_logService != null)
+                    {
+                        _logService.LogError("State file was not created successfully!", "TimerJobManager");
+                    }
+                    throw new Exception("State file was not created at: " + TimerJobsStateFilePath);
+                }
                 
                 // Also save to service JobStateManager for cross-component recovery
                 // Note: This will be handled by the service itself during normal operation
@@ -1642,12 +1964,26 @@ namespace syncer.ui.Services
                 }
                 catch (Exception saveEx)
                 {
-                    _logService.LogWarning("Could not save timer job state to service manager: " + saveEx.Message);
+                    if (_logService != null)
+                    {
+                        _logService.LogWarning("Could not save timer job state to service manager: " + saveEx.Message, "TimerJobManager");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                _logService.LogError("Failed to save timer jobs state: " + ex.Message);
+                string errorMsg = "Failed to save timer jobs state: " + ex.Message;
+                if (_logService != null)
+                {
+                    _logService.LogError(errorMsg, "TimerJobManager");
+                    _logService.LogError("Stack trace: " + ex.StackTrace, "TimerJobManager");
+                }
+                
+                // Also write to debug output
+                System.Diagnostics.Debug.WriteLine(errorMsg);
+                System.Diagnostics.Debug.WriteLine(ex.StackTrace);
+                
+                // Don't throw - log and continue
             }
         }
 
@@ -1658,12 +1994,16 @@ namespace syncer.ui.Services
         {
             try
             {
+                _logService.LogInfo("Starting timer jobs restoration...", "TimerJobManager");
+                _logService.LogInfo("Checking for state file at: " + TimerJobsStateFilePath, "TimerJobManager");
+                
                 if (!File.Exists(TimerJobsStateFilePath))
                 {
-                    _logService.LogInfo("No saved timer jobs state found - starting fresh.");
+                    _logService.LogInfo("No saved timer jobs state found - starting fresh. File does not exist.", "TimerJobManager");
                     return;
                 }
 
+                _logService.LogInfo("State file found, attempting to deserialize...", "TimerJobManager");
                 XmlSerializer serializer = new XmlSerializer(typeof(TimerJobsState));
                 TimerJobsState state;
                 
@@ -1674,35 +2014,47 @@ namespace syncer.ui.Services
 
                 if (state == null || state.Jobs == null)
                 {
-                    _logService.LogInfo("Timer jobs state file is empty - starting fresh.");
+                    _logService.LogInfo("Timer jobs state file is empty - starting fresh.", "TimerJobManager");
                     return;
                 }
 
+                _logService.LogInfo(string.Format("Found {0} job(s) in state file. Starting restoration...", state.Jobs.Count), "TimerJobManager");
+
                 int restoredCount = 0;
+                int autoStartedCount = 0;
                 foreach (var persistentJob in state.Jobs)
                 {
                     try
                     {
+                        _logService.LogInfo(string.Format("Attempting to restore job {0} ({1}), IsRunning={2}", 
+                            persistentJob.JobId, persistentJob.JobName, persistentJob.IsRunning), "TimerJobManager");
+                        
                         // Try to restore the job
                         bool restored = RestoreTimerJob(persistentJob);
                         if (restored)
                         {
                             restoredCount++;
+                            if (persistentJob.IsRunning)
+                            {
+                                autoStartedCount++;
+                            }
                         }
                     }
                     catch (Exception jobEx)
                     {
                         _logService.LogError(string.Format("Failed to restore timer job {0}: {1}", 
-                            persistentJob.JobId, jobEx.Message));
+                            persistentJob.JobId, jobEx.Message), "TimerJobManager");
+                        _logService.LogError("Stack trace: " + jobEx.StackTrace, "TimerJobManager");
                     }
                 }
 
-                _logService.LogInfo(string.Format("Timer jobs restoration completed. {0} of {1} jobs restored successfully.", 
-                    restoredCount, state.Jobs.Count));
+                _logService.LogInfo(string.Format("Timer jobs restoration completed. {0} of {1} jobs restored successfully. {2} auto-started.", 
+                    restoredCount, state.Jobs.Count, autoStartedCount), "TimerJobManager");
             }
             catch (Exception ex)
             {
-                _logService.LogError("Failed to restore timer jobs: " + ex.Message);
+                _logService.LogError("Failed to restore timer jobs: " + ex.Message, "TimerJobManager");
+                _logService.LogError("Stack trace: " + ex.StackTrace, "TimerJobManager");
             }
         }
 
@@ -1840,21 +2192,41 @@ namespace syncer.ui.Services
                     EnableFilters = persistentJob.EnableFilters,
                     IncludeExtensions = persistentJob.IncludeExtensions ?? new List<string>(),
                     ExcludeExtensions = persistentJob.ExcludeExtensions ?? new List<string>(),
-                    FileStateTracker = new FileStateTracker() // Initialize file state tracker
+                    RunOnStartup = persistentJob.RunOnStartup,
+                    FileStateTracker = new FileStateTracker(), // Initialize file state tracker
+                    FileRetryManager = new FileRetryManager()  // Initialize file retry manager
                 };
 
                 // Restore file state tracking data
-                if (persistentJob.FileStates != null && persistentJob.FileStates.Count > 0)
+                if (persistentJob.FileStatesList != null && persistentJob.FileStatesList.Count > 0)
                 {
-                    timerJob.FileStateTracker.SetAllFileStates(persistentJob.FileStates);
-                    _logService.LogInfo(string.Format("Restored {0} file states for job {1}", persistentJob.FileStates.Count, persistentJob.JobId));
+                    // Convert List back to Dictionary
+                    var fileStatesDict = new Dictionary<string, FileState>();
+                    foreach (var fileState in persistentJob.FileStatesList)
+                    {
+                        if (!string.IsNullOrEmpty(fileState.FilePath) && !fileStatesDict.ContainsKey(fileState.FilePath))
+                        {
+                            fileStatesDict[fileState.FilePath] = fileState;
+                        }
+                    }
+                    timerJob.FileStateTracker.SetAllFileStates(fileStatesDict);
+                    _logService.LogInfo(string.Format("Restored {0} file states for job {1}", persistentJob.FileStatesList.Count, persistentJob.JobId));
                 }
 
                 // Restore locked file tracking data
-                if (persistentJob.LockedFiles != null && persistentJob.LockedFiles.Count > 0)
+                if (persistentJob.LockedFilesList != null && persistentJob.LockedFilesList.Count > 0)
                 {
-                    timerJob.FileRetryManager.SetAllLockedFileStates(persistentJob.LockedFiles);
-                    _logService.LogInfo(string.Format("Restored {0} locked file states for job {1}", persistentJob.LockedFiles.Count, persistentJob.JobId));
+                    // Convert List back to Dictionary
+                    var lockedFilesDict = new Dictionary<string, LockedFileInfo>();
+                    foreach (var lockedFile in persistentJob.LockedFilesList)
+                    {
+                        if (!string.IsNullOrEmpty(lockedFile.FilePath) && !lockedFilesDict.ContainsKey(lockedFile.FilePath))
+                        {
+                            lockedFilesDict[lockedFile.FilePath] = lockedFile;
+                        }
+                    }
+                    timerJob.FileRetryManager.SetAllLockedFileStates(lockedFilesDict);
+                    _logService.LogInfo(string.Format("Restored {0} locked file states for job {1}", persistentJob.LockedFilesList.Count, persistentJob.JobId));
                 }
 
                 // Setup timer
@@ -2239,6 +2611,44 @@ namespace syncer.ui.Services
                     _timerJobs[jobId].IsUploadInProgress = false;
                     _timerJobs[jobId].UploadStartTime = null;
                 }
+            }
+        }
+        
+        /// <summary>
+        /// Cleanup method to dispose resources and save final state
+        /// </summary>
+        public void Dispose()
+        {
+            try
+            {
+                _logService.LogInfo("TimerJobManager disposing - saving final state...", "TimerJobManager");
+                
+                // Save final state before cleanup
+                SaveTimerJobsState();
+                
+                // Stop and dispose auto-save timer
+                if (_autoSaveTimer != null)
+                {
+                    _autoSaveTimer.Stop();
+                    _autoSaveTimer.Dispose();
+                    _autoSaveTimer = null;
+                }
+                
+                // Stop all timer jobs
+                foreach (var job in _timerJobs.Values)
+                {
+                    if (job.Timer != null)
+                    {
+                        job.Timer.Stop();
+                        job.Timer.Dispose();
+                    }
+                }
+                
+                _logService.LogInfo("TimerJobManager disposed successfully", "TimerJobManager");
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError("Error disposing TimerJobManager: " + ex.Message, "TimerJobManager");
             }
         }
     }

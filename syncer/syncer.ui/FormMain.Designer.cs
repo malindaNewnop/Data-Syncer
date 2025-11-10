@@ -371,7 +371,6 @@ namespace syncer.ui
             this.dgvTimerJobs.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.dgvTimerJobs.Location = new System.Drawing.Point(6, 105);
             this.dgvTimerJobs.Name = "dgvTimerJobs";
-            this.dgvTimerJobs.ReadOnly = true;
             this.dgvTimerJobs.RowHeadersWidth = 51;
             this.dgvTimerJobs.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             this.dgvTimerJobs.Size = new System.Drawing.Size(964, 233);

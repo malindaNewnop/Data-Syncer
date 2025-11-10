@@ -12,12 +12,15 @@ namespace syncer.ui
     {
         private ILogService _logService;
         private DataTable _logsDataTable;
+        private Timer _autoRefreshTimer;
+        private const int MAX_LOG_ENTRIES = 1000; // Maximum number of logs to display
 
         public FormLogs()
         {
             InitializeComponent();
             InitializeServices();
             InitializeCustomComponents();
+            SetupAutoRefresh();
         }
 
         private void InitializeServices()
@@ -29,12 +32,91 @@ namespace syncer.ui
                 {
                     throw new InvalidOperationException("LogService is not available from ServiceLocator");
                 }
+                
+                // Subscribe to log entry events for auto-refresh
+                if (_logService != null)
+                {
+                    var eventInfo = _logService.GetType().GetEvent("LogEntryAdded");
+                    if (eventInfo != null)
+                    {
+                        var handler = new EventHandler<LogEntryEventArgs>(OnLogEntryAdded);
+                        eventInfo.AddEventHandler(_logService, handler);
+                    }
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Error initializing services: " + ex.Message, "Error",
                               MessageBoxButtons.OK, MessageBoxIcon.Error);
                 throw; // Re-throw to prevent further execution with null service
+            }
+        }
+        
+        /// <summary>
+        /// Setup auto-refresh timer for periodic updates
+        /// </summary>
+        private void SetupAutoRefresh()
+        {
+            _autoRefreshTimer = new Timer();
+            _autoRefreshTimer.Interval = 5000; // Refresh every 5 seconds
+            _autoRefreshTimer.Tick += AutoRefreshTimer_Tick;
+            _autoRefreshTimer.Start();
+        }
+        
+        private void AutoRefreshTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                // Only refresh if form is visible and not in the middle of an operation
+                if (this.Visible && !dgvLogs.IsCurrentCellInEditMode)
+                {
+                    LoadLogs(); // Use existing LoadLogs method
+                }
+            }
+            catch
+            {
+                // Ignore errors during auto-refresh
+            }
+        }
+        
+        /// <summary>
+        /// Event handler for new log entries (real-time update)
+        /// </summary>
+        private void OnLogEntryAdded(object sender, LogEntryEventArgs e)
+        {
+            try
+            {
+                if (InvokeRequired)
+                {
+                    Invoke(new Action<object, LogEntryEventArgs>(OnLogEntryAdded), sender, e);
+                    return;
+                }
+
+                // Add the new log entry to the data table
+                if (_logsDataTable != null && e != null)
+                {
+                    DataRow newRow = _logsDataTable.NewRow();
+                    newRow["Timestamp"] = e.Timestamp;
+                    newRow["Level"] = e.Level ?? "Info";
+                    newRow["Source"] = e.Source ?? "";
+                    newRow["Message"] = e.Message ?? "";
+                    newRow["JobID"] = e.JobName ?? ""; // Use JobName for JobID
+                    
+                    _logsDataTable.Rows.InsertAt(newRow, 0); // Insert at top (newest first)
+                    
+                    // Keep only the most recent MAX_LOG_ENTRIES
+                    while (_logsDataTable.Rows.Count > MAX_LOG_ENTRIES)
+                    {
+                        _logsDataTable.Rows.RemoveAt(_logsDataTable.Rows.Count - 1);
+                    }
+                    
+                    UpdateLogCount();
+                    UpdateLastUpdatedLabel();
+                }
+            }
+            catch
+            {
+                // Silently handle errors in event handler
             }
         }
 
@@ -300,14 +382,6 @@ namespace syncer.ui
                         jobNameColumn.DisplayIndex = 2;
                         jobNameColumn.Visible = true;
                     }
-                    else if (dgvLogs.Columns.Contains("JobId"))
-                    {
-                        var jobIdColumn = dgvLogs.Columns["JobId"];
-                        jobIdColumn.HeaderText = "Job";
-                        jobIdColumn.Width = 100;
-                        jobIdColumn.DisplayIndex = 2;
-                        jobIdColumn.Visible = true;
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -355,10 +429,10 @@ namespace syncer.ui
                         _logService.LogError("Error configuring Message column: " + ex.Message, "UI");
                 }
 
-                // Hide unwanted columns
+                // Hide unwanted columns including JobId
                 try
                 {
-                    string[] hiddenColumns = { "Exception", "FileName", "FileSize", "Duration", "RemotePath", "LocalPath" };
+                    string[] hiddenColumns = { "JobId", "Exception", "FileName", "FileSize", "Duration", "RemotePath", "LocalPath" };
                     foreach (string columnName in hiddenColumns)
                     {
                         if (dgvLogs.Columns.Contains(columnName))
@@ -411,6 +485,21 @@ namespace syncer.ui
                 if (_logsDataTable != null)
                 {
                     _logsDataTable = EnsureConsistentLogStructure(_logsDataTable);
+                }
+                
+                // Limit to most recent MAX_LOG_ENTRIES (1000)
+                if (_logsDataTable != null && _logsDataTable.Rows.Count > MAX_LOG_ENTRIES)
+                {
+                    // Create a sorted view and take only the most recent entries
+                    DataView dv = new DataView(_logsDataTable);
+                    dv.Sort = "Timestamp DESC";
+                    
+                    DataTable limitedTable = _logsDataTable.Clone();
+                    for (int i = 0; i < MAX_LOG_ENTRIES && i < dv.Count; i++)
+                    {
+                        limitedTable.ImportRow(dv[i].Row);
+                    }
+                    _logsDataTable = limitedTable;
                 }
 
                 if (dgvLogs != null && _logsDataTable != null)
@@ -1032,20 +1121,94 @@ namespace syncer.ui
         /// </summary>
         private void InitializeRealTimeLogging()
         {
-            chkEnableRealTimeLogging.Checked = false;
-            txtRealTimeLogPath.Text = "";
-            lblRealTimeLogPath.Enabled = false;
-            txtRealTimeLogPath.Enabled = false;
-            btnBrowseRealTimeLogPath.Enabled = false;
-            lblRealTimeStatus.Text = "Real-time logging disabled";
-            lblRealTimeStatus.ForeColor = Color.Gray;
+            // Load settings from a simple config file
+            bool enabledByDefault = true; // Default to enabled
+            string savedPath = "";
             
-            // Set default file path suggestion
-            string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string dataFolderPath = System.IO.Path.Combine(documentsPath, "DataSyncerLogs");
-            string defaultPath = System.IO.Path.Combine(dataFolderPath, 
-                string.Format("syncer_realtime_{0:yyyyMMdd}.csv", DateTime.Now));
-            txtRealTimeLogPath.Text = defaultPath;
+            try
+            {
+                string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string settingsPath = System.IO.Path.Combine(appDataPath, "DataSyncer");
+                settingsPath = System.IO.Path.Combine(settingsPath, "FormLogs.settings");
+                    
+                if (System.IO.File.Exists(settingsPath))
+                {
+                    var lines = System.IO.File.ReadAllLines(settingsPath);
+                    foreach (var line in lines)
+                    {
+                        if (line.StartsWith("EnableRealTimeLogging="))
+                        {
+                            bool.TryParse(line.Substring("EnableRealTimeLogging=".Length), out enabledByDefault);
+                        }
+                        else if (line.StartsWith("RealTimeLogPath="))
+                        {
+                            savedPath = line.Substring("RealTimeLogPath=".Length);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore errors loading settings
+            }
+            
+            // Set default file path suggestion if not saved
+            if (string.IsNullOrEmpty(savedPath))
+            {
+                string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                string dataFolderPath = System.IO.Path.Combine(documentsPath, "DataSyncerLogs");
+                savedPath = System.IO.Path.Combine(dataFolderPath, 
+                    string.Format("syncer_realtime_{0:yyyyMMdd}.log", DateTime.Now));
+            }
+            
+            txtRealTimeLogPath.Text = savedPath;
+            chkEnableRealTimeLogging.Checked = enabledByDefault;
+            
+            if (!enabledByDefault)
+            {
+                lblRealTimeLogPath.Enabled = false;
+                txtRealTimeLogPath.Enabled = false;
+                btnBrowseRealTimeLogPath.Enabled = false;
+                lblRealTimeStatus.Text = "Log file creation disabled";
+                lblRealTimeStatus.ForeColor = Color.Gray;
+            }
+            else
+            {
+                lblRealTimeLogPath.Enabled = true;
+                txtRealTimeLogPath.Enabled = true;
+                btnBrowseRealTimeLogPath.Enabled = true;
+            }
+        }
+        
+        /// <summary>
+        /// Save real-time logging settings
+        /// </summary>
+        private void SaveRealTimeLoggingSettings()
+        {
+            try
+            {
+                string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string settingsDir = System.IO.Path.Combine(appDataPath, "DataSyncer");
+                    
+                if (!System.IO.Directory.Exists(settingsDir))
+                {
+                    System.IO.Directory.CreateDirectory(settingsDir);
+                }
+                
+                string settingsPath = System.IO.Path.Combine(settingsDir, "FormLogs.settings");
+                
+                string[] lines = new string[]
+                {
+                    "EnableRealTimeLogging=" + chkEnableRealTimeLogging.Checked.ToString(),
+                    "RealTimeLogPath=" + txtRealTimeLogPath.Text
+                };
+                
+                System.IO.File.WriteAllLines(settingsPath, lines);
+            }
+            catch
+            {
+                // Ignore errors saving settings
+            }
         }
 
         /// <summary>
@@ -1068,7 +1231,7 @@ namespace syncer.ui
                     string logPath = txtRealTimeLogPath.Text.Trim();
                     if (string.IsNullOrEmpty(logPath))
                     {
-                        MessageBox.Show("Please select a CSV file path first.", "Real-Time Logging",
+                        MessageBox.Show("Please select a log file path first.", "Create Log File",
                                       MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         chkEnableRealTimeLogging.Checked = false;
                         return;
@@ -1096,20 +1259,20 @@ namespace syncer.ui
                             throw new NotSupportedException("Current log service does not support real-time logging");
                         }
                         
-                        lblRealTimeStatus.Text = "Real-time logging enabled";
+                        lblRealTimeStatus.Text = "Log file creation enabled";
                         lblRealTimeStatus.ForeColor = Color.Green;
 
-                        MessageBox.Show(string.Format("Real-time logging enabled to:\r\n{0}", logPath),
-                                      "Real-Time Logging", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show(string.Format("Log file creation enabled:\r\n{0}", logPath),
+                                      "Create Log File", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     catch (Exception ex)
                     {
                         chkEnableRealTimeLogging.Checked = false;
-                        lblRealTimeStatus.Text = "Failed to enable real-time logging";
+                        lblRealTimeStatus.Text = "Failed to enable log file creation";
                         lblRealTimeStatus.ForeColor = Color.Red;
                         
-                        MessageBox.Show(string.Format("Failed to enable real-time logging:\r\n{0}", ex.Message),
-                                      "Real-Time Logging Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        MessageBox.Show(string.Format("Failed to enable log file creation:\r\n{0}", ex.Message),
+                                      "Create Log File Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
                 else
@@ -1132,19 +1295,19 @@ namespace syncer.ui
                             disableMethod.Invoke(_logService, new object[0]);
                         }
 
-                        lblRealTimeStatus.Text = "Real-time logging disabled";
+                        lblRealTimeStatus.Text = "Log file creation disabled";
                         lblRealTimeStatus.ForeColor = Color.Gray;
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show(string.Format("Error disabling real-time logging:\r\n{0}", ex.Message),
-                                      "Real-Time Logging Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show(string.Format("Error disabling log file creation:\r\n{0}", ex.Message),
+                                      "Create Log File Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error in real-time logging toggle: " + ex.Message, "Error",
+                MessageBox.Show("Error in log file creation toggle: " + ex.Message, "Error",
                               MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -1158,10 +1321,10 @@ namespace syncer.ui
             {
                 using (SaveFileDialog saveDialog = new SaveFileDialog())
                 {
-                    saveDialog.Title = "Select Real-Time Log File";
-                    saveDialog.Filter = "CSV Files (*.csv)|*.csv|Text Files (*.txt)|*.txt|All Files (*.*)|*.*";
+                    saveDialog.Title = "Select Log File";
+                    saveDialog.Filter = "Log Files (*.log)|*.log|Text Files (*.txt)|*.txt|All Files (*.*)|*.*";
                     saveDialog.FilterIndex = 1;
-                    saveDialog.DefaultExt = "csv";
+                    saveDialog.DefaultExt = "log";
                     
                     // Set initial directory and filename
                     if (!string.IsNullOrEmpty(txtRealTimeLogPath.Text))
@@ -1177,14 +1340,14 @@ namespace syncer.ui
                             // Use default if current path is invalid
                             string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
                             saveDialog.InitialDirectory = documentsPath;
-                            saveDialog.FileName = string.Format("syncer_realtime_{0:yyyyMMdd}.csv", DateTime.Now);
+                            saveDialog.FileName = string.Format("syncer_realtime_{0:yyyyMMdd}.log", DateTime.Now);
                         }
                     }
                     else
                     {
                         string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
                         saveDialog.InitialDirectory = documentsPath;
-                        saveDialog.FileName = string.Format("syncer_realtime_{0:yyyyMMdd}.csv", DateTime.Now);
+                        saveDialog.FileName = string.Format("syncer_realtime_{0:yyyyMMdd}.log", DateTime.Now);
                     }
 
                     if (saveDialog.ShowDialog() == DialogResult.OK)
@@ -1234,6 +1397,28 @@ namespace syncer.ui
         {
             try
             {
+                // Stop auto-refresh timer
+                if (_autoRefreshTimer != null)
+                {
+                    _autoRefreshTimer.Stop();
+                    _autoRefreshTimer.Dispose();
+                    _autoRefreshTimer = null;
+                }
+                
+                // Unsubscribe from LogEntryAdded event
+                if (_logService != null)
+                {
+                    var eventInfo = _logService.GetType().GetEvent("LogEntryAdded");
+                    if (eventInfo != null)
+                    {
+                        var handler = new EventHandler<LogEntryEventArgs>(OnLogEntryAdded);
+                        eventInfo.RemoveEventHandler(_logService, handler);
+                    }
+                }
+                
+                // Save the settings before closing
+                SaveRealTimeLoggingSettings();
+                
                 if (_logService != null)
                 {
                     // Check if real-time logging is enabled using reflection
@@ -1255,12 +1440,8 @@ namespace syncer.ui
                             eventInfo.RemoveEventHandler(_logService, handler);
                         }
 
-                        // Disable real-time logging using reflection
-                        var disableMethod = _logService.GetType().GetMethod("DisableRealTimeLogging");
-                        if (disableMethod != null)
-                        {
-                            disableMethod.Invoke(_logService, new object[0]);
-                        }
+                        // Note: Don't disable real-time logging here - keep it running
+                        // User explicitly enabled it, so keep it active even after form closes
                     }
                 }
             }

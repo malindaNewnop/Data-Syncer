@@ -283,21 +283,47 @@ namespace syncer.core.Transfers
                     client = CreateSftpClient(settings);
                     client.Connect();
 
-                    // Check if file exists and overwrite is false
-                    if (!overwrite && client.Exists(remotePath))
+                    // Check if file exists on remote
+                    if (client.Exists(remotePath))
                     {
                         var attrs = client.GetAttributes(remotePath);
                         if (attrs.IsRegularFile)
                         {
-                            error = string.Format("Destination file already exists: {0}", remotePath);
-                            
-                            // Clean up temp copy if created
-                            if (usedTempCopy && tempCopyPath != null)
+                            // If overwrite is false, return error
+                            if (!overwrite)
                             {
-                                LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                                error = string.Format("Destination file already exists: {0}", remotePath);
+                                
+                                // Clean up temp copy if created
+                                if (usedTempCopy && tempCopyPath != null)
+                                {
+                                    LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                                }
+                                
+                                return false;
                             }
                             
-                            return false;
+                            // If overwrite is true, compare file modification times to skip unchanged files
+                            // Only upload if local file is newer than remote file
+                            var localFileInfo = new FileInfo(sourceFilePath);
+                            var remoteModifiedTime = attrs.LastWriteTime;
+                            var localModifiedTime = localFileInfo.LastWriteTime;
+                            
+                            // Compare file sizes and modification times
+                            // Skip upload if both size and modification time are the same
+                            if (localFileInfo.Length == attrs.Size && 
+                                Math.Abs((localModifiedTime - remoteModifiedTime).TotalSeconds) < 2)
+                            {
+                                // Files are identical, skip upload
+                                // Clean up temp copy if created
+                                if (usedTempCopy && tempCopyPath != null)
+                                {
+                                    LockedFileHandler.CleanupTempCopy(tempCopyPath);
+                                }
+                                
+                                // Return success since file is already up to date
+                                return true;
+                            }
                         }
                     }
 
@@ -356,6 +382,22 @@ namespace syncer.core.Transfers
                         var remoteAttrs = client.GetAttributes(remotePath);
                         if (remoteAttrs.Size == _currentFileSize)
                         {
+                            // Preserve the original file's modification time
+                            try
+                            {
+                                var originalFileInfo = new FileInfo(localPath);
+                                var attrs = client.GetAttributes(remotePath);
+                                attrs.LastWriteTime = originalFileInfo.LastWriteTime;
+                                attrs.LastAccessTime = originalFileInfo.LastAccessTime;
+                                client.SetAttributes(remotePath, attrs);
+                            }
+                            catch (Exception timeEx)
+                            {
+                                // Log warning but don't fail the transfer if time setting fails
+                                // The file was successfully uploaded, just timestamp couldn't be set
+                                System.Diagnostics.Debug.WriteLine("Warning: Failed to set remote file timestamp: " + timeEx.Message);
+                            }
+                            
                             // Clean up temp copy if created
                             if (usedTempCopy && tempCopyPath != null)
                             {

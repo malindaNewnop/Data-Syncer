@@ -197,7 +197,9 @@ namespace syncer.core
             json.AppendLine($"  \"ServiceName\": \"{EscapeJsonString(settings.ServiceName)}\",");
             json.AppendLine($"  \"ServiceDisplayName\": \"{EscapeJsonString(settings.ServiceDisplayName)}\",");
             json.AppendLine($"  \"TempFolder\": \"{EscapeJsonString(settings.TempFolder)}\",");
-            json.AppendLine($"  \"LogFolder\": \"{EscapeJsonString(settings.LogFolder)}\"");
+            json.AppendLine($"  \"LogFolder\": \"{EscapeJsonString(settings.LogFolder)}\",");
+            json.AppendLine($"  \"EnableRealTimeLogging\": {settings.EnableRealTimeLogging.ToString().ToLower()},");
+            json.AppendLine($"  \"RealTimeLogPath\": \"{EscapeJsonString(settings.RealTimeLogPath)}\"");
             
             json.AppendLine("}");
             return json.ToString();
@@ -259,6 +261,13 @@ namespace syncer.core
                                 case "LogFolder":
                                     settings.LogFolder = UnescapeJsonString(value.Trim('"'));
                                     break;
+                                case "EnableRealTimeLogging":
+                                    if (bool.TryParse(value, out bool enableRealTime))
+                                        settings.EnableRealTimeLogging = enableRealTime;
+                                    break;
+                                case "RealTimeLogPath":
+                                    settings.RealTimeLogPath = UnescapeJsonString(value.Trim('"'));
+                                    break;
                             }
                         }
                     }
@@ -302,6 +311,10 @@ namespace syncer.core
         public string ServiceDisplayName { get; set; }
         public string TempFolder { get; set; }
         public string LogFolder { get; set; }
+        
+        // Real-time logging settings
+        public bool EnableRealTimeLogging { get; set; }
+        public string RealTimeLogPath { get; set; }
 
         public AppSettings()
         {
@@ -316,6 +329,9 @@ namespace syncer.core
             ServiceDisplayName = "FTPSyncer Service";
             TempFolder = Paths.TempFolder;
             
+            // Real-time logging defaults
+            EnableRealTimeLogging = true; // Default to enabled
+            RealTimeLogPath = "";
         }
     }
 }

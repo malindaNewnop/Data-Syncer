@@ -14,7 +14,8 @@ namespace syncer.core.Services
     public class EnhancedLogService : ILogService
     {
         private readonly string _logFolder;
-        private readonly string _logFile;
+        private string _logFile;
+        private string _currentLogDate; // Track current date for daily rotation
         private readonly int _maxLogSizeKB;
         private readonly int _keepLogDays;
         private readonly LogLevel _minLevel;
@@ -37,8 +38,8 @@ namespace syncer.core.Services
             _maxRecentLogs = 1000; // Keep last 1000 log entries in memory
             
             // Create log file name with date
-            string dateStr = DateTime.Now.ToString("yyyyMMdd");
-            _logFile = Path.Combine(_logFolder, $"syncer_{dateStr}.log");
+            _currentLogDate = DateTime.Now.ToString("yyyyMMdd");
+            _logFile = Path.Combine(_logFolder, string.Format("syncer_{0}.log", _currentLogDate));
             
             EnsureLogFolder();
             PerformLogMaintenance();
@@ -97,7 +98,9 @@ namespace syncer.core.Services
         public void LogJobStart(SyncJob job)
         {
             if (job == null) return;
-            LogInfo($"Job '{job.Name}' started. Source: {job.SourcePath}, Destination: {job.DestinationPath}", "JobManager");
+            string message = string.Format("Job '{0}' started. Source: {1}, Destination: {2}", 
+                job.Name, job.SourcePath, job.DestinationPath);
+            LogMessage(LogLevel.Info, message, "JobManager", null, job.Id);
         }
 
         /// <summary>
@@ -106,7 +109,8 @@ namespace syncer.core.Services
         public void LogJobProgress(SyncJob job, string message)
         {
             if (job == null) return;
-            LogInfo($"Job '{job.Name}' progress: {message}", "JobManager");
+            string fullMessage = string.Format("Job '{0}' progress: {1}", job.Name, message);
+            LogMessage(LogLevel.Info, fullMessage, "JobManager", null, job.Id);
         }
 
         /// <summary>
@@ -115,7 +119,8 @@ namespace syncer.core.Services
         public void LogJobSuccess(SyncJob job, string message)
         {
             if (job == null) return;
-            LogInfo($"Job '{job.Name}' completed successfully: {message}", "JobManager");
+            string fullMessage = string.Format("Job '{0}' completed successfully: {1}", job.Name, message);
+            LogMessage(LogLevel.Info, fullMessage, "JobManager", null, job.Id);
         }
 
         /// <summary>
@@ -125,10 +130,8 @@ namespace syncer.core.Services
         {
             if (job == null) return;
             
-            if (ex != null)
-                LogError($"Job '{job.Name}' error: {message}", ex, "JobManager");
-            else
-                LogError($"Job '{job.Name}' error: {message}", "JobManager");
+            string fullMessage = string.Format("Job '{0}' error: {1}", job.Name, message);
+            LogMessage(LogLevel.Error, fullMessage, "JobManager", ex, job.Id);
         }
 
         /// <summary>
@@ -163,7 +166,7 @@ namespace syncer.core.Services
         /// <summary>
         /// Core logging method
         /// </summary>
-        private void LogMessage(LogLevel level, string message, string source, Exception ex = null)
+        private void LogMessage(LogLevel level, string message, string source, Exception ex = null, string jobId = null)
         {
             if (string.IsNullOrEmpty(message))
                 return;
@@ -179,10 +182,12 @@ namespace syncer.core.Services
                 Message = message,
                 Source = logSource,
                 ThreadId = threadId,
-                Exception = ex
+                Exception = ex,
+                JobId = jobId
             };
             
-            string formattedMessage = $"{timestamp} [{level}] [{threadId}] [{logSource}] {message}";
+            string formattedMessage = string.Format("{0} [{1}] [{2}] [{3}] {4}", 
+                timestamp, level, threadId, logSource, message);
             
             lock (_logLock)
             {
@@ -222,7 +227,15 @@ namespace syncer.core.Services
                     }
                     
                     // Trigger event
-                    OnLogEntryAdded(new LogEntryEventArgs { LogEntry = logEntry });
+                    OnLogEntryAdded(new LogEntryEventArgs 
+                    { 
+                        Timestamp = logEntry.Timestamp,
+                        Level = logEntry.Level.ToString(),
+                        Source = logEntry.Source,
+                        Message = logEntry.Message,
+                        JobName = logEntry.JobId,
+                        Exception = logEntry.Exception
+                    });
                 }
                 catch (Exception e)
                 {
@@ -240,7 +253,30 @@ namespace syncer.core.Services
         {
             try
             {
-                // Check if we need to rotate log file
+                // Check if date has changed - create new file for new day
+                string currentDate = DateTime.Now.ToString("yyyyMMdd");
+                if (_currentLogDate != currentDate)
+                {
+                    _currentLogDate = currentDate;
+                    _logFile = Path.Combine(_logFolder, string.Format("syncer_{0}.log", _currentLogDate));
+                    
+                    // Log the rotation
+                    string rotationMessage = string.Format("{0} [INFO] [LogService] New day - switched to new log file: {1}",
+                        DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"), _logFile);
+                    
+                    // Ensure directory exists
+                    Directory.CreateDirectory(Path.GetDirectoryName(_logFile));
+                    
+                    // Create new file with header
+                    using (StreamWriter writer = new StreamWriter(_logFile, true, Encoding.UTF8))
+                    {
+                        writer.WriteLine(rotationMessage);
+                        writer.WriteLine(message);
+                    }
+                    return;
+                }
+                
+                // Check if we need to rotate log file based on size
                 if (File.Exists(_logFile))
                 {
                     var fileInfo = new FileInfo(_logFile);
@@ -360,6 +396,8 @@ namespace syncer.core.Services
         
         private bool _realTimeLoggingEnabled = false;
         private string _realTimeLogPath = null;
+        private string _realTimeLogBasePath = null; // Base path without date for daily rotation
+        private string _realTimeLogDate = null; // Current date for real-time log
         private StreamWriter _realTimeCsvWriter = null;
         private readonly object _realTimeLock = new object();
         
@@ -385,15 +423,24 @@ namespace syncer.core.Services
                     if (!Directory.Exists(directory))
                         Directory.CreateDirectory(directory);
 
-                    _realTimeLogPath = customFilePath;
+                    // Store base path and add date to filename
+                    _realTimeLogBasePath = customFilePath;
+                    _realTimeLogDate = DateTime.Now.ToString("yyyyMMdd");
                     
-                    // Initialize CSV writer
+                    // Insert date before file extension
+                    string fileNameWithoutExt = Path.GetFileNameWithoutExtension(customFilePath);
+                    string extension = Path.GetExtension(customFilePath);
+                    string directoryPath = Path.GetDirectoryName(customFilePath);
+                    _realTimeLogPath = Path.Combine(directoryPath, 
+                        string.Format("{0}_{1}{2}", fileNameWithoutExt, _realTimeLogDate, extension));
+                    
+                    // Initialize log writer (plain text format)
                     _realTimeCsvWriter = new StreamWriter(_realTimeLogPath, true, Encoding.UTF8);
                     
-                    // Write CSV header if file is new/empty
+                    // Write header if file is new/empty
                     if (new FileInfo(_realTimeLogPath).Length == 0)
                     {
-                        _realTimeCsvWriter.WriteLine("Timestamp,Level,Source,Message,Exception");
+                        _realTimeCsvWriter.WriteLine("=== Log File Started: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " ===");
                         _realTimeCsvWriter.Flush();
                     }
                     
@@ -479,7 +526,17 @@ namespace syncer.core.Services
             // Also trigger real-time logging if enabled
             if (_realTimeLoggingEnabled)
             {
-                WriteToRealTimeLog(e.LogEntry);
+                // Create LogEntry from EventArgs for real-time logging
+                var logEntry = new LogEntry
+                {
+                    Timestamp = e.Timestamp,
+                    Level = (LogLevel)Enum.Parse(typeof(LogLevel), e.Level),
+                    Source = e.Source,
+                    Message = e.Message,
+                    Exception = e.Exception,
+                    JobId = e.JobName
+                };
+                WriteToRealTimeLog(logEntry);
                 OnRealTimeLogEntry(e);
             }
         }
@@ -493,15 +550,49 @@ namespace syncer.core.Services
             {
                 try
                 {
-                    string csvLine = string.Format("{0},{1},{2},{3},{4}",
-                        EscapeCSVField(logEntry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")),
-                        EscapeCSVField(logEntry.Level.ToString()),
-                        EscapeCSVField(logEntry.Source ?? ""),
-                        EscapeCSVField(logEntry.Message ?? ""),
-                        EscapeCSVField(logEntry.Exception != null ? logEntry.Exception.ToString() : "")
+                    // Check if date has changed - create new file for new day
+                    string currentDate = DateTime.Now.ToString("yyyyMMdd");
+                    if (_realTimeLogDate != currentDate && !string.IsNullOrEmpty(_realTimeLogBasePath))
+                    {
+                        // Close current writer
+                        if (_realTimeCsvWriter != null)
+                        {
+                            _realTimeCsvWriter.WriteLine("=== Log File Ended: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " (New day started) ===");
+                            _realTimeCsvWriter.Flush();
+                            _realTimeCsvWriter.Close();
+                            _realTimeCsvWriter.Dispose();
+                        }
+                        
+                        // Update date and create new file path
+                        _realTimeLogDate = currentDate;
+                        string fileNameWithoutExt = Path.GetFileNameWithoutExtension(_realTimeLogBasePath);
+                        string extension = Path.GetExtension(_realTimeLogBasePath);
+                        string directoryPath = Path.GetDirectoryName(_realTimeLogBasePath);
+                        _realTimeLogPath = Path.Combine(directoryPath, 
+                            string.Format("{0}_{1}{2}", fileNameWithoutExt, _realTimeLogDate, extension));
+                        
+                        // Create new writer
+                        _realTimeCsvWriter = new StreamWriter(_realTimeLogPath, true, Encoding.UTF8);
+                        _realTimeCsvWriter.WriteLine("=== Log File Started: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " ===");
+                        _realTimeCsvWriter.Flush();
+                    }
+                    
+                    // Write in plain text format instead of CSV
+                    string logLine = string.Format("[{0}] [{1}] {2}: {3}",
+                        logEntry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff"),
+                        logEntry.Level.ToString().ToUpper(),
+                        string.IsNullOrEmpty(logEntry.Source) ? "General" : logEntry.Source,
+                        logEntry.Message ?? ""
                     );
-
-                    _realTimeCsvWriter.WriteLine(csvLine);
+                    
+                    _realTimeCsvWriter.WriteLine(logLine);
+                    
+                    // If there's an exception, write it on the next line with indentation
+                    if (logEntry.Exception != null)
+                    {
+                        _realTimeCsvWriter.WriteLine("    Exception: " + logEntry.Exception.ToString());
+                    }
+                    
                     _realTimeCsvWriter.Flush(); // Ensure immediate write for real-time
                 }
                 catch
@@ -545,6 +636,9 @@ namespace syncer.core.Services
     /// <summary>
     /// Represents a log entry
     /// </summary>
+    /// <summary>
+    /// Represents a log entry
+    /// </summary>
     public class LogEntry
     {
         public DateTime Timestamp { get; set; }
@@ -553,6 +647,7 @@ namespace syncer.core.Services
         public string Source { get; set; }
         public string ThreadId { get; set; }
         public Exception Exception { get; set; }
+        public string JobId { get; set; }
     }
 
     /// <summary>

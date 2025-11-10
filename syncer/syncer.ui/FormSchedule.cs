@@ -84,6 +84,9 @@ namespace syncer.ui
         
         private void FormSchedule_FormClosing(object sender, FormClosingEventArgs e)
         {
+            // Save checkbox preferences before closing
+            SaveCheckboxPreferences();
+            
             // If a timer is running and no job has been saved, warn the user
             if (_isTimerRunning && _currentJob?.Id == null)
             {
@@ -846,6 +849,128 @@ namespace syncer.ui
             // Initialize timer upload settings
             _selectedFilesForTimer = null;
             _timerUploadDestination = "/";
+            
+            // Load saved checkbox preferences from configuration
+            LoadCheckboxPreferences();
+        }
+        
+        /// <summary>
+        /// Load saved checkbox state preferences from configuration
+        /// </summary>
+        private void LoadCheckboxPreferences()
+        {
+            try
+            {
+                var configService = ServiceLocator.ConfigurationService;
+                if (configService != null)
+                {
+                    // Load Include Subfolders preference (default: true)
+                    bool includeSubfolders = configService.GetSetting("FormSchedule_IncludeSubfolders", true);
+                    if (chkIncludeSubfolders != null)
+                    {
+                        chkIncludeSubfolders.Checked = includeSubfolders;
+                    }
+                    
+                    // Load Delete After Transfer preference (default: false)
+                    bool deleteAfterTransfer = configService.GetSetting("FormSchedule_DeleteAfterTransfer", false);
+                    CheckBox chkDeleteAfterTransfer = FindControlByName<CheckBox>("chkDeleteAfterTransfer");
+                    if (chkDeleteAfterTransfer != null)
+                    {
+                        chkDeleteAfterTransfer.Checked = deleteAfterTransfer;
+                    }
+                    
+                    // Load Enable Filters preference (default: false)
+                    bool enableFilters = configService.GetSetting("FormSchedule_EnableFilters", false);
+                    if (chkEnableFilters != null)
+                    {
+                        chkEnableFilters.Checked = enableFilters;
+                        UpdateFilterControlsVisibility();
+                    }
+                    
+                    ServiceLocator.LogService?.LogInfo("Loaded checkbox preferences from configuration", "FormSchedule");
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService?.LogWarning($"Error loading checkbox preferences: {ex.Message}", "FormSchedule");
+            }
+        }
+        
+        /// <summary>
+        /// Save checkbox state preferences to configuration
+        /// </summary>
+        private void SaveCheckboxPreferences()
+        {
+            try
+            {
+                var configService = ServiceLocator.ConfigurationService;
+                if (configService != null)
+                {
+                    // Save Include Subfolders state
+                    if (chkIncludeSubfolders != null)
+                    {
+                        configService.SaveSetting("FormSchedule_IncludeSubfolders", chkIncludeSubfolders.Checked);
+                    }
+                    
+                    // Save Delete After Transfer state
+                    CheckBox chkDeleteAfterTransfer = FindControlByName<CheckBox>("chkDeleteAfterTransfer");
+                    if (chkDeleteAfterTransfer != null)
+                    {
+                        configService.SaveSetting("FormSchedule_DeleteAfterTransfer", chkDeleteAfterTransfer.Checked);
+                    }
+                    
+                    // Save Enable Filters state
+                    if (chkEnableFilters != null)
+                    {
+                        configService.SaveSetting("FormSchedule_EnableFilters", chkEnableFilters.Checked);
+                    }
+                    
+                    ServiceLocator.LogService?.LogInfo("Saved checkbox preferences to configuration", "FormSchedule");
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService?.LogWarning($"Error saving checkbox preferences: {ex.Message}", "FormSchedule");
+            }
+        }
+        
+        /// <summary>
+        /// Helper method to find a control by name
+        /// </summary>
+        private T FindControlByName<T>(string name) where T : Control
+        {
+            foreach (Control control in this.Controls)
+            {
+                if (control.Name == name && control is T)
+                {
+                    return control as T;
+                }
+                
+                // Search in child controls recursively
+                T found = FindControlInChildren<T>(control, name);
+                if (found != null)
+                    return found;
+            }
+            return null;
+        }
+        
+        /// <summary>
+        /// Recursively search for control in children
+        /// </summary>
+        private T FindControlInChildren<T>(Control parent, string name) where T : Control
+        {
+            foreach (Control child in parent.Controls)
+            {
+                if (child.Name == name && child is T)
+                {
+                    return child as T;
+                }
+                
+                T found = FindControlInChildren<T>(child, name);
+                if (found != null)
+                    return found;
+            }
+            return null;
         }
 
         private void LoadJobSettings()
@@ -1306,20 +1431,21 @@ namespace syncer.ui
                                     _currentJob.EnableFilters, includeExtensions, excludeExtensions);
                             }
                             
-                            bool isTimerCurrentlyRunning = (_currentTransferMode == "Upload" && _isTimerRunning) ||
-                                                         (_currentTransferMode == "Download" && _isDownloadTimerRunning);
-                            
-                            if (registered && isTimerCurrentlyRunning)
+                            // If registered successfully and Enable Timer is checked, start the job automatically
+                            if (registered)
                             {
-                                // If the timer is already running, start the job in the manager
-                                timerJobManager.StartTimerJob(_currentJob.Id);
-                                ServiceLocator.LogService.LogInfo(string.Format(
-                                    "Job '{0}' registered and started in background timer service", _currentJob.Name));
-                            }
-                            else if (registered)
-                            {
-                                ServiceLocator.LogService.LogInfo(string.Format(
-                                    "Job '{0}' registered in background timer service", _currentJob.Name));
+                                // Start the timer job since Enable Timer checkbox is checked
+                                bool started = timerJobManager.StartTimerJob(_currentJob.Id);
+                                if (started)
+                                {
+                                    ServiceLocator.LogService.LogInfo(string.Format(
+                                        "Job '{0}' registered and automatically started in background timer service", _currentJob.Name));
+                                }
+                                else
+                                {
+                                    ServiceLocator.LogService.LogWarning(string.Format(
+                                        "Job '{0}' registered but failed to auto-start", _currentJob.Name));
+                                }
                             }
                         }
                     }

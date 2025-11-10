@@ -305,5 +305,32 @@ namespace syncer.ui.Interfaces
         /// <param name="jobId">The ID of the job</param>
         /// <returns>List of file extensions to exclude</returns>
         List<string> GetTimerJobExcludeExtensions(long jobId);
+        
+        /// <summary>
+        /// Gets whether the timer job should run on application startup
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>True if job should auto-start on application startup</returns>
+        bool GetTimerJobRunOnStartup(long jobId);
+        
+        /// <summary>
+        /// Sets whether the timer job should run on application startup
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <param name="runOnStartup">True to auto-start job on application startup</param>
+        /// <returns>True if the setting was updated successfully</returns>
+        bool SetTimerJobRunOnStartup(long jobId, bool runOnStartup);
+        
+        /// <summary>
+        /// Saves the current state of all timer jobs to persistent storage
+        /// </summary>
+        void SaveTimerJobsState();
+        
+        /// <summary>
+        /// Gets timer job info for a specific job (for internal use)
+        /// </summary>
+        /// <param name="jobId">The ID of the job</param>
+        /// <returns>Timer job info object or null if not found</returns>
+        object GetTimerJobInfo(long jobId);
     }
 }

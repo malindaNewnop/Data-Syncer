@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Xml.Serialization;
 
 namespace syncer.ui.Services
 {
@@ -9,11 +10,19 @@ namespace syncer.ui.Services
     /// Tracks file states (modification time and size) to detect changes between transfer iterations
     /// </summary>
     [Serializable]
+    [XmlRoot("FileState")]
     public class FileState
     {
+        [XmlElement("FilePath")]
         public string FilePath { get; set; }
+        
+        [XmlElement("LastModifiedTime")]
         public DateTime LastModifiedTime { get; set; }
+        
+        [XmlElement("FileSize")]
         public long FileSize { get; set; }
+        
+        [XmlElement("LastTransferTime")]
         public DateTime LastTransferTime { get; set; }
 
         public FileState()

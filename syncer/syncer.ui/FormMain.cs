@@ -147,9 +147,20 @@ namespace syncer.ui
             refreshTimer.Tick += (sender, e) => RefreshTimerJobsGrid();
             refreshTimer.Start();
             
+            // Auto-start jobs that have RunOnStartup enabled
+            Timer autoStartTimer = new Timer();
+            autoStartTimer.Interval = 2000; // 2 second delay to ensure everything is loaded
+            autoStartTimer.Tick += (sender, e) => 
+            {
+                autoStartTimer.Stop();
+                autoStartTimer.Dispose();
+                AutoStartJobsOnStartup();
+            };
+            autoStartTimer.Start();
+            
             // Show Quick Launch popup on startup
             Timer startupTimer = new Timer();
-            startupTimer.Interval = 1000; // 1 second delay to ensure form is fully loaded
+            startupTimer.Interval = 3000; // 3 second delay (after auto-start)
             startupTimer.Tick += (sender, e) => 
             {
                 startupTimer.Stop();
@@ -1140,7 +1151,91 @@ namespace syncer.ui
             }
             catch (Exception ex)
             {
-                ServiceLocator.LogService.LogError($"Error auto-starting service: {ex.Message}", "UI");
+                ServiceLocator.LogService.LogError(string.Format("Error auto-starting service: {0}", ex.Message), "UI");
+            }
+        }
+        
+        /// <summary>
+        /// Auto-start jobs that have RunOnStartup enabled when application starts
+        /// </summary>
+        private void AutoStartJobsOnStartup()
+        {
+            try
+            {
+                var timerJobManager = ServiceLocator.TimerJobManager;
+                if (timerJobManager == null)
+                {
+                    ServiceLocator.LogService?.LogWarning("TimerJobManager not available for auto-start", "UI");
+                    return;
+                }
+                
+                // Get all registered timer job IDs
+                var jobIds = timerJobManager.GetRegisteredTimerJobs();
+                if (jobIds == null || jobIds.Count == 0)
+                {
+                    ServiceLocator.LogService?.LogInfo("No timer jobs found for auto-start", "UI");
+                    return;
+                }
+                
+                int autoStartedCount = 0;
+                foreach (var jobId in jobIds)
+                {
+                    try
+                    {
+                        // Check if job should run on startup
+                        bool runOnStartup = timerJobManager.GetTimerJobRunOnStartup(jobId);
+                        
+                        if (runOnStartup)
+                        {
+                            // Check if job is not already running
+                            if (!timerJobManager.IsTimerJobRunning(jobId))
+                            {
+                                string jobName = timerJobManager.GetTimerJobName(jobId);
+                                ServiceLocator.LogService?.LogInfo(string.Format("Auto-starting job: {0} (ID: {1})", jobName, jobId), "UI");
+                                
+                                bool started = timerJobManager.StartTimerJob(jobId);
+                                if (started)
+                                {
+                                    autoStartedCount++;
+                                    ServiceLocator.LogService?.LogInfo(string.Format("Successfully auto-started job: {0}", jobName), "UI");
+                                }
+                                else
+                                {
+                                    ServiceLocator.LogService?.LogWarning(string.Format("Failed to auto-start job: {0}", jobName), "UI");
+                                }
+                            }
+                            else
+                            {
+                                string jobName = timerJobManager.GetTimerJobName(jobId);
+                                ServiceLocator.LogService?.LogInfo(string.Format("Job already running, skipping auto-start: {0}", jobName), "UI");
+                            }
+                        }
+                    }
+                    catch (Exception jobEx)
+                    {
+                        ServiceLocator.LogService?.LogError(string.Format("Error auto-starting job {0}: {1}", jobId, jobEx.Message), "UI");
+                    }
+                }
+                
+                if (autoStartedCount > 0)
+                {
+                    ServiceLocator.LogService?.LogInfo(string.Format("Auto-started {0} job(s) on startup", autoStartedCount), "UI");
+                    
+                    if (_notificationService != null)
+                    {
+                        _notificationService.ShowNotification(
+                            "Jobs Auto-Started",
+                            string.Format("{0} job(s) started automatically on startup.", autoStartedCount),
+                            ToolTipIcon.Info);
+                    }
+                    
+                    // Refresh the grid to show updated status
+                    RefreshTimerJobsGrid();
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService?.LogError(string.Format("Error in AutoStartJobsOnStartup: {0}", ex.Message), "UI");
             }
         }
 
@@ -1408,6 +1503,14 @@ namespace syncer.ui
             dgvTimerJobs.Columns.Add("LastUpload", "Last Transfer");
             dgvTimerJobs.Columns.Add("Status", "Status");
             
+            // Add auto-start checkbox column
+            DataGridViewCheckBoxColumn autoStartColumn = new DataGridViewCheckBoxColumn();
+            autoStartColumn.Name = "AutoStart";
+            autoStartColumn.HeaderText = "Auto Start";
+            autoStartColumn.Width = 80;
+            autoStartColumn.ReadOnly = false;
+            dgvTimerJobs.Columns.Add(autoStartColumn);
+            
             dgvTimerJobs.Columns["JobId"].Width = 40;
             dgvTimerJobs.Columns["JobName"].Width = 120;
             dgvTimerJobs.Columns["FolderPath"].Width = 250;
@@ -1415,6 +1518,19 @@ namespace syncer.ui
             dgvTimerJobs.Columns["Interval"].Width = 100;
             dgvTimerJobs.Columns["LastUpload"].Width = 150;
             dgvTimerJobs.Columns["Status"].Width = 80;
+            
+            // Make all columns except AutoStart read-only
+            foreach (DataGridViewColumn col in dgvTimerJobs.Columns)
+            {
+                if (col.Name != "AutoStart")
+                {
+                    col.ReadOnly = true;
+                }
+            }
+            
+            // Add cell value changed event for auto-start checkbox
+            dgvTimerJobs.CellValueChanged += dgvTimerJobs_CellValueChanged;
+            dgvTimerJobs.CurrentCellDirtyStateChanged += dgvTimerJobs_CurrentCellDirtyStateChanged;
             
             // Add selection changed event
             dgvTimerJobs.SelectionChanged += dgvTimerJobs_SelectionChanged;
@@ -1427,6 +1543,58 @@ namespace syncer.ui
             btnEditTimerJob.Enabled = false;
             btnDeleteTimerJob.Enabled = false;
             btnResumeTimerJob.Enabled = false;
+        }
+        
+        // Handle immediate checkbox state changes
+        private void dgvTimerJobs_CurrentCellDirtyStateChanged(object sender, EventArgs e)
+        {
+            if (dgvTimerJobs.IsCurrentCellDirty)
+            {
+                dgvTimerJobs.CommitEdit(DataGridViewDataErrorContexts.Commit);
+            }
+        }
+        
+        // Handle auto-start checkbox changes
+        private void dgvTimerJobs_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            try
+            {
+                // Check if it's the AutoStart column
+                if (e.RowIndex >= 0 && e.ColumnIndex >= 0)
+                {
+                    DataGridViewColumn col = dgvTimerJobs.Columns[e.ColumnIndex];
+                    if (col.Name == "AutoStart")
+                    {
+                        DataGridViewRow row = dgvTimerJobs.Rows[e.RowIndex];
+                        object jobIdObj = row.Cells["JobId"].Value;
+                        object autoStartObj = row.Cells["AutoStart"].Value;
+                        
+                        if (jobIdObj != null)
+                        {
+                            long jobId;
+                            if (long.TryParse(jobIdObj.ToString(), out jobId))
+                            {
+                                bool autoStart = autoStartObj != null && Convert.ToBoolean(autoStartObj);
+                                
+                                ITimerJobManager timerJobManager = ServiceLocator.TimerJobManager;
+                                if (timerJobManager != null)
+                                {
+                                    if (timerJobManager.SetTimerJobRunOnStartup(jobId, autoStart))
+                                    {
+                                        ServiceLocator.LogService?.LogInfo(
+                                            string.Format("Auto-start {0} for job {1}", 
+                                                autoStart ? "enabled" : "disabled", jobId), "UI");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ServiceLocator.LogService?.LogError("Error updating auto-start setting: " + ex.Message, "UI");
+            }
         }
         
         private void dgvTimerJobs_SelectionChanged(object sender, EventArgs e)
@@ -1541,6 +1709,10 @@ namespace syncer.ui
                     row.Cells["FolderPath"].Value = folderPath;
                     row.Cells["RemotePath"].Value = remotePath;
                     row.Cells["Interval"].Value = interval;
+                    
+                    // Get and set auto-start setting
+                    bool runOnStartup = timerJobManager.GetTimerJobRunOnStartup(jobId);
+                    row.Cells["AutoStart"].Value = runOnStartup;
                     
                     // Show appropriate last transfer time based on job type
                     if (isDownloadJob)

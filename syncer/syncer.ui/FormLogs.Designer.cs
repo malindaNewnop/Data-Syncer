@@ -482,7 +482,7 @@ namespace syncer.ui
             this.gbRealTimeLogging.Size = new System.Drawing.Size(860, 40);
             this.gbRealTimeLogging.TabIndex = 5;
             this.gbRealTimeLogging.TabStop = false;
-            this.gbRealTimeLogging.Text = "Real-time CSV Logging";
+            this.gbRealTimeLogging.Text = "Create Log File";
             
             // 
             // chkEnableRealTimeLogging
