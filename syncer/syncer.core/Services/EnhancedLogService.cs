@@ -57,6 +57,15 @@ namespace syncer.core.Services
         }
 
         /// <summary>
+        /// Log informational message with job ID
+        /// </summary>
+        public void LogInfo(string message, string source, string jobId)
+        {
+            if (_minLevel <= LogLevel.Info)
+                LogMessage(LogLevel.Info, message, source, null, jobId);
+        }
+
+        /// <summary>
         /// Log warning message
         /// </summary>
         public void LogWarning(string message, string source = null)
@@ -66,12 +75,30 @@ namespace syncer.core.Services
         }
 
         /// <summary>
+        /// Log warning message with job ID
+        /// </summary>
+        public void LogWarning(string message, string source, string jobId)
+        {
+            if (_minLevel <= LogLevel.Warning)
+                LogMessage(LogLevel.Warning, message, source, null, jobId);
+        }
+
+        /// <summary>
         /// Log error message
         /// </summary>
         public void LogError(string message, string source = null)
         {
             if (_minLevel <= LogLevel.Error)
                 LogMessage(LogLevel.Error, message, source, null);
+        }
+
+        /// <summary>
+        /// Log error message with job ID
+        /// </summary>
+        public void LogError(string message, string source, string jobId)
+        {
+            if (_minLevel <= LogLevel.Error)
+                LogMessage(LogLevel.Error, message, source, null, jobId);
         }
 
         /// <summary>

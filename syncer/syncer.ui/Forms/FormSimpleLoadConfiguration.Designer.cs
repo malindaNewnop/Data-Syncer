@@ -48,7 +48,6 @@ namespace syncer.ui.Forms
             this.btnDelete = new System.Windows.Forms.Button();
             this.btnEdit = new System.Windows.Forms.Button();
             this.btnLoadAndStart = new System.Windows.Forms.Button();
-            this.btnLoad = new System.Windows.Forms.Button();
             this.groupBoxDetails.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -262,19 +261,6 @@ namespace syncer.ui.Forms
             this.btnLoadAndStart.UseVisualStyleBackColor = true;
             this.btnLoadAndStart.Click += new System.EventHandler(this.btnLoadAndStart_Click);
             // 
-            // btnLoad
-            // 
-            this.btnLoad.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnLoad.Location = new System.Drawing.Point(160, 540);
-            this.btnLoad.Name = "btnLoad";
-            this.btnLoad.Size = new System.Drawing.Size(90, 35);
-            this.btnLoad.TabIndex = 3;
-            this.btnLoad.Text = "Load";
-            this.btnLoad.UseVisualStyleBackColor = true;
-            this.btnLoad.Click += new System.EventHandler(this.btnLoad_Click);
-            // 
-
-            // 
             // FormSimpleLoadConfiguration
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -285,7 +271,6 @@ namespace syncer.ui.Forms
             this.Controls.Add(this.btnExport);
             this.Controls.Add(this.btnDelete);
             this.Controls.Add(this.btnEdit);
-            this.Controls.Add(this.btnLoad);
             this.Controls.Add(this.btnLoadAndStart);
             this.Controls.Add(this.panelSeparator);
             this.Controls.Add(this.groupBoxDetails);
@@ -321,7 +306,6 @@ namespace syncer.ui.Forms
         private System.Windows.Forms.Label lblDestinationConnection;
         private System.Windows.Forms.Label lblSourceFilePath;
         private System.Windows.Forms.Panel panelSeparator;
-        private System.Windows.Forms.Button btnLoad;
         private System.Windows.Forms.Button btnLoadAndStart;
         private System.Windows.Forms.Button btnEdit;
         private System.Windows.Forms.Button btnDelete;

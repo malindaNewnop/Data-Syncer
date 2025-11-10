@@ -371,6 +371,24 @@ namespace syncer.ui
                         _logService.LogError("Error configuring Level column: " + ex.Message, "UI");
                 }
 
+                // Configure JobId column (show it)
+                try
+                {
+                    if (dgvLogs.Columns.Contains("JobId"))
+                    {
+                        var jobIdColumn = dgvLogs.Columns["JobId"];
+                        jobIdColumn.HeaderText = "Job ID";
+                        jobIdColumn.Width = 150;
+                        jobIdColumn.DisplayIndex = 2;
+                        jobIdColumn.Visible = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_logService != null)
+                        _logService.LogError("Error configuring JobId column: " + ex.Message, "UI");
+                }
+
                 // Configure JobName column
                 try
                 {
@@ -379,7 +397,7 @@ namespace syncer.ui
                         var jobNameColumn = dgvLogs.Columns["JobName"];
                         jobNameColumn.HeaderText = "Job";
                         jobNameColumn.Width = 100;
-                        jobNameColumn.DisplayIndex = 2;
+                        jobNameColumn.DisplayIndex = 3;
                         jobNameColumn.Visible = true;
                     }
                 }
@@ -397,7 +415,7 @@ namespace syncer.ui
                         var sourceColumn = dgvLogs.Columns["Source"];
                         sourceColumn.HeaderText = "Source";
                         sourceColumn.Width = 80;
-                        sourceColumn.DisplayIndex = 3;
+                        sourceColumn.DisplayIndex = 4;
                         sourceColumn.Visible = true;
                     }
                 }
@@ -415,7 +433,7 @@ namespace syncer.ui
                         var messageColumn = dgvLogs.Columns["Message"];
                         messageColumn.HeaderText = "Message";
                         messageColumn.Width = 400;
-                        messageColumn.DisplayIndex = 4;
+                        messageColumn.DisplayIndex = 5;
                         messageColumn.Visible = true;
                         if (dgvLogs.IsHandleCreated)
                         {
@@ -429,10 +447,10 @@ namespace syncer.ui
                         _logService.LogError("Error configuring Message column: " + ex.Message, "UI");
                 }
 
-                // Hide unwanted columns including JobId
+                // Hide unwanted columns (JobId removed from this list)
                 try
                 {
-                    string[] hiddenColumns = { "JobId", "Exception", "FileName", "FileSize", "Duration", "RemotePath", "LocalPath" };
+                    string[] hiddenColumns = { "Exception", "FileName", "FileSize", "Duration", "RemotePath", "LocalPath" };
                     foreach (string columnName in hiddenColumns)
                     {
                         if (dgvLogs.Columns.Contains(columnName))

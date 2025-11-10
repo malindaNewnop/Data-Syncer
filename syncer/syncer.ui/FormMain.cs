@@ -129,10 +129,6 @@ namespace syncer.ui
             this.MinimumSize = new Size(800, 600);
             this.WindowState = FormWindowState.Normal;
             
-            // Initialize full screen menu state
-            fullScreenToolStripMenuItem.Enabled = true;
-            normalViewToolStripMenuItem.Enabled = false;
-            
             // Add event handler to refresh timer jobs when form is activated
             this.Activated += FormMain_Activated;
             
@@ -1067,30 +1063,8 @@ namespace syncer.ui
 
         private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("FTPSyncer v0.6\nFile Synchronization Tool\n\nDeveloped for automated file transfers.", "About FTPSyncer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("FTPSyncer v0.6\nFile Synchronization Tool\n\nDeveloped for automated file transfers.\n\nDT Korea Inc", "About FTPSyncer", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
-
-        private void jobRecoveryToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                // Show information about automatic job recovery via Windows service
-                string message = "Job Recovery is handled automatically by the FTPSyncer Windows Service.\n\n" +
-                               "Features:\n" +
-                               "â€¢ Jobs automatically resume after system restart\n" +
-                               "â€¢ No manual intervention required\n" +
-                               "â€¢ Service runs in background\n\n" +
-                               "Service Status: " + GetServiceStatus();
-                               
-                MessageBox.Show(message, "Automatic Job Recovery", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error checking job recovery status: " + ex.Message, "Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-        
 
         private void btnAddJob_Click(object sender, EventArgs e)
         {
@@ -1396,11 +1370,6 @@ namespace syncer.ui
             ToggleFullScreen(true);
         }
         
-        private void normalViewToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            ToggleFullScreen(false);
-        }
-        
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             // Handle F11 for full screen toggle
@@ -1428,8 +1397,8 @@ namespace syncer.ui
                 _previousBorderStyle = FormBorderStyle;
                 _previousMenuVisible = menuStrip1.Visible;
                 
-                // Set full screen properties
-                menuStrip1.Visible = false;
+                // Set full screen properties - keep menu visible
+                // menuStrip1.Visible = false; // Keep menu bar visible in full screen
                 FormBorderStyle = FormBorderStyle.None;
                 WindowState = FormWindowState.Maximized;
                 TopMost = true;
@@ -1438,7 +1407,6 @@ namespace syncer.ui
                 
                 // Update menu items
                 fullScreenToolStripMenuItem.Enabled = false;
-                normalViewToolStripMenuItem.Enabled = true;
             }
             else if (!fullScreen && _isFullScreen)
             {
@@ -1452,7 +1420,6 @@ namespace syncer.ui
                 
                 // Update menu items
                 fullScreenToolStripMenuItem.Enabled = true;
-                normalViewToolStripMenuItem.Enabled = false;
             }
         }
         
@@ -2851,7 +2818,20 @@ namespace syncer.ui
                     this.Location.Y + 50
                 );
 
+                // If in full screen mode, temporarily disable TopMost to allow popup to show
+                bool wasTopMost = this.TopMost;
+                if (_isFullScreen && wasTopMost)
+                {
+                    this.TopMost = false;
+                }
+
                 _quickLaunchForm.ShowAtPosition(location);
+
+                // Restore TopMost state after popup is shown
+                if (_isFullScreen && wasTopMost)
+                {
+                    this.TopMost = true;
+                }
             }
             catch (Exception ex)
             {

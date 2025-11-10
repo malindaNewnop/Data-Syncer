@@ -1339,6 +1339,11 @@ namespace syncer.ui.Services
             AddLog("INFO", message, jobName);
         }
 
+        public void LogInfo(string message, string source, string jobId)
+        {
+            AddLog("INFO", message, source ?? string.Empty, jobId ?? string.Empty);
+        }
+
         public void LogWarning(string message)
         {
             LogWarning(message, string.Empty);
@@ -1347,6 +1352,11 @@ namespace syncer.ui.Services
         public void LogWarning(string message, string jobName)
         {
             AddLog("WARNING", message, jobName);
+        }
+
+        public void LogWarning(string message, string source, string jobId)
+        {
+            AddLog("WARNING", message, source ?? string.Empty, jobId ?? string.Empty);
         }
 
         public void LogError(string message)
@@ -1359,9 +1369,19 @@ namespace syncer.ui.Services
             AddLog("ERROR", message, jobName);
         }
 
+        public void LogError(string message, string source, string jobId)
+        {
+            AddLog("ERROR", message, source ?? string.Empty, jobId ?? string.Empty);
+        }
+
         private void AddLog(string level, string message, string jobName)
         {
             _logsTable.Rows.Add(DateTime.Now, level, jobName, string.Empty, string.Empty, message);
+        }
+
+        private void AddLog(string level, string message, string source, string jobId)
+        {
+            _logsTable.Rows.Add(DateTime.Now, level, source, string.Empty, string.Empty, message);
         }
 
         #region Real-time Logging Interface Implementation (No-op for UI LogService)

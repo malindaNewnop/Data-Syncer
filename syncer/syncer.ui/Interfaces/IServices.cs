@@ -59,10 +59,13 @@ namespace syncer.ui
         bool ExportLogs(string filePath, DateTime? fromDate, DateTime? toDate);
         void LogInfo(string message);
         void LogInfo(string message, string jobName);
+        void LogInfo(string message, string source, string jobId);
         void LogWarning(string message);
         void LogWarning(string message, string jobName);
+        void LogWarning(string message, string source, string jobId);
         void LogError(string message);
         void LogError(string message, string jobName);
+        void LogError(string message, string source, string jobId);
     }
 
     /// <summary>

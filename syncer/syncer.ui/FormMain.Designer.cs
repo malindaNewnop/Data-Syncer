@@ -19,8 +19,6 @@ namespace syncer.ui
         private System.Windows.Forms.ToolStripMenuItem loadConfigurationToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem sshKeyGenerationToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem fullScreenToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem normalViewToolStripMenuItem;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.Button btnAddJob;
         private System.Windows.Forms.Button btnStartStop;
         private System.Windows.Forms.Button btnLoadConfiguration;
@@ -54,9 +52,6 @@ namespace syncer.ui
         // Quick Launch menu item
         private System.Windows.Forms.ToolStripMenuItem showQuickLaunchToolStripMenuItem;
         
-        // Job Recovery menu item
-        private System.Windows.Forms.ToolStripMenuItem jobRecoveryToolStripMenuItem;
-
         protected override void Dispose(bool disposing)
         {
             if (disposing)
@@ -105,11 +100,8 @@ namespace syncer.ui
             this.viewLogsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.viewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fullScreenToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.normalViewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             this.helpToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.aboutToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.jobRecoveryToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.btnAddJob = new System.Windows.Forms.Button();
             this.btnStartStop = new System.Windows.Forms.Button();
             this.btnLoadConfiguration = new System.Windows.Forms.Button();
@@ -229,12 +221,27 @@ namespace syncer.ui
             this.settingsToolStripMenuItem.Size = new System.Drawing.Size(61, 20);
             this.settingsToolStripMenuItem.Text = "Settings";
             
+            // connectionSettingsToolStripMenuItem
+            this.connectionSettingsToolStripMenuItem.Name = "connectionSettingsToolStripMenuItem";
+            this.connectionSettingsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
+            this.connectionSettingsToolStripMenuItem.Text = "Connection Settings";
+            this.connectionSettingsToolStripMenuItem.Click += new System.EventHandler(this.connectionSettingsToolStripMenuItem_Click);
+            
+            // sshKeyGenerationToolStripMenuItem
+            this.sshKeyGenerationToolStripMenuItem.Name = "sshKeyGenerationToolStripMenuItem";
+            this.sshKeyGenerationToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
+            this.sshKeyGenerationToolStripMenuItem.Text = "SSH Key Generation";
+            this.sshKeyGenerationToolStripMenuItem.Click += new System.EventHandler(this.sshKeyGenerationToolStripMenuItem_Click);
+            
+            // viewLogsToolStripMenuItem
+            this.viewLogsToolStripMenuItem.Name = "viewLogsToolStripMenuItem";
+            this.viewLogsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
+            this.viewLogsToolStripMenuItem.Text = "View Logs";
+            this.viewLogsToolStripMenuItem.Click += new System.EventHandler(this.viewLogsToolStripMenuItem_Click);
+            
             // viewToolStripMenuItem
             this.viewToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.fullScreenToolStripMenuItem,
-            this.normalViewToolStripMenuItem,
-            this.toolStripSeparator1,
-            this.jobRecoveryToolStripMenuItem});
+            this.fullScreenToolStripMenuItem});
             this.viewToolStripMenuItem.Name = "viewToolStripMenuItem";
             this.viewToolStripMenuItem.Size = new System.Drawing.Size(44, 20);
             this.viewToolStripMenuItem.Text = "View";
@@ -243,34 +250,9 @@ namespace syncer.ui
             this.fullScreenToolStripMenuItem.Name = "fullScreenToolStripMenuItem";
             this.fullScreenToolStripMenuItem.ShortcutKeys = System.Windows.Forms.Keys.F11;
             this.fullScreenToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.fullScreenToolStripMenuItem.Text = "Full Screen\tF11";
+            this.fullScreenToolStripMenuItem.Text = "Full Screen";
             this.fullScreenToolStripMenuItem.Click += new System.EventHandler(this.fullScreenToolStripMenuItem_Click);
             
-            // normalViewToolStripMenuItem
-            this.normalViewToolStripMenuItem.Name = "normalViewToolStripMenuItem";
-            this.normalViewToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.normalViewToolStripMenuItem.Text = "Normal View\tEsc";
-            this.normalViewToolStripMenuItem.Click += new System.EventHandler(this.normalViewToolStripMenuItem_Click);
-            
-            // toolStripSeparator1
-            this.toolStripSeparator1.Name = "toolStripSeparator1";
-            this.toolStripSeparator1.Size = new System.Drawing.Size(177, 6);
-            
-            // jobRecoveryToolStripMenuItem
-            this.jobRecoveryToolStripMenuItem.Name = "jobRecoveryToolStripMenuItem";
-            this.jobRecoveryToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.jobRecoveryToolStripMenuItem.Text = "Job Recovery Manager";
-            this.jobRecoveryToolStripMenuItem.Click += new System.EventHandler(this.jobRecoveryToolStripMenuItem_Click);
-            // connectionSettingsToolStripMenuItem
-            this.connectionSettingsToolStripMenuItem.Name = "connectionSettingsToolStripMenuItem";
-            this.connectionSettingsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
-            this.connectionSettingsToolStripMenuItem.Text = "Connection Settings";
-            this.connectionSettingsToolStripMenuItem.Click += new System.EventHandler(this.connectionSettingsToolStripMenuItem_Click);
-            // viewLogsToolStripMenuItem
-            this.viewLogsToolStripMenuItem.Name = "viewLogsToolStripMenuItem";
-            this.viewLogsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
-            this.viewLogsToolStripMenuItem.Text = "View Logs";
-            this.viewLogsToolStripMenuItem.Click += new System.EventHandler(this.viewLogsToolStripMenuItem_Click);
             // helpToolStripMenuItem
             this.helpToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.aboutToolStripMenuItem});

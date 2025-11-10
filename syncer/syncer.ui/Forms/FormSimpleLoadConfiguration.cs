@@ -263,11 +263,6 @@ namespace syncer.ui.Forms
             LoadConfiguration(true);
         }
 
-        private void btnLoad_Click(object sender, EventArgs e)
-        {
-            LoadConfiguration(false);
-        }
-
         private void btnEdit_Click(object sender, EventArgs e)
         {
             try

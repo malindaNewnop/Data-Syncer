@@ -34,20 +34,35 @@ namespace syncer.core
             Write(LogLevel.Error, job.Name, job.Id, "job", message, ex, "", 0, TimeSpan.Zero, "", "");
         }
 
-        // Keep existing methods for backward compatibility
-        public void LogInfo(string jobId, string message)
+        // ILogService interface implementation
+        public void LogInfo(string message, string source = null)
         {
-            Write(LogLevel.Info, "", jobId, "core", message, null, "", 0, TimeSpan.Zero, "", "");
+            Write(LogLevel.Info, "", "", source ?? "core", message, null, "", 0, TimeSpan.Zero, "", "");
         }
 
-        public void LogWarning(string jobId, string message)
+        public void LogInfo(string message, string source, string jobId)
         {
-            Write(LogLevel.Warning, "", jobId, "core", message, null, "", 0, TimeSpan.Zero, "", "");
+            Write(LogLevel.Info, "", jobId ?? "", source ?? "core", message, null, "", 0, TimeSpan.Zero, "", "");
         }
 
-        public void LogError(string jobId, string message)
+        public void LogWarning(string message, string source = null)
         {
-            Write(LogLevel.Error, "", jobId, "core", message, null, "", 0, TimeSpan.Zero, "", "");
+            Write(LogLevel.Warning, "", "", source ?? "core", message, null, "", 0, TimeSpan.Zero, "", "");
+        }
+
+        public void LogWarning(string message, string source, string jobId)
+        {
+            Write(LogLevel.Warning, "", jobId ?? "", source ?? "core", message, null, "", 0, TimeSpan.Zero, "", "");
+        }
+
+        public void LogError(string message, string source = null)
+        {
+            Write(LogLevel.Error, "", "", source ?? "core", message, null, "", 0, TimeSpan.Zero, "", "");
+        }
+
+        public void LogError(string message, string source, string jobId)
+        {
+            Write(LogLevel.Error, "", jobId ?? "", source ?? "core", message, null, "", 0, TimeSpan.Zero, "", "");
         }
 
         public void Info(string message, string jobName)
@@ -55,14 +70,29 @@ namespace syncer.core
             Write(LogLevel.Info, jobName, "", "core", message, null, "", 0, TimeSpan.Zero, "", "");
         }
 
+        public void Info(string message, string jobName, string jobId)
+        {
+            Write(LogLevel.Info, jobName, jobId, "core", message, null, "", 0, TimeSpan.Zero, "", "");
+        }
+
         public void Warning(string message, string jobName)
         {
             Write(LogLevel.Warning, jobName, "", "core", message, null, "", 0, TimeSpan.Zero, "", "");
         }
 
+        public void Warning(string message, string jobName, string jobId)
+        {
+            Write(LogLevel.Warning, jobName, jobId, "core", message, null, "", 0, TimeSpan.Zero, "", "");
+        }
+
         public void Error(string message, string jobName, Exception ex)
         {
             Write(LogLevel.Error, jobName, "", "core", message, ex, "", 0, TimeSpan.Zero, "", "");
+        }
+
+        public void Error(string message, string jobName, Exception ex, string jobId)
+        {
+            Write(LogLevel.Error, jobName, jobId, "core", message, ex, "", 0, TimeSpan.Zero, "", "");
         }
 
         public void LogTransfer(string jobName, string fileName, long fileSize, bool success, string error)
@@ -384,7 +414,7 @@ namespace syncer.core
                             sw.WriteLine("Timestamp,Level,JobName,JobId,Source,Message,Exception,FileName,FileSize,Duration,RemotePath,LocalPath");
                         }
 
-                        LogInfo("system", "Log file rotated due to size limit. Previous log archived to: " + backupPath);
+                        LogInfo("Log file rotated due to size limit. Previous log archived to: " + backupPath, "system");
 
                         // Clean up old backup files to prevent disk space issues
                         CleanupOldBackups();

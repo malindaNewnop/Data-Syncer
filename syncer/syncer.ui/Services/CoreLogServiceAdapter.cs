@@ -123,6 +123,12 @@ namespace syncer.ui.Services
             WriteToRealTimeLog("INFO", message, jobName);
         }
 
+        public void LogInfo(string message, string source, string jobId)
+        {
+            _coreLogService.Info(message, source, jobId);
+            WriteToRealTimeLog("INFO", message, source);
+        }
+
         public void LogWarning(string message)
         {
             _coreLogService.Warning(message, "UI");
@@ -135,6 +141,12 @@ namespace syncer.ui.Services
             WriteToRealTimeLog("WARNING", message, jobName);
         }
 
+        public void LogWarning(string message, string source, string jobId)
+        {
+            _coreLogService.Warning(message, source, jobId);
+            WriteToRealTimeLog("WARNING", message, source);
+        }
+
         public void LogError(string message)
         {
             _coreLogService.Error(message, "UI", null);
@@ -145,6 +157,12 @@ namespace syncer.ui.Services
         {
             _coreLogService.Error(message, jobName, null);
             WriteToRealTimeLog("ERROR", message, jobName);
+        }
+
+        public void LogError(string message, string source, string jobId)
+        {
+            _coreLogService.Error(message, source, null, jobId);
+            WriteToRealTimeLog("ERROR", message, source);
         }
 
         // Real-time logging methods

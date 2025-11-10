@@ -63,6 +63,14 @@ namespace syncer.ui.Services
             // Auto-start setting
             public bool RunOnStartup { get; set; } // Whether to auto-start this job on application startup
 
+            // Cancellation flag to stop ongoing transfers
+            private bool _isCancellationRequested;
+            public bool IsCancellationRequested 
+            { 
+                get { return _isCancellationRequested; }
+                set { _isCancellationRequested = value; }
+            }
+
         }
 
         #region Persistence Classes
@@ -320,7 +328,8 @@ namespace syncer.ui.Services
                     _logService.LogInfo(string.Format("Updated existing timer job {0} with FilterSettings - EnableFilters: {1}, Include: {2}, Exclude: {3}",
                         jobId, enableFilters,
                         includeExtensions != null ? string.Join(",", includeExtensions.ToArray()) : "none",
-                        excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"));
+                        excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"),
+                        "TimerJobManager", jobId.ToString());
 
                     // Initialize new properties if they don't exist
                     if (!job.IsUploadInProgress) job.IsUploadInProgress = false;
@@ -334,7 +343,7 @@ namespace syncer.ui.Services
                         job.Timer.Interval = intervalMs;
                     }
 
-                    _logService.LogInfo(string.Format("Updated timer job {0} ({1}) for folder {2}", jobId, jobName, folderPath));
+                    _logService.LogInfo(string.Format("Updated timer job {0} ({1}) for folder {2}", jobId, jobName, folderPath), "TimerJobManager", jobId.ToString());
                     return true;
                 }
 
@@ -342,7 +351,7 @@ namespace syncer.ui.Services
                 ConnectionSettings connectionSettings = _connectionService.GetConnectionSettings();
                 if (connectionSettings == null || !connectionSettings.IsRemoteConnection)
                 {
-                    _logService.LogError("Cannot register timer job: No remote connection settings available");
+                    _logService.LogError("Cannot register timer job: No remote connection settings available", "TimerJobManager");
                     return false;
                 }
 
@@ -376,12 +385,12 @@ namespace syncer.ui.Services
                         // Apply the bandwidth limit to the core settings if supported
                         // Note: This depends on your core ConnectionSettings having bandwidth support
                         _logService.LogInfo(string.Format("Applied upload bandwidth limits to job {0}: {1} bytes/sec", 
-                            jobId, sftpConfig.BandwidthLimitBytesPerSecond));
+                            jobId, sftpConfig.BandwidthLimitBytesPerSecond), "TimerJobManager", jobId.ToString());
                     }
                 }
                 catch (Exception bwEx)
                 {
-                    _logService.LogError(string.Format("Error applying bandwidth limits to upload job {0}: {1}", jobId, bwEx.Message));
+                    _logService.LogError(string.Format("Error applying bandwidth limits to upload job {0}: {1}", jobId, bwEx.Message), "TimerJobManager", jobId.ToString());
                 }
 
                 // Get the appropriate transfer client using the factory
@@ -416,8 +425,9 @@ namespace syncer.ui.Services
                 _logService.LogInfo(string.Format("Created NEW timer job {0} with FilterSettings - EnableFilters: {1}, Include: {2}, Exclude: {3}",
                     jobId, enableFilters,
                     includeExtensions != null ? string.Join(",", includeExtensions.ToArray()) : "none",
-                    excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"));
-                _logService.LogInfo(string.Format("Registered timer job {0} ({1}) for folder {2}", jobId, jobName, folderPath));
+                    excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"),
+                    "TimerJobManager", jobId.ToString());
+                _logService.LogInfo(string.Format("Registered timer job {0} ({1}) for folder {2}", jobId, jobName, folderPath), "TimerJobManager", jobId.ToString());
                 
                 // Save state after successful registration
                 SaveTimerJobsState();
@@ -426,7 +436,7 @@ namespace syncer.ui.Services
             }
             catch (Exception ex)
             {
-                _logService.LogError(string.Format("Failed to register timer job: {0}", ex.Message));
+                _logService.LogError(string.Format("Failed to register timer job: {0}", ex.Message), "TimerJobManager");
                 return false;
             }
         }
@@ -437,11 +447,15 @@ namespace syncer.ui.Services
             {
                 if (!_timerJobs.ContainsKey(jobId))
                 {
-                    _logService.LogError(string.Format("Cannot start timer job {0}: Job not found", jobId));
+                    _logService.LogError(string.Format("Cannot start timer job {0}: Job not found", jobId), "TimerJobManager", jobId.ToString());
                     return false;
                 }
 
                 TimerJobInfo job = _timerJobs[jobId];
+
+                // Reset cancellation flag when starting the job
+                job.IsCancellationRequested = false;
+                _logService.LogInfo(string.Format("Cancellation flag reset for job {0}", jobId), "TimerJobManager", jobId.ToString());
 
                 // Create timer if it doesn't exist
                 if (job.Timer == null)
@@ -459,12 +473,12 @@ namespace syncer.ui.Services
                 // Save state after starting
                 SaveTimerJobsState();
 
-                _logService.LogInfo(string.Format("Started timer job {0} with interval {1}ms", jobId, job.IntervalMs));
+                _logService.LogInfo(string.Format("Started timer job {0} with interval {1}ms", jobId, job.IntervalMs), "TimerJobManager", jobId.ToString());
                 return true;
             }
             catch (Exception ex)
             {
-                _logService.LogError(string.Format("Failed to start timer job {0}: {1}", jobId, ex.Message));
+                _logService.LogError(string.Format("Failed to start timer job {0}: {1}", jobId, ex.Message), "TimerJobManager", jobId.ToString());
                 return false;
             }
         }
@@ -496,7 +510,7 @@ namespace syncer.ui.Services
                     }
                     catch (Exception ex)
                     {
-                        _logService.LogError(string.Format("Exception starting timer job {0}: {1}", currentJobId, ex.Message), "TimerJobManager");
+                        _logService.LogError(string.Format("Exception starting timer job {0}: {1}", currentJobId, ex.Message), "TimerJobManager", currentJobId.ToString());
                         success = false;
                     }
                     
@@ -562,11 +576,15 @@ namespace syncer.ui.Services
             {
                 if (!_timerJobs.ContainsKey(jobId))
                 {
-                    _logService.LogError(string.Format("Cannot stop timer job {0}: Job not found", jobId));
+                    _logService.LogError(string.Format("Cannot stop timer job {0}: Job not found", jobId), "TimerJobManager", jobId.ToString());
                     return false;
                 }
 
                 TimerJobInfo job = _timerJobs[jobId];
+
+                // Set cancellation flag to stop any ongoing transfers
+                job.IsCancellationRequested = true;
+                _logService.LogInfo(string.Format("Cancellation requested for job {0} - stopping ongoing transfers", jobId), "TimerJobManager", jobId.ToString());
 
                 // Stop the timer if it exists
                 if (job.Timer != null)
@@ -577,7 +595,7 @@ namespace syncer.ui.Services
                     // Save state after stopping
                     SaveTimerJobsState();
                     
-                    _logService.LogInfo(string.Format("Stopped timer job {0}", jobId));
+                    _logService.LogInfo(string.Format("Stopped timer job {0}", jobId), "TimerJobManager", jobId.ToString());
                     return true;
                 }
 
@@ -585,7 +603,7 @@ namespace syncer.ui.Services
             }
             catch (Exception ex)
             {
-                _logService.LogError(string.Format("Failed to stop timer job {0}: {1}", jobId, ex.Message));
+                _logService.LogError(string.Format("Failed to stop timer job {0}: {1}", jobId, ex.Message), "TimerJobManager", jobId.ToString());
                 return false;
             }
         }
@@ -613,12 +631,12 @@ namespace syncer.ui.Services
                 // Save state after removal
                 SaveTimerJobsState();
 
-                _logService.LogInfo(string.Format("Removed timer job {0}", jobId));
+                _logService.LogInfo(string.Format("Removed timer job {0}", jobId), "TimerJobManager", jobId.ToString());
                 return true;
             }
             catch (Exception ex)
             {
-                _logService.LogError(string.Format("Failed to remove timer job {0}: {1}", jobId, ex.Message));
+                _logService.LogError(string.Format("Failed to remove timer job {0}: {1}", jobId, ex.Message), "TimerJobManager", jobId.ToString());
                 return false;
             }
         }
@@ -739,7 +757,7 @@ namespace syncer.ui.Services
             {
                 if (!_timerJobs.ContainsKey(jobId))
                 {
-                    _logService.LogError(string.Format("Cannot update timer job {0}: Job not found", jobId));
+                    _logService.LogError(string.Format("Cannot update timer job {0}: Job not found", jobId), "TimerJobManager", jobId.ToString());
                     return false;
                 }
 
@@ -768,7 +786,7 @@ namespace syncer.ui.Services
                 _logService.LogInfo(string.Format("Updated timer job {0} with filters - EnableFilters: {1}, Include: {2}, Exclude: {3}",
                     jobId, enableFilters,
                     includeExtensions != null ? string.Join(",", includeExtensions.ToArray()) : "none",
-                    excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"));
+                    excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"), "TimerJobManager", jobId.ToString());
 
                 // Update timer interval if the timer exists
                 if (job.Timer != null)
@@ -783,13 +801,13 @@ namespace syncer.ui.Services
                 }
 
                 _logService.LogInfo(string.Format("Updated timer job {0}: folder={1}, remote={2}, interval={3}ms",
-                    jobId, folderPath, remotePath, intervalMs));
+                    jobId, folderPath, remotePath, intervalMs), "TimerJobManager", jobId.ToString());
 
                 return true;
             }
             catch (Exception ex)
             {
-                _logService.LogError(string.Format("Failed to update timer job {0}: {1}", jobId, ex.Message));
+                _logService.LogError(string.Format("Failed to update timer job {0}: {1}", jobId, ex.Message), "TimerJobManager", jobId.ToString());
                 return false;
             }
         }
@@ -818,7 +836,7 @@ namespace syncer.ui.Services
             }
             catch (Exception ex)
             {
-                _logService.LogError(string.Format("Error in OnTimerElapsed for job {0}: {1}", jobId, ex.Message));
+                _logService.LogError(string.Format("Error in OnTimerElapsed for job {0}: {1}", jobId, ex.Message), "TimerJobManager", jobId.ToString());
             }
         }
 
@@ -829,18 +847,18 @@ namespace syncer.ui.Services
             {
                 TimeSpan downloadDuration = DateTime.Now - (job.DownloadStartTime ?? DateTime.Now);
                 _logService.LogWarning(string.Format("Skipping timer cycle for download job {0} - previous download still in progress (running for {1:mm\\:ss})",
-                    jobId, downloadDuration));
+                    jobId, downloadDuration), "TimerJobManager", jobId.ToString());
                 return;
             }
 
-            _logService.LogInfo(string.Format("Timer elapsed for download job {0} - starting folder download", jobId));
+            _logService.LogInfo(string.Format("Timer elapsed for download job {0} - starting folder download", jobId), "TimerJobManager", jobId.ToString());
 
             // List remote files
             List<string> remoteFiles;
             string error;
             if (!job.TransferClient.ListFiles(job.ConnectionSettings, job.RemotePath, out remoteFiles, out error))
             {
-                _logService.LogError(string.Format("Failed to list remote files for job {0}: {1}", jobId, error ?? "Unknown error"));
+                _logService.LogError(string.Format("Failed to list remote files for job {0}: {1}", jobId, error ?? "Unknown error"), "TimerJobManager", jobId.ToString());
                 return;
             }
 
@@ -849,7 +867,7 @@ namespace syncer.ui.Services
 
             if (filteredFiles.Length == 0)
             {
-                _logService.LogInfo(string.Format("No files found (after filtering) in remote folder for download job {0}", jobId));
+                _logService.LogInfo(string.Format("No files found (after filtering) in remote folder for download job {0}", jobId), "TimerJobManager", jobId.ToString());
                 return;
             }
 
@@ -869,11 +887,11 @@ namespace syncer.ui.Services
 
                     TimeSpan totalDuration = DateTime.Now - job.DownloadStartTime.Value;
                     _logService.LogInfo(string.Format("Download cycle completed for job {0} in {1:mm\\:ss}",
-                        jobId, totalDuration));
+                        jobId, totalDuration), "TimerJobManager", jobId.ToString());
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(string.Format("Error in background download for job {0}: {1}", jobId, ex.Message));
+                    _logService.LogError(string.Format("Error in background download for job {0}: {1}", jobId, ex.Message), "TimerJobManager", jobId.ToString());
                 }
                 finally
                 {
@@ -964,10 +982,10 @@ namespace syncer.ui.Services
             try
             {
                 _logService.LogInfo(string.Format("Starting folder download for job {0} with {1} files from {2} to {3}",
-                    job.JobId, remoteFilePaths.Length, job.RemotePath, job.FolderPath));
+                    job.JobId, remoteFilePaths.Length, job.RemotePath, job.FolderPath), "TimerJobManager", job.JobId.ToString());
 
                 _logService.LogInfo(string.Format("Connection: {0}@{1}:{2}",
-                    job.ConnectionSettings.Username, job.ConnectionSettings.Host, job.ConnectionSettings.Port));
+                    job.ConnectionSettings.Username, job.ConnectionSettings.Host, job.ConnectionSettings.Port), "TimerJobManager", job.JobId.ToString());
 
                 // Track download statistics
                 int successfulDownloads = 0;
@@ -980,15 +998,30 @@ namespace syncer.ui.Services
 
                 for (int batchIndex = 0; batchIndex < totalBatches; batchIndex++)
                 {
+                    // Check for cancellation before processing each batch
+                    if (job.IsCancellationRequested)
+                    {
+                        _logService.LogWarning(string.Format("Download cancelled for job {0} - stopping file transfers", job.JobId), "TimerJobManager", job.JobId.ToString());
+                        break;
+                    }
+
                     int startIndex = batchIndex * batchSize;
                     int endIndex = Math.Min(startIndex + batchSize, remoteFilePaths.Length);
 
                     _logService.LogInfo(string.Format("Processing download batch {0}/{1} (files {2}-{3})",
-                        batchIndex + 1, totalBatches, startIndex + 1, endIndex));
+                        batchIndex + 1, totalBatches, startIndex + 1, endIndex), "TimerJobManager", job.JobId.ToString());
 
                     // Process files in current batch
                     for (int i = startIndex; i < endIndex; i++)
                     {
+                        // Check for cancellation before processing each file
+                        if (job.IsCancellationRequested)
+                        {
+                            _logService.LogWarning(string.Format("Download cancelled for job {0} - stopping at file {1}/{2}", 
+                                job.JobId, i + 1, remoteFilePaths.Length), "TimerJobManager", job.JobId.ToString());
+                            break;
+                        }
+
                         string remoteFile = remoteFilePaths[i];
 
                         try
@@ -1029,7 +1062,7 @@ namespace syncer.ui.Services
                             if (!Directory.Exists(localDir))
                             {
                                 Directory.CreateDirectory(localDir);
-                                _logService.LogInfo(string.Format("Created local directory: {0}", localDir));
+                                _logService.LogInfo(string.Format("Created local directory: {0}", localDir), "TimerJobManager", job.JobId.ToString());
                             }
 
                             // Get remote file information to check if it should be transferred
@@ -1042,7 +1075,7 @@ namespace syncer.ui.Services
                             
                             if (!hasModTime || !hasSize)
                             {
-                                _logService.LogWarning(string.Format("Could not get remote file info for {0}, will transfer anyway", fileName));
+                                _logService.LogWarning(string.Format("Could not get remote file info for {0}, will transfer anyway", fileName), "TimerJobManager", job.JobId.ToString());
                                 // Set defaults if we can't get file info - transfer the file
                                 remoteModifiedTime = DateTime.Now;
                                 remoteFileSize = 0;
@@ -1054,7 +1087,7 @@ namespace syncer.ui.Services
                             if (!shouldTransfer)
                             {
                                 _logService.LogInfo(string.Format("Skipping unchanged remote file: {0} (last modified: {1}, size: {2} bytes)", 
-                                    fileName, remoteModifiedTime.ToString("yyyy-MM-dd HH:mm:ss"), remoteFileSize));
+                                    fileName, remoteModifiedTime.ToString("yyyy-MM-dd HH:mm:ss"), remoteFileSize), "TimerJobManager", job.JobId.ToString());
                                 skippedFiles++;
                                 continue;
                             }
@@ -1062,7 +1095,7 @@ namespace syncer.ui.Services
                             // Download the file
                             _logService.LogInfo(string.Format("Downloading {0}: {1} -> {2}", 
                                 shouldTransfer && job.FileStateTracker.GetFileState(remoteFile) != null ? "modified" : "new", 
-                                remoteFile, localFile));
+                                remoteFile, localFile), "TimerJobManager", job.JobId.ToString());
 
                             string error = null;
                             DateTime transferStart = DateTime.Now;
@@ -1073,7 +1106,7 @@ namespace syncer.ui.Services
                             {
                                 string errorMsg = string.Format("Failed to download {0}: {1}",
                                     fileName, error == null ? "Unknown error" : error);
-                                _logService.LogError(errorMsg);
+                                _logService.LogError(errorMsg, "TimerJobManager", job.JobId.ToString());
                                 failedDownloads++;
 
                                 // Don't break here - continue trying to download other files
@@ -1082,12 +1115,12 @@ namespace syncer.ui.Services
                             else
                             {
                                 FileInfo localFileInfo = new FileInfo(localFile);
-                                _logService.LogInfo(string.Format("Successfully downloaded: {0} ({1} bytes)", fileName, localFileInfo.Length));
+                                _logService.LogInfo(string.Format("Successfully downloaded: {0} ({1} bytes)", fileName, localFileInfo.Length), "TimerJobManager", job.JobId.ToString());
                                 successfulDownloads++;
 
                                 // Update file state tracker after successful download
                                 job.FileStateTracker.UpdateFileState(remoteFile, remoteModifiedTime, remoteFileSize);
-                                _logService.LogInfo(string.Format("File state updated for remote file: {0}", fileName));
+                                _logService.LogInfo(string.Format("File state updated for remote file: {0}", fileName), "TimerJobManager", job.JobId.ToString());
 
                                 // Update bandwidth tracking for download speed
                                 try
@@ -1098,12 +1131,12 @@ namespace syncer.ui.Services
                                     {
                                         bandwidthService.UpdateDownloadSpeed(localFileInfo.Length, transferDurationSeconds);
                                         _logService.LogInfo(string.Format("Download speed updated: {0} bytes in {1:F2} seconds ({2:F0} bytes/second)", 
-                                            localFileInfo.Length, transferDurationSeconds, localFileInfo.Length / transferDurationSeconds));
+                                            localFileInfo.Length, transferDurationSeconds, localFileInfo.Length / transferDurationSeconds), "TimerJobManager", job.JobId.ToString());
                                     }
                                 }
                                 catch (Exception speedEx)
                                 {
-                                    _logService.LogError(string.Format("Error updating download speed tracking: {0}", speedEx.Message));
+                                    _logService.LogError(string.Format("Error updating download speed tracking: {0}", speedEx.Message), "TimerJobManager", job.JobId.ToString());
                                 }
 
                                 // Check if we should delete source file after successful download
@@ -1114,19 +1147,19 @@ namespace syncer.ui.Services
                                         string deleteError;
                                         if (job.TransferClient.DeleteFile(job.ConnectionSettings, remoteFile, out deleteError))
                                         {
-                                            _logService.LogInfo(string.Format("Source file deleted after successful download: {0}", remoteFile));
+                                            _logService.LogInfo(string.Format("Source file deleted after successful download: {0}", remoteFile), "TimerJobManager", job.JobId.ToString());
                                             
                                             // Remove from file state tracker since file is deleted
                                             job.FileStateTracker.RemoveFileState(remoteFile);
                                         }
                                         else
                                         {
-                                            _logService.LogError(string.Format("Failed to delete remote source file {0} after download: {1}", remoteFile, deleteError));
+                                            _logService.LogError(string.Format("Failed to delete remote source file {0} after download: {1}", remoteFile, deleteError), "TimerJobManager", job.JobId.ToString());
                                         }
                                     }
                                     catch (Exception deleteEx)
                                     {
-                                        _logService.LogError(string.Format("Failed to delete remote source file {0} after download: {1}", remoteFile, deleteEx.Message));
+                                        _logService.LogError(string.Format("Failed to delete remote source file {0} after download: {1}", remoteFile, deleteEx.Message), "TimerJobManager", job.JobId.ToString());
                                     }
                                 }
 
@@ -1135,22 +1168,22 @@ namespace syncer.ui.Services
                                 {
                                     if (File.Exists(localFile))
                                     {
-                                        _logService.LogInfo(string.Format("Download verified: {0} exists locally", fileName));
+                                        _logService.LogInfo(string.Format("Download verified: {0} exists locally", fileName), "TimerJobManager", job.JobId.ToString());
                                     }
                                     else
                                     {
-                                        _logService.LogWarning(string.Format("Download completed but file not found locally: {0}", fileName));
+                                        _logService.LogWarning(string.Format("Download completed but file not found locally: {0}", fileName), "TimerJobManager", job.JobId.ToString());
                                     }
                                 }
                                 catch (Exception verifyEx)
                                 {
-                                    _logService.LogWarning(string.Format("Could not verify download of {0}: {1}", fileName, verifyEx.Message));
+                                    _logService.LogWarning(string.Format("Could not verify download of {0}: {1}", fileName, verifyEx.Message), "TimerJobManager", job.JobId.ToString());
                                 }
                             }
                         }
                         catch (Exception fileEx)
                         {
-                            _logService.LogError(string.Format("Error downloading file: {0}", fileEx.Message));
+                            _logService.LogError(string.Format("Error downloading file: {0}", fileEx.Message), "TimerJobManager", job.JobId.ToString());
                             failedDownloads++;
                         }
                     }
@@ -1162,12 +1195,14 @@ namespace syncer.ui.Services
                     }
                 }
 
-                _logService.LogInfo(string.Format("Folder download completed for job {0}. Results: {1} successful, {2} failed, {3} skipped out of {4} total files",
-                    job.JobId, successfulDownloads, failedDownloads, skippedFiles, remoteFilePaths.Length));
+                // Log completion message
+                string completionStatus = job.IsCancellationRequested ? "cancelled" : "completed";
+                _logService.LogInfo(string.Format("Folder download {0} for job {1}. Results: {2} successful, {3} failed, {4} skipped out of {5} total files",
+                    completionStatus, job.JobId, successfulDownloads, failedDownloads, skippedFiles, remoteFilePaths.Length), "TimerJobManager", job.JobId.ToString());
             }
             catch (Exception ex)
             {
-                _logService.LogError(string.Format("Error in folder download for job {0}: {1}", job.JobId, ex.Message));
+                _logService.LogError(string.Format("Error in folder download for job {0}: {1}", job.JobId, ex.Message), "TimerJobManager", job.JobId.ToString());
             }
         }
 
@@ -1176,10 +1211,10 @@ namespace syncer.ui.Services
             try
             {
                 _logService.LogInfo(string.Format("Starting folder upload for job {0} with {1} files from {2} to {3}",
-                    job.JobId, localFilePaths.Length, job.FolderPath, job.RemotePath));
+                    job.JobId, localFilePaths.Length, job.FolderPath, job.RemotePath), "TimerJobManager", job.JobId.ToString());
 
                 _logService.LogInfo(string.Format("Connection: {0}@{1}:{2}",
-                    job.ConnectionSettings.Username, job.ConnectionSettings.Host, job.ConnectionSettings.Port));
+                    job.ConnectionSettings.Username, job.ConnectionSettings.Host, job.ConnectionSettings.Port), "TimerJobManager", job.JobId.ToString());
 
                 // Track upload statistics
                 int successfulUploads = 0;
@@ -1195,15 +1230,30 @@ namespace syncer.ui.Services
 
                 for (int batchIndex = 0; batchIndex < totalBatches; batchIndex++)
                 {
+                    // Check for cancellation before processing each batch
+                    if (job.IsCancellationRequested)
+                    {
+                        _logService.LogWarning(string.Format("Upload cancelled for job {0} - stopping file transfers", job.JobId), "TimerJobManager", job.JobId.ToString());
+                        break;
+                    }
+
                     int startIndex = batchIndex * batchSize;
                     int endIndex = Math.Min(startIndex + batchSize, localFilePaths.Length);
 
                     _logService.LogInfo(string.Format("Processing batch {0}/{1} (files {2}-{3})",
-                        batchIndex + 1, totalBatches, startIndex + 1, endIndex));
+                        batchIndex + 1, totalBatches, startIndex + 1, endIndex), "TimerJobManager", job.JobId.ToString());
 
                     // Process files in current batch
                     for (int i = startIndex; i < endIndex; i++)
                     {
+                        // Check for cancellation before processing each file
+                        if (job.IsCancellationRequested)
+                        {
+                            _logService.LogWarning(string.Format("Upload cancelled for job {0} - stopping at file {1}/{2}", 
+                                job.JobId, i + 1, localFilePaths.Length), "TimerJobManager", job.JobId.ToString());
+                            break;
+                        }
+
                         string localFile = localFilePaths[i];
 
                         try
@@ -1211,7 +1261,7 @@ namespace syncer.ui.Services
                             // Skip if the file doesn't exist
                             if (!File.Exists(localFile))
                             {
-                                _logService.LogWarning(string.Format("File does not exist: {0}", localFile));
+                                _logService.LogWarning(string.Format("File does not exist: {0}", localFile), "TimerJobManager", job.JobId.ToString());
                                 skippedFiles++;
                                 continue;
                             }
@@ -1250,13 +1300,13 @@ namespace syncer.ui.Services
                                         string dirError = null;
                                         if (job.TransferClient.EnsureDirectory(job.ConnectionSettings, currentPath, out dirError))
                                         {
-                                            _logService.LogInfo(string.Format("Ensured remote directory exists: {0}", currentPath));
+                                            _logService.LogInfo(string.Format("Ensured remote directory exists: {0}", currentPath), "TimerJobManager", job.JobId.ToString());
                                             createdRemoteFolders.Add(currentPath, true);
                                         }
                                         else
                                         {
                                             _logService.LogError(string.Format("Failed to create directory {0}: {1}",
-                                                currentPath, dirError ?? "Unknown error"));
+                                                currentPath, dirError ?? "Unknown error"), "TimerJobManager", job.JobId.ToString());
                                             continue;
                                         }
                                     }
@@ -1278,7 +1328,7 @@ namespace syncer.ui.Services
                             if (!shouldTransferByLocalState)
                             {
                                 _logService.LogInfo(string.Format("File unchanged locally since last upload: {0} (last modified: {1}, size: {2} bytes)", 
-                                    fileName, fileModifiedTime.ToString("yyyy-MM-dd HH:mm:ss"), fileSize));
+                                    fileName, fileModifiedTime.ToString("yyyy-MM-dd HH:mm:ss"), fileSize), "TimerJobManager", job.JobId.ToString());
                                 skippedFiles++;
                                 
                                 // Remove from locked files tracker if it was previously locked
@@ -1293,7 +1343,7 @@ namespace syncer.ui.Services
                             if (!shouldUploadToRemote)
                             {
                                 _logService.LogInfo(string.Format("Skipping upload - remote file already up-to-date: {0} ({1})", 
-                                    fileName, uploadDecisionReason));
+                                    fileName, uploadDecisionReason), "TimerJobManager", job.JobId.ToString());
                                 skippedFiles++;
                                 
                                 // Update file state tracker since file matches remote (prevent checking again next time)
@@ -1306,9 +1356,9 @@ namespace syncer.ui.Services
 
                             // Upload the file - the transfer client will handle locked files by creating temp copies
                             _logService.LogInfo(string.Format("Uploading file: {0} -> {1} ({2})", 
-                                localFile, remoteFile, uploadDecisionReason));
+                                localFile, remoteFile, uploadDecisionReason), "TimerJobManager", job.JobId.ToString());
                             _logService.LogInfo(string.Format("Local file size: {0} bytes, modified: {1}", 
-                                fileSize, fileModifiedTime.ToString("yyyy-MM-dd HH:mm:ss")));
+                                fileSize, fileModifiedTime.ToString("yyyy-MM-dd HH:mm:ss")), "TimerJobManager", job.JobId.ToString());
 
                             string error = null;
                             DateTime transferStart = DateTime.Now;
@@ -1319,7 +1369,7 @@ namespace syncer.ui.Services
                             {
                                 string errorMsg = string.Format("Failed to upload {0}: {1}",
                                     fileName, error == null ? "Unknown error" : error);
-                                _logService.LogError(errorMsg);
+                                _logService.LogError(errorMsg, "TimerJobManager", job.JobId.ToString());
                                 failedUploads++;
 
                                 // Check if the error is due to file locking
@@ -1327,7 +1377,7 @@ namespace syncer.ui.Services
                                 {
                                     // Track this file for retry in next iteration
                                     job.FileRetryManager.TrackLockedFile(localFile, error);
-                                    _logService.LogWarning(string.Format("File '{0}' appears to be locked. Tracked for retry in next iteration.", fileName));
+                                    _logService.LogWarning(string.Format("File '{0}' appears to be locked. Tracked for retry in next iteration.", fileName), "TimerJobManager", job.JobId.ToString());
                                 }
 
                                 // Don't break here - continue trying to upload other files
@@ -1335,12 +1385,12 @@ namespace syncer.ui.Services
                             }
                             else
                             {
-                                _logService.LogInfo(string.Format("Successfully uploaded: {0} ({1} bytes)", fileName, fileSize));
+                                _logService.LogInfo(string.Format("Successfully uploaded: {0} ({1} bytes)", fileName, fileSize), "TimerJobManager", job.JobId.ToString());
                                 successfulUploads++;
 
                                 // Update file state tracker after successful upload
                                 job.FileStateTracker.UpdateFileState(localFile, fileModifiedTime, fileSize);
-                                _logService.LogInfo(string.Format("File state updated for: {0}", fileName));
+                                _logService.LogInfo(string.Format("File state updated for: {0}", fileName), "TimerJobManager", job.JobId.ToString());
 
                                 // Mark file as successfully transferred (remove from locked files if it was tracked)
                                 job.FileRetryManager.MarkFileTransferred(localFile);
@@ -1354,12 +1404,12 @@ namespace syncer.ui.Services
                                     {
                                         bandwidthService.UpdateUploadSpeed(fileSize, transferDurationSeconds);
                                         _logService.LogInfo(string.Format("Upload speed updated: {0} bytes in {1:F2} seconds ({2:F0} bytes/second)", 
-                                            fileSize, transferDurationSeconds, fileSize / transferDurationSeconds));
+                                            fileSize, transferDurationSeconds, fileSize / transferDurationSeconds), "TimerJobManager", job.JobId.ToString());
                                     }
                                 }
                                 catch (Exception speedEx)
                                 {
-                                    _logService.LogError(string.Format("Error updating upload speed tracking: {0}", speedEx.Message));
+                                    _logService.LogError(string.Format("Error updating upload speed tracking: {0}", speedEx.Message), "TimerJobManager", job.JobId.ToString());
                                 }
 
                                 // Check if we should delete source file after successful upload
@@ -1368,14 +1418,14 @@ namespace syncer.ui.Services
                                     try
                                     {
                                         File.Delete(localFile);
-                                        _logService.LogInfo(string.Format("Source file deleted after successful upload: {0}", localFile));
+                                        _logService.LogInfo(string.Format("Source file deleted after successful upload: {0}", localFile), "TimerJobManager", job.JobId.ToString());
                                         
                                         // Remove from file state tracker since file is deleted
                                         job.FileStateTracker.RemoveFileState(localFile);
                                     }
                                     catch (Exception deleteEx)
                                     {
-                                        _logService.LogError(string.Format("Failed to delete source file {0} after upload: {1}", localFile, deleteEx.Message));
+                                        _logService.LogError(string.Format("Failed to delete source file {0} after upload: {1}", localFile, deleteEx.Message), "TimerJobManager", job.JobId.ToString());
                                     }
                                 }
 
@@ -1388,23 +1438,23 @@ namespace syncer.ui.Services
                                     {
                                         if (remoteFileExists)
                                         {
-                                            _logService.LogInfo(string.Format("Upload verified: {0} exists on remote server", fileName));
+                                            _logService.LogInfo(string.Format("Upload verified: {0} exists on remote server", fileName), "TimerJobManager", job.JobId.ToString());
                                         }
                                         else
                                         {
-                                            _logService.LogWarning(string.Format("Upload completed but file not found on remote: {0}", fileName));
+                                            _logService.LogWarning(string.Format("Upload completed but file not found on remote: {0}", fileName), "TimerJobManager", job.JobId.ToString());
                                         }
                                     }
                                 }
                                 catch (Exception verifyEx)
                                 {
-                                    _logService.LogWarning(string.Format("Could not verify upload of {0}: {1}", fileName, verifyEx.Message));
+                                    _logService.LogWarning(string.Format("Could not verify upload of {0}: {1}", fileName, verifyEx.Message), "TimerJobManager", job.JobId.ToString());
                                 }
                             }
                         }
                         catch (Exception fileEx)
                         {
-                            _logService.LogError(string.Format("Error uploading file: {0}", fileEx.Message));
+                            _logService.LogError(string.Format("Error uploading file: {0}", fileEx.Message), "TimerJobManager", job.JobId.ToString());
                             failedUploads++;
                         }
                     }
@@ -1416,12 +1466,14 @@ namespace syncer.ui.Services
                     }
                 }
 
-                _logService.LogInfo(string.Format("Folder upload completed for job {0}. Results: {1} successful, {2} failed, {3} skipped (already up-to-date on remote or unchanged locally) out of {4} total files",
-                    job.JobId, successfulUploads, failedUploads, skippedFiles, localFilePaths.Length));
+                // Log completion message
+                string completionStatus = job.IsCancellationRequested ? "cancelled" : "completed";
+                _logService.LogInfo(string.Format("Folder upload {0} for job {1}. Results: {2} successful, {3} failed, {4} skipped (already up-to-date on remote or unchanged locally) out of {5} total files",
+                    completionStatus, job.JobId, successfulUploads, failedUploads, skippedFiles, localFilePaths.Length), "TimerJobManager", job.JobId.ToString());
                 
                 if (skippedFiles > 0)
                 {
-                    _logService.LogInfo(string.Format("Note: {0} file(s) were skipped because they already exist on remote with identical content or haven't changed locally since last upload", skippedFiles));
+                    _logService.LogInfo(string.Format("Note: {0} file(s) were skipped because they already exist on remote with identical content or haven't changed locally since last upload", skippedFiles), "TimerJobManager", job.JobId.ToString());
                 }
                 
                 // Report on locked files that will be retried in next iteration
@@ -1429,19 +1481,19 @@ namespace syncer.ui.Services
                 if (lockedFileCount > 0)
                 {
                     _logService.LogWarning(string.Format("Job {0}: {1} file(s) remain locked and will be retried in the next iteration", 
-                        job.JobId, lockedFileCount));
+                        job.JobId, lockedFileCount), "TimerJobManager", job.JobId.ToString());
                     
                     var lockedFiles = job.FileRetryManager.GetAllLockedFiles();
                     foreach (var lockedFile in lockedFiles)
                     {
                         _logService.LogInfo(string.Format("  - {0} (retry count: {1}, last error: {2})", 
-                            Path.GetFileName(lockedFile.FilePath), lockedFile.RetryCount, lockedFile.LastError));
+                            Path.GetFileName(lockedFile.FilePath), lockedFile.RetryCount, lockedFile.LastError), "TimerJobManager", job.JobId.ToString());
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logService.LogError(string.Format("Error in folder upload for job {0}: {1}", job.JobId, ex.Message));
+                _logService.LogError(string.Format("Error in folder upload for job {0}: {1}", job.JobId, ex.Message), "TimerJobManager", job.JobId.ToString());
             }
         }
 
@@ -1509,7 +1561,7 @@ namespace syncer.ui.Services
                     _logService.LogInfo(string.Format("Updated existing download timer job {0} with FilterSettings - EnableFilters: {1}, Include: {2}, Exclude: {3}", 
                         jobId, enableFilters, 
                         includeExtensions != null ? string.Join(",", includeExtensions.ToArray()) : "none",
-                        excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"));
+                        excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"), "TimerJobManager", jobId.ToString());
                     
                     // Initialize download-specific properties if they don't exist
                     if (!job.IsDownloadInProgress) job.IsDownloadInProgress = false;
@@ -1522,7 +1574,7 @@ namespace syncer.ui.Services
                         job.Timer.Interval = intervalMs;
                     }
                     
-                    _logService.LogInfo(string.Format("Updated download timer job {0} ({1}) for remote folder {2} to local {3}", jobId, jobName, remoteFolderPath, localDestinationPath));
+                    _logService.LogInfo(string.Format("Updated download timer job {0} ({1}) for remote folder {2} to local {3}", jobId, jobName, remoteFolderPath, localDestinationPath), "TimerJobManager", jobId.ToString());
                     return true;
                 }
                 
@@ -1530,7 +1582,7 @@ namespace syncer.ui.Services
                 ConnectionSettings connectionSettings = _connectionService.GetConnectionSettings();
                 if (connectionSettings == null || !connectionSettings.IsRemoteConnection)
                 {
-                    _logService.LogError("Cannot register download timer job: No remote connection settings available");
+                    _logService.LogError("Cannot register download timer job: No remote connection settings available", "TimerJobManager");
                     return false;
                 }
                 
@@ -1563,12 +1615,12 @@ namespace syncer.ui.Services
                         
                         // Apply the bandwidth limit to the core settings if supported
                         _logService.LogInfo(string.Format("Applied download bandwidth limits to job {0}: {1} bytes/sec", 
-                            jobId, sftpConfig.BandwidthLimitBytesPerSecond));
+                            jobId, sftpConfig.BandwidthLimitBytesPerSecond), "TimerJobManager", jobId.ToString());
                     }
                 }
                 catch (Exception bwEx)
                 {
-                    _logService.LogError(string.Format("Error applying bandwidth limits to download job {0}: {1}", jobId, bwEx.Message));
+                    _logService.LogError(string.Format("Error applying bandwidth limits to download job {0}: {1}", jobId, bwEx.Message), "TimerJobManager", jobId.ToString());
                 }
                 
                 // Get the appropriate transfer client using the factory
@@ -1604,13 +1656,13 @@ namespace syncer.ui.Services
                 _logService.LogInfo(string.Format("Created NEW download timer job {0} with FilterSettings - EnableFilters: {1}, Include: {2}, Exclude: {3}", 
                     jobId, enableFilters, 
                     includeExtensions != null ? string.Join(",", includeExtensions.ToArray()) : "none",
-                    excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"));
-                _logService.LogInfo(string.Format("Registered download timer job {0} ({1}) for remote folder {2} to local {3}", jobId, jobName, remoteFolderPath, localDestinationPath));
+                    excludeExtensions != null ? string.Join(",", excludeExtensions.ToArray()) : "none"), "TimerJobManager", jobId.ToString());
+                _logService.LogInfo(string.Format("Registered download timer job {0} ({1}) for remote folder {2} to local {3}", jobId, jobName, remoteFolderPath, localDestinationPath), "TimerJobManager", jobId.ToString());
                 return true;
             }
             catch (Exception ex)
             {
-                _logService.LogError(string.Format("Failed to register download timer job: {0}", ex.Message));
+                _logService.LogError(string.Format("Failed to register download timer job: {0}", ex.Message), "TimerJobManager");
                 return false;
             }
         }
@@ -1726,7 +1778,7 @@ namespace syncer.ui.Services
                 }
                 
                 _timerJobs[jobId].RunOnStartup = runOnStartup;
-                _logService.LogInfo(string.Format("Set RunOnStartup to {0} for job {1}", runOnStartup, jobId), "TimerJobManager");
+                _logService.LogInfo(string.Format("Set RunOnStartup to {0} for job {1}", runOnStartup, jobId), "TimerJobManager", jobId.ToString());
                 
                 // Save the state to persist the change
                 SaveTimerJobsState();
@@ -1849,14 +1901,14 @@ namespace syncer.ui.Services
                             
                             if (_logService != null && persistentJob.FileStatesList != null)
                             {
-                                _logService.LogInfo(string.Format("Saved {0} file states for job {1}", persistentJob.FileStatesList.Count, job.JobId), "TimerJobManager");
+                                _logService.LogInfo(string.Format("Saved {0} file states for job {1}", persistentJob.FileStatesList.Count, job.JobId), "TimerJobManager", job.JobId.ToString());
                             }
                         }
                         catch (Exception fsEx)
                         {
                             if (_logService != null)
                             {
-                                _logService.LogWarning(string.Format("Could not save file states for job {0}: {1}", job.JobId, fsEx.Message), "TimerJobManager");
+                                _logService.LogWarning(string.Format("Could not save file states for job {0}: {1}", job.JobId, fsEx.Message), "TimerJobManager", job.JobId.ToString());
                             }
                             persistentJob.FileStatesList = new List<FileState>(); // Empty list if error
                         }
@@ -1877,14 +1929,14 @@ namespace syncer.ui.Services
                             
                             if (persistentJob.LockedFilesList != null && persistentJob.LockedFilesList.Count > 0 && _logService != null)
                             {
-                                _logService.LogInfo(string.Format("Saved {0} locked file states for job {1}", persistentJob.LockedFilesList.Count, job.JobId), "TimerJobManager");
+                                _logService.LogInfo(string.Format("Saved {0} locked file states for job {1}", persistentJob.LockedFilesList.Count, job.JobId), "TimerJobManager", job.JobId.ToString());
                             }
                         }
                         catch (Exception lfEx)
                         {
                             if (_logService != null)
                             {
-                                _logService.LogWarning(string.Format("Could not save locked files for job {0}: {1}", job.JobId, lfEx.Message), "TimerJobManager");
+                                _logService.LogWarning(string.Format("Could not save locked files for job {0}: {1}", job.JobId, lfEx.Message), "TimerJobManager", job.JobId.ToString());
                             }
                             persistentJob.LockedFilesList = new List<LockedFileInfo>(); // Empty list if error
                         }

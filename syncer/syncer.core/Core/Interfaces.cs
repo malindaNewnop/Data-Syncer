@@ -54,6 +54,12 @@ namespace syncer.core
         void LogInfo(string message, string source = null);
         void LogWarning(string message, string source = null);
         void LogError(string message, string source = null);
+        
+        // Overloads with jobId parameter
+        void LogInfo(string message, string source, string jobId);
+        void LogWarning(string message, string source, string jobId);
+        void LogError(string message, string source, string jobId);
+        
         void LogJobStart(SyncJob job);
         void LogJobProgress(SyncJob job, string message);
         void LogJobSuccess(SyncJob job, string message);
