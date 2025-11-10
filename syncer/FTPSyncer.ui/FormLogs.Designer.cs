@@ -195,6 +195,7 @@ namespace FTPSyncer.ui
             this.txtSearch.Name = "txtSearch";
             this.txtSearch.Size = new System.Drawing.Size(420, 21);
             this.txtSearch.TabIndex = 1;
+            this.txtSearch.TextChanged += new System.EventHandler(this.txtSearch_TextChanged);
             this.txtSearch.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.txtSearch_KeyPress);
             
             // 

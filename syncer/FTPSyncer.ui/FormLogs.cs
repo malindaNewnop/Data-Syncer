@@ -70,12 +70,114 @@ namespace FTPSyncer.ui
                 // Only refresh if form is visible and not in the middle of an operation
                 if (this.Visible && !dgvLogs.IsCurrentCellInEditMode)
                 {
-                    LoadLogs(); // Use existing LoadLogs method
+                    LoadNewLogsOnly(); // Load only new logs without refreshing entire grid
                 }
             }
             catch
             {
                 // Ignore errors during auto-refresh
+            }
+        }
+        
+        /// <summary>
+        /// Load only new logs without refreshing the entire grid
+        /// </summary>
+        private void LoadNewLogsOnly()
+        {
+            try
+            {
+                if (_logService == null || _logsDataTable == null)
+                {
+                    return;
+                }
+
+                // Get the timestamp of the most recent log in our current data
+                DateTime lastLogTime = DateTime.MinValue;
+                if (_logsDataTable.Rows.Count > 0)
+                {
+                    // Find the maximum timestamp in the table
+                    foreach (DataRow row in _logsDataTable.Rows)
+                    {
+                        if (row["Timestamp"] != DBNull.Value)
+                        {
+                            DateTime rowTime = Convert.ToDateTime(row["Timestamp"]);
+                            if (rowTime > lastLogTime)
+                            {
+                                lastLogTime = rowTime;
+                            }
+                        }
+                    }
+                }
+
+                // Load logs newer than the last log time
+                DateTime fromDate = lastLogTime > DateTime.MinValue ? lastLogTime.AddSeconds(1) : DateTime.Today.AddDays(-1);
+                DateTime toDate = DateTime.Now.AddDays(1);
+                
+                DataTable newLogs = _logService.GetLogs(fromDate, toDate, null);
+                
+                if (newLogs != null && newLogs.Rows.Count > 0)
+                {
+                    // Ensure consistent structure for new logs
+                    newLogs = EnsureConsistentLogStructure(newLogs);
+                    
+                    // Track if we actually added any new logs
+                    bool logsAdded = false;
+                    
+                    // Add new logs to the top of the existing table
+                    foreach (DataRow newRow in newLogs.Rows)
+                    {
+                        // Check if this log already exists (duplicate check)
+                        bool isDuplicate = false;
+                        string newTimestamp = newRow["Timestamp"].ToString();
+                        string newMessage = newRow["Message"].ToString();
+                        
+                        foreach (DataRow existingRow in _logsDataTable.Rows)
+                        {
+                            string existingTimestamp = existingRow["Timestamp"].ToString();
+                            string existingMessage = existingRow["Message"].ToString();
+                            
+                            if (newTimestamp == existingTimestamp && newMessage == existingMessage)
+                            {
+                                isDuplicate = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!isDuplicate)
+                        {
+                            // Insert at the top (index 0)
+                            DataRow insertRow = _logsDataTable.NewRow();
+                            insertRow.ItemArray = newRow.ItemArray;
+                            _logsDataTable.Rows.InsertAt(insertRow, 0);
+                            logsAdded = true;
+                        }
+                    }
+                    
+                    // Only update UI if new logs were added
+                    if (logsAdded)
+                    {
+                        // Keep only the most recent MAX_LOG_ENTRIES
+                        while (_logsDataTable.Rows.Count > MAX_LOG_ENTRIES)
+                        {
+                            _logsDataTable.Rows.RemoveAt(_logsDataTable.Rows.Count - 1);
+                        }
+                        
+                        // Re-apply filters to include new logs in filtered view
+                        ApplyFilters();
+                        
+                        // Update UI
+                        UpdateLogCount();
+                        UpdateLastUpdatedLabel();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Silently log errors during auto-refresh
+                if (_logService != null)
+                {
+                    _logService.LogError("Error loading new logs in auto-refresh: " + ex.Message, "UI");
+                }
             }
         }
         
@@ -164,52 +266,70 @@ namespace FTPSyncer.ui
                     return;
 
                 DataTable dt = dgvLogs.DataSource as DataTable;
+                if (dt == null && dgvLogs.DataSource is DataView)
+                {
+                    dt = ((DataView)dgvLogs.DataSource).Table;
+                }
+                
                 if (dt == null)
                     return;
 
                 // Build filter string
                 string filterExpression = string.Empty;
 
-                // Text search filter
+                // Text search filter - search across multiple columns
                 if (!string.IsNullOrEmpty(txtSearch.Text))
                 {
-                    string searchTerm = txtSearch.Text.Replace("'", "''"); // Escape single quotes
+                    string searchTerm = txtSearch.Text.Trim().Replace("'", "''"); // Escape single quotes
+                    
+                    var searchParts = new System.Collections.Generic.List<string>();
 
                     // Search in Message column
                     if (dt.Columns.Contains("Message"))
                     {
-                        filterExpression += string.IsNullOrEmpty(filterExpression) ?
-                            $"Message LIKE '%{searchTerm}%'" :
-                            $" AND Message LIKE '%{searchTerm}%'";
+                        searchParts.Add(string.Format("Message LIKE '%{0}%'", searchTerm));
                     }
 
-                    // Also search in JobId column
+                    // Search in JobId column
                     if (dt.Columns.Contains("JobId"))
                     {
-                        filterExpression += string.IsNullOrEmpty(filterExpression) ?
-                            $"JobId LIKE '%{searchTerm}%'" :
-                            $" OR JobId LIKE '%{searchTerm}%'";
+                        searchParts.Add(string.Format("JobId LIKE '%{0}%'", searchTerm));
+                    }
+                    
+                    // Search in JobName column
+                    if (dt.Columns.Contains("JobName"))
+                    {
+                        searchParts.Add(string.Format("JobName LIKE '%{0}%'", searchTerm));
+                    }
+                    
+                    // Search in Source column
+                    if (dt.Columns.Contains("Source"))
+                    {
+                        searchParts.Add(string.Format("Source LIKE '%{0}%'", searchTerm));
+                    }
+                    
+                    if (searchParts.Count > 0)
+                    {
+                        filterExpression = "(" + string.Join(" OR ", searchParts.ToArray()) + ")";
                     }
                 }
 
-                // Removed: Log level filter logic
-
                 // JobId filter
-                if (cmbJobs.SelectedIndex > 0) // Not "All Jobs"
+                if (cmbJobs != null && cmbJobs.SelectedIndex > 0) // Not "All Jobs"
                 {
-                    string selectedJob = cmbJobs.SelectedItem.ToString();
+                    string selectedJob = cmbJobs.SelectedItem.ToString().Replace("'", "''");
 
                     if (dt.Columns.Contains("JobId"))
                     {
-                        string jobFilter = $"JobId = '{selectedJob}'";
+                        string jobFilter = string.Format("JobId = '{0}'", selectedJob);
 
                         filterExpression = string.IsNullOrEmpty(filterExpression) ?
-                            jobFilter : $"({filterExpression}) AND {jobFilter}";
+                            jobFilter : string.Format("({0}) AND {1}", filterExpression, jobFilter);
                     }
                 }
 
                 // Time filter - use the single Timestamp column
-                if (chkEnableTimeFilter.Checked && dt.Columns.Contains("Timestamp"))
+                if (chkEnableTimeFilter != null && chkEnableTimeFilter.Checked && dt.Columns.Contains("Timestamp"))
                 {
                     DateTime fromDateTime = dtpFrom.Value.Date.Add(dtpFromTime.Value.TimeOfDay);
                     DateTime toDateTime = dtpTo.Value.Date.Add(dtpToTime.Value.TimeOfDay);
@@ -790,57 +910,8 @@ namespace FTPSyncer.ui
         {
             try
             {
-                string searchText = txtSearch != null ? txtSearch.Text.Trim() : "";
-
-                if (UIStringExtensions.IsNullOrWhiteSpace(searchText))
-                {
-                    // Clear filter
-                    DataTable dt = dgvLogs != null ? dgvLogs.DataSource as DataTable : null;
-                    if (dt == null && dgvLogs.DataSource is DataView)
-                    {
-                        dt = ((DataView)dgvLogs.DataSource).Table;
-                    }
-                    
-                    if (dt != null)
-                    {
-                        dt.DefaultView.RowFilter = string.Empty;
-                    }
-                }
-                else
-                {
-                    // Apply filter - search across JobName, Source, and Message columns
-                    string safe = searchText.Replace("'", "''");
-                    string filter = string.Empty;
-                    
-                    DataTable dt = dgvLogs != null ? dgvLogs.DataSource as DataTable : null;
-                    if (dt == null && dgvLogs.DataSource is DataView)
-                    {
-                        dt = ((DataView)dgvLogs.DataSource).Table;
-                    }
-                    
-                    if (dt != null)
-                    {
-                        // Build dynamic filter based on available columns
-                        var filterParts = new System.Collections.Generic.List<string>();
-                        
-                        if (dt.Columns.Contains("JobName"))
-                            filterParts.Add("JobName LIKE '%" + safe + "%'");
-                        if (dt.Columns.Contains("JobId"))
-                            filterParts.Add("JobId LIKE '%" + safe + "%'");
-                        if (dt.Columns.Contains("Source"))
-                            filterParts.Add("Source LIKE '%" + safe + "%'");
-                        if (dt.Columns.Contains("Message"))
-                            filterParts.Add("Message LIKE '%" + safe + "%'");
-                        
-                        if (filterParts.Count > 0)
-                        {
-                            filter = string.Join(" OR ", filterParts.ToArray());
-                            dt.DefaultView.RowFilter = filter;
-                        }
-                    }
-                }
-
-                UpdateLogCount();
+                // Simply apply all filters using the unified filter method
+                ApplyFilters();
             }
             catch (Exception ex)
             {
@@ -851,23 +922,21 @@ namespace FTPSyncer.ui
 
         private void btnClearSearch_Click(object sender, EventArgs e)
         {
-            if (txtSearch != null)
+            try
             {
-                txtSearch.Text = string.Empty;
-            }
+                if (txtSearch != null)
+                {
+                    txtSearch.Text = string.Empty;
+                }
 
-            DataTable dt = dgvLogs != null ? dgvLogs.DataSource as DataTable : null;
-            if (dt == null && dgvLogs != null && dgvLogs.DataSource is DataView)
-            {
-                dt = ((DataView)dgvLogs.DataSource).Table;
+                // Re-apply filters (which will clear the search filter since txtSearch is empty)
+                ApplyFilters();
             }
-            
-            if (dt != null)
+            catch (Exception ex)
             {
-                dt.DefaultView.RowFilter = string.Empty;
+                MessageBox.Show("Error clearing search: " + ex.Message, "Error",
+                              MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-
-            UpdateLogCount();
         }
 
         private void btnRefresh_Click(object sender, EventArgs e)
@@ -1129,6 +1198,22 @@ namespace FTPSyncer.ui
             {
                 e.Handled = true;
                 ApplyFilters();
+            }
+        }
+        
+        /// <summary>
+        /// Event handler for text change in search box - enables real-time search
+        /// </summary>
+        private void txtSearch_TextChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                // Apply filters as user types (real-time search)
+                ApplyFilters();
+            }
+            catch
+            {
+                // Silently ignore errors during real-time search
             }
         }
 

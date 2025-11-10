@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("FTPSyncer.core")]
-[assembly: AssemblyCopyright("Copyright ©  2025")]
+[assembly: AssemblyCopyright("Copyright ï¿½  2025")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -29,8 +29,8 @@ using System.Runtime.InteropServices;
 //      Build Number
 //      Revision
 //
-[assembly: AssemblyVersion("0.6.0.0")]
-[assembly: AssemblyFileVersion("0.6.0.0")]
+[assembly: AssemblyVersion("0.6.1.0")]
+[assembly: AssemblyFileVersion("0.6.1.0")]
 
 
 
