@@ -137,6 +137,7 @@ namespace FTPSyncer.ui.Forms
                 
                 // Job information
                 AddPreviewItem("Job Name", _currentJob.Name ?? "");
+                AddPreviewItem("Job Status", _currentJob.IsEnabled ? "Enabled" : "Disabled");
                 AddPreviewItem("Source Path", _currentJob.SourcePath ?? "");
                 AddPreviewItem("Destination Path", _currentJob.DestinationPath ?? "");
                 AddPreviewItem("Interval", $"{_currentJob.IntervalValue} {_currentJob.IntervalType}");
@@ -145,12 +146,6 @@ namespace FTPSyncer.ui.Forms
                 // Connection information
                 AddPreviewItem("Source Connection", GetConnectionDescription(_sourceConnection));
                 AddPreviewItem("Destination Connection", GetConnectionDescription(_destinationConnection));
-                
-                // Options
-                AddPreviewItem("Set as Default", checkBoxSetAsDefault.Checked ? "Yes" : "No");
-                AddPreviewItem("Add to Quick Launch", checkBoxAddToQuickLaunch.Checked ? "Yes" : "No");
-                AddPreviewItem("Auto Start on Load", checkBoxAutoStartOnLoad.Checked ? "Yes" : "No");
-                AddPreviewItem("Show Notification", checkBoxShowNotificationOnStart.Checked ? "Yes" : "No");
             }
             catch (Exception)
             {
@@ -247,24 +242,6 @@ namespace FTPSyncer.ui.Forms
                 {
                     SavedConfiguration = config;
                     
-                    // Set as default if requested
-                    if (checkBoxSetAsDefault.Checked)
-                        _configService.SetDefaultConfiguration(config.Id);
-                    
-                    // Add to quick launch if requested
-                    if (checkBoxAddToQuickLaunch.Checked)
-                    {
-                        var quickLaunchItem = new QuickLaunchItem
-                        {
-                            ConfigurationId = config.Id,
-                            DisplayName = config.DisplayName,
-                            Description = config.FormattedDescription,
-                            IsFavorite = false,
-                            SortOrder = 0
-                        };
-                        _configService.AddToQuickLaunch(config.Id, quickLaunchItem);
-                    }
-                    
                     MessageBox.Show("Configuration saved successfully!", "Success", 
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     
@@ -346,12 +323,12 @@ namespace FTPSyncer.ui.Forms
                 Description = textBoxDescription.Text.Trim(),
                 Category = comboBoxCategory.Text.Trim(),
                 Tags = GetTagsList(),
-                IsDefault = checkBoxSetAsDefault.Checked,
-                EnableQuickLaunch = checkBoxAddToQuickLaunch.Checked,
-                AutoStartOnLoad = checkBoxAutoStartOnLoad.Checked,
-                ShowNotificationOnStart = checkBoxShowNotificationOnStart.Checked,
+                IsDefault = false,
+                EnableQuickLaunch = true,
+                AutoStartOnLoad = false,
+                ShowNotificationOnStart = true,
                 
-                // Copy job settings
+                // Copy job settings - ensure IsEnabled status is preserved
                 JobSettings = CloneJob(_currentJob)
             };
             

@@ -96,6 +96,15 @@ namespace FTPSyncer.ui.Services
             if (!_notificationsEnabled || _trayManager == null)
                 return;
                 
+            // Check specific notification type settings
+            if (_settings != null)
+            {
+                if (icon == ToolTipIcon.Error && !_settings.ShowErrorNotifications)
+                    return;
+                if (icon == ToolTipIcon.Warning && !_settings.ShowWarningNotifications)
+                    return;
+            }
+                
             // Create the notification item
             var notification = new NotificationItem
             {
@@ -176,6 +185,10 @@ namespace FTPSyncer.ui.Services
         /// <param name="errorMessage">The error message if connection failed</param>
         public void ShowConnectionNotification(bool connected, string serverName, string errorMessage = null)
         {
+            // Check if connection notifications are enabled
+            if (_settings != null && !_settings.ShowConnectionNotifications)
+                return;
+                
             string title = connected ? "Connection Established" : "Connection Failed";
             string message = connected
                 ? $"Successfully connected to {serverName}."
@@ -250,6 +263,102 @@ namespace FTPSyncer.ui.Services
                         break;
                 }
             }
+        }
+
+        #endregion
+
+        #region Notification Settings Management
+
+        private NotificationSettings _settings;
+        private const string SETTINGS_FILE = "notification_settings.json";
+
+        /// <summary>
+        /// Gets the current notification settings
+        /// </summary>
+        public NotificationSettings GetSettings()
+        {
+            if (_settings == null)
+            {
+                LoadSettingsFromFile();
+            }
+            return _settings ?? new NotificationSettings();
+        }
+
+        /// <summary>
+        /// Saves the notification settings
+        /// </summary>
+        public void SaveSettings(NotificationSettings settings)
+        {
+            if (settings == null)
+                throw new ArgumentNullException(nameof(settings));
+
+            _settings = settings;
+            _notificationsEnabled = settings.EnableNotifications;
+
+            // Update tray manager
+            if (_trayManager != null)
+                _trayManager.NotificationsEnabled = _notificationsEnabled;
+
+            // Save to file
+            SaveSettingsToFile();
+        }
+
+        private void LoadSettingsFromFile()
+        {
+            try
+            {
+                string settingsPath = GetSettingsFilePath();
+                if (File.Exists(settingsPath))
+                {
+                    string json = File.ReadAllText(settingsPath);
+                    _settings = Newtonsoft.Json.JsonConvert.DeserializeObject<NotificationSettings>(json);
+                    
+                    if (_settings != null)
+                    {
+                        _notificationsEnabled = _settings.EnableNotifications;
+                        if (_trayManager != null)
+                            _trayManager.NotificationsEnabled = _notificationsEnabled;
+                    }
+                }
+                else
+                {
+                    _settings = new NotificationSettings();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService?.LogError($"Error loading notification settings: {ex.Message}", "NotificationService");
+                _settings = new NotificationSettings();
+            }
+        }
+
+        private void SaveSettingsToFile()
+        {
+            try
+            {
+                string settingsPath = GetSettingsFilePath();
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(_settings, Newtonsoft.Json.Formatting.Indented);
+                
+                // Ensure directory exists
+                string directory = Path.GetDirectoryName(settingsPath);
+                if (!Directory.Exists(directory))
+                    Directory.CreateDirectory(directory);
+
+                File.WriteAllText(settingsPath, json);
+                _logService?.LogInfo("Notification settings saved successfully", "NotificationService");
+            }
+            catch (Exception ex)
+            {
+                _logService?.LogError($"Error saving notification settings: {ex.Message}", "NotificationService");
+                throw;
+            }
+        }
+
+        private string GetSettingsFilePath()
+        {
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string appFolder = Path.Combine(appDataPath, "FTPSyncer");
+            return Path.Combine(appFolder, SETTINGS_FILE);
         }
 
         #endregion

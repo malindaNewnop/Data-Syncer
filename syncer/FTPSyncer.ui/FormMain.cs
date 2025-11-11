@@ -82,6 +82,9 @@ namespace FTPSyncer.ui
                 // Create the notification service
                 _notificationService = new NotificationService(_trayManager);
                 
+                // Register notification service in ServiceLocator so other components can access it
+                ServiceLocator.NotificationService = _notificationService;
+                
                 // Update the tray icon tooltip with application status
                 string serviceStatus = _serviceManager != null ? 
                     (_serviceManager.IsServiceRunning() ? "Running" : "Stopped") : "Unknown";
@@ -404,6 +407,29 @@ namespace FTPSyncer.ui
                         _notificationService.ShowConnectionNotification(isConnected, serverName);
                     }
                 }
+            }
+        }
+
+        private void notificationsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Create a simple dialog to configure notification settings
+                using (var notificationForm = new Forms.FormNotificationSettings())
+                {
+                    if (notificationForm.ShowDialog() == DialogResult.OK)
+                    {
+                        // Settings are saved within the form
+                        MessageBox.Show("Notification settings saved successfully!", "Settings Saved",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening notification settings: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService?.LogError($"Error opening notification settings: {ex.Message}", "UI");
             }
         }
 
@@ -738,9 +764,11 @@ namespace FTPSyncer.ui
                     
                     if (connDict != null)
                     {
+                        string protocol = GetStringValue(connDict, "Protocol") ?? "FTP";
+                        
                         connectionSettings = new ConnectionSettings
                         {
-                            Protocol = GetStringValue(connDict, "Protocol") ?? "FTP",
+                            Protocol = protocol,
                             Host = GetStringValue(connDict, "Host") ?? "",
                             Port = GetIntValue(connDict, "Port", 21),
                             Username = GetStringValue(connDict, "Username") ?? "",
@@ -752,6 +780,21 @@ namespace FTPSyncer.ui
                             Timeout = GetIntValue(connDict, "Timeout", 30),
                             OperationTimeout = GetIntValue(connDict, "OperationTimeout", 60)
                         };
+                        
+                        // Set ProtocolType based on Protocol string
+                        if (protocol.Equals("LOCAL", StringComparison.OrdinalIgnoreCase))
+                        {
+                            connectionSettings.ProtocolType = 0;
+                        }
+                        else if (protocol.Equals("FTP", StringComparison.OrdinalIgnoreCase))
+                        {
+                            connectionSettings.ProtocolType = 1;
+                        }
+                        else if (protocol.Equals("SFTP", StringComparison.OrdinalIgnoreCase))
+                        {
+                            connectionSettings.ProtocolType = 2;
+                            connectionSettings.UseSftp = true;
+                        }
                         
                         // Decode password if present
                         string encodedPassword = GetStringValue(connDict, "Password");
@@ -790,16 +833,56 @@ namespace FTPSyncer.ui
                     }
                 }
 
-                // Extract job settings
-                SyncJob jobSettings = null;
-                if (configDict.ContainsKey("Job"))
+                // Extract job settings - support both single job and multi-job configurations
+                SavedJobConfiguration loadedConfig = new SavedJobConfiguration();
+                loadedConfig.SourceConnection = new SavedConnection { Settings = connectionSettings };
+                loadedConfig.DestinationConnection = new SavedConnection { Settings = connectionSettings };
+                
+                // Check for multi-job configuration (Jobs array)
+                if (configDict.ContainsKey("Jobs"))
+                {
+                    var jobsJson = configDict["Jobs"].ToString();
+                    var jobsList = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Dictionary<string, object>>>(jobsJson);
+                    
+                    if (jobsList != null && jobsList.Count > 0)
+                    {
+                        loadedConfig.Jobs = new List<SyncJob>();
+                        foreach (var jobDict in jobsList)
+                        {
+                            var job = new SyncJob
+                            {
+                                Name = GetStringValue(jobDict, "Name") ?? "Imported Job",
+                                Description = GetStringValue(jobDict, "Description") ?? "Job loaded from file",
+                                SourcePath = GetStringValue(jobDict, "SourcePath") ?? "",
+                                DestinationPath = GetStringValue(jobDict, "DestinationPath") ?? "",
+                                TransferMode = GetStringValue(jobDict, "TransferMode") ?? "Copy (Keep both files)",
+                                IntervalValue = GetIntValue(jobDict, "IntervalValue", 30),
+                                IntervalType = GetStringValue(jobDict, "IntervalType") ?? "Minutes",
+                                IncludeSubFolders = GetBoolValue(jobDict, "IncludeSubFolders", true),
+                                OverwriteExisting = GetBoolValue(jobDict, "OverwriteExisting", true),
+                                IsEnabled = true, // Always enable jobs when loading from file
+                                DeleteSourceAfterTransfer = GetBoolValue(jobDict, "DeleteSourceAfterTransfer", false),
+                                AutoStartOnLoad = GetBoolValue(jobDict, "AutoStartOnLoad", false),
+                                StartAfterLoad = GetBoolValue(jobDict, "StartAfterLoad", false),
+                                StartTime = GetDateTimeValue(jobDict, "StartTime", DateTime.Now),
+                                SourceConnection = connectionSettings,
+                                DestinationConnection = connectionSettings
+                            };
+                            loadedConfig.Jobs.Add(job);
+                        }
+                        loadedConfig.Name = $"Multi-Job Configuration ({loadedConfig.Jobs.Count} jobs)";
+                        ServiceLocator.LogService?.LogInfo($"Loaded multi-job configuration with {loadedConfig.Jobs.Count} jobs from file", "UI");
+                    }
+                }
+                // Check for single job configuration (Job object)
+                else if (configDict.ContainsKey("Job"))
                 {
                     var jobJson = configDict["Job"].ToString();
                     var jobDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(jobJson);
                     
                     if (jobDict != null)
                     {
-                        jobSettings = new SyncJob
+                        var jobSettings = new SyncJob
                         {
                             Name = GetStringValue(jobDict, "Name") ?? "Imported Configuration",
                             Description = GetStringValue(jobDict, "Description") ?? "Configuration loaded from file",
@@ -810,20 +893,30 @@ namespace FTPSyncer.ui
                             IntervalType = GetStringValue(jobDict, "IntervalType") ?? "Minutes",
                             IncludeSubFolders = GetBoolValue(jobDict, "IncludeSubFolders", true),
                             OverwriteExisting = GetBoolValue(jobDict, "OverwriteExisting", true),
-                            IsEnabled = GetBoolValue(jobDict, "IsEnabled", true),
+                            IsEnabled = true, // Always enable jobs when loading from file
                             DeleteSourceAfterTransfer = GetBoolValue(jobDict, "DeleteSourceAfterTransfer", false),
-                            StartTime = GetDateTimeValue(jobDict, "StartTime", DateTime.Now)
+                            AutoStartOnLoad = GetBoolValue(jobDict, "AutoStartOnLoad", false),
+                            StartAfterLoad = GetBoolValue(jobDict, "StartAfterLoad", false),
+                            StartTime = GetDateTimeValue(jobDict, "StartTime", DateTime.Now),
+                            SourceConnection = connectionSettings,
+                            DestinationConnection = connectionSettings
                         };
+                        loadedConfig.JobSettings = jobSettings;
+                        loadedConfig.Name = jobSettings.Name;
+                        ServiceLocator.LogService?.LogInfo($"Loaded single job configuration from file", "UI");
                     }
                 }
 
-                if (jobSettings == null)
+                // Ensure we have at least one job
+                loadedConfig.EnsureJobsCompatibility();
+                
+                if (loadedConfig.Jobs == null || loadedConfig.Jobs.Count == 0)
                 {
-                    throw new Exception("Invalid configuration file format. Missing Job data.");
+                    throw new Exception("Invalid configuration file format. Missing Job or Jobs data.");
                 }
 
-                // Apply loaded settings to the application
-                ApplyLoadedConfigurationFromFile(jobSettings, connectionSettings);
+                // Apply loaded settings to the application and start all jobs automatically
+                ApplyLoadedConfiguration(loadedConfig, true); // true = start all jobs from JSON file
             }
             catch (Exception ex)
             {
@@ -1481,8 +1574,8 @@ namespace FTPSyncer.ui
             
             dgvTimerJobs.Columns["JobId"].Width = 40;
             dgvTimerJobs.Columns["JobName"].Width = 120;
-            dgvTimerJobs.Columns["FolderPath"].Width = 250;
-            dgvTimerJobs.Columns["RemotePath"].Width = 200;
+            dgvTimerJobs.Columns["FolderPath"].Width = 180;
+            dgvTimerJobs.Columns["RemotePath"].Width = 80;
             dgvTimerJobs.Columns["Interval"].Width = 100;
             dgvTimerJobs.Columns["LastUpload"].Width = 150;
             dgvTimerJobs.Columns["Status"].Width = 80;
@@ -2252,41 +2345,38 @@ namespace FTPSyncer.ui
                     return;
                 }
                 
-                // If user has multiple timer jobs, suggest using the built-in save configuration instead
-                if (dgvTimerJobs.Rows.Count > 1)
-                {
-                    var result = MessageBox.Show(
-                        $"You have {dgvTimerJobs.Rows.Count} timer jobs in your list.\n\n" +
-                        "For multiple timer jobs, we recommend using 'Save Configuration' instead of 'Save As' to create a proper multi-job configuration that will run all jobs in parallel.\n\n" +
-                        "• Click YES to continue with 'Save As' (will only save the first job to file)\n" +
-                        "• Click NO to cancel and use 'Save Configuration' instead",
-                        "Multiple Timer Jobs - Consider Save Configuration",
-                        MessageBoxButtons.YesNo, 
-                        MessageBoxIcon.Information);
-                        
-                    if (result == DialogResult.No)
-                        return;
-                }
-                
-                // Create single-job configuration for file export
-                var currentJob = CreateJobFromCurrentState();
+                // Determine if we should save single or multiple jobs
+                bool saveMultipleJobs = dgvTimerJobs.Rows.Count > 1;
+                string jobCountText = saveMultipleJobs ? $"{dgvTimerJobs.Rows.Count} jobs" : "1 job";
                 
                 // Show SaveFileDialog to let user choose location and filename
                 using (var saveFileDialog = new SaveFileDialog())
                 {
-                    saveFileDialog.Title = "Save FTPSyncer Configuration As";
+                    saveFileDialog.Title = $"Save FTPSyncer Configuration As ({jobCountText})";
                     saveFileDialog.Filter = "FTPSyncer Configuration Files (*.json)|*.json|All Files (*.*)|*.*";
                     saveFileDialog.DefaultExt = "json";
-                    saveFileDialog.FileName = $"FTPSyncer_Config_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.json";
+                    saveFileDialog.FileName = $"FTPSyncer_Config_{dgvTimerJobs.Rows.Count}_Jobs_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.json";
                     saveFileDialog.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
                     
                     if (saveFileDialog.ShowDialog() == DialogResult.OK)
                     {
-                        // Save configuration to selected file
-                        SaveConfigurationToFile(currentJob, currentConnection, saveFileDialog.FileName);
-                        
-                        MessageBox.Show($"Configuration saved successfully to:\n{saveFileDialog.FileName}", 
-                            "Save Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        // Save all jobs from the grid to the file
+                        if (saveMultipleJobs)
+                        {
+                            var multiJobConfig = CreateMultiJobConfigurationFromCurrentState();
+                            SaveMultiJobConfigurationToFile(multiJobConfig, currentConnection, saveFileDialog.FileName);
+                            
+                            MessageBox.Show($"Configuration with {multiJobConfig.Jobs.Count} jobs saved successfully to:\n{saveFileDialog.FileName}", 
+                                "Save Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        else
+                        {
+                            var currentJob = CreateJobFromCurrentState();
+                            SaveConfigurationToFile(currentJob, currentConnection, saveFileDialog.FileName);
+                            
+                            MessageBox.Show($"Configuration saved successfully to:\n{saveFileDialog.FileName}", 
+                                "Save Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
                     }
                 }
             }
@@ -2326,7 +2416,9 @@ namespace FTPSyncer.ui
                         IsEnabled = job.IsEnabled,
                         LastStatus = job.LastStatus ?? "Stopped",
                         StartTime = job.StartTime,
-                        DeleteSourceAfterTransfer = job.DeleteSourceAfterTransfer
+                        DeleteSourceAfterTransfer = job.DeleteSourceAfterTransfer,
+                        AutoStartOnLoad = job.AutoStartOnLoad,
+                        StartAfterLoad = job.StartAfterLoad
                     },
                     Connection = new
                     {
@@ -2365,6 +2457,84 @@ namespace FTPSyncer.ui
             }
         }
 
+        private void SaveMultiJobConfigurationToFile(SavedJobConfiguration config, ConnectionSettings connection, string filePath)
+        {
+            try
+            {
+                // Create a multi-job configuration object
+                var jobsArray = new List<object>();
+                
+                foreach (var job in config.Jobs)
+                {
+                    jobsArray.Add(new
+                    {
+                        Name = job.Name,
+                        Description = job.Description,
+                        SourcePath = job.SourcePath,
+                        DestinationPath = job.DestinationPath,
+                        TransferMode = job.TransferMode,
+                        IntervalValue = job.IntervalValue,
+                        IntervalType = job.IntervalType,
+                        IncludeSubFolders = job.IncludeSubFolders,
+                        OverwriteExisting = job.OverwriteExisting,
+                        IsEnabled = job.IsEnabled,
+                        StartTime = job.StartTime,
+                        DeleteSourceAfterTransfer = job.DeleteSourceAfterTransfer,
+                        AutoStartOnLoad = job.AutoStartOnLoad,
+                        StartAfterLoad = job.StartAfterLoad
+                    });
+                }
+                
+                var multiConfig = new
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    DisplayName = config.Name ?? $"Multi-Job Configuration ({config.Jobs.Count} jobs)",
+                    Description = config.Description ?? $"Multi-job configuration with {config.Jobs.Count} jobs exported from FTPSyncer",
+                    CreatedDate = DateTime.Now,
+                    LastModified = DateTime.Now,
+                    Version = "1.0",
+                    ApplicationName = "FTPSyncer",
+                    JobCount = config.Jobs.Count,
+                    Jobs = jobsArray,
+                    Connection = new
+                    {
+                        Protocol = connection.Protocol,
+                        Host = connection.Host,
+                        Port = connection.Port,
+                        Username = connection.Username,
+                        // Encode password with base64 for basic obfuscation (not secure encryption, but better than plain text)
+                        Password = !string.IsNullOrEmpty(connection.Password) ? 
+                            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(connection.Password)) : "",
+                        UsePassiveMode = connection.UsePassiveMode,
+                        UseSftp = connection.UseSftp,
+                        UseKeyAuthentication = connection.UseKeyAuthentication,
+                        SshKeyPath = connection.SshKeyPath,
+                        EnableSsl = connection.EnableSsl,
+                        Timeout = connection.Timeout,
+                        OperationTimeout = connection.OperationTimeout
+                    },
+                    // Add timestamp and version info
+                    ExportInfo = new
+                    {
+                        ExportedBy = Environment.UserName,
+                        ExportedOn = Environment.MachineName,
+                        ExportDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                        FTPSyncerVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString()
+                    }
+                };
+                
+                // Convert to JSON and save to file
+                var json = Newtonsoft.Json.JsonConvert.SerializeObject(multiConfig, Newtonsoft.Json.Formatting.Indented);
+                System.IO.File.WriteAllText(filePath, json);
+                
+                ServiceLocator.LogService?.LogInfo($"Saved multi-job configuration with {config.Jobs.Count} jobs to file: {filePath}", "UI");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to save multi-job configuration file: {ex.Message}", ex);
+            }
+        }
+
         private SyncJob CreateJobFromCurrentState()
         {
             try
@@ -2379,15 +2549,25 @@ namespace FTPSyncer.ui
                     var intervalText = firstRow.Cells["Interval"].Value?.ToString() ?? "30 Minutes";
                     var status = firstRow.Cells["Status"].Value?.ToString() ?? "Stopped";
                     
+                    // Get auto-start setting
+                    bool autoStart = false;
+                    if (firstRow.Cells["AutoStart"].Value != null)
+                    {
+                        autoStart = Convert.ToBoolean(firstRow.Cells["AutoStart"].Value);
+                    }
+                    
+                    // Determine if job was running when saved
+                    bool wasRunning = status.Contains("Running") || status.Contains("Uploading") || 
+                                     status.Contains("Downloading") || status.Contains("Transferring");
+                    
                     // Parse interval
                     string intervalType = "Minutes";
                     int intervalValue = 30;
                     ParseIntervalText(intervalText, out intervalValue, out intervalType);
                     
-                    // Determine if job is enabled based on status
-                    // Jobs that are "Running" or "Uploading" are considered enabled
-                    // Jobs that are "Stopped" are considered disabled
-                    bool isEnabled = status.Contains("Running") || status.Contains("Uploading") || status.Contains("Downloading");
+                    // Job should be enabled by default when saving configuration
+                    // IsEnabled should represent if the job is available to run, not if it's currently running
+                    bool isEnabled = true;
                     
                     return new SyncJob
                     {
@@ -2403,7 +2583,9 @@ namespace FTPSyncer.ui
                         IncludeSubFolders = true,
                         OverwriteExisting = true,
                         IsEnabled = isEnabled,
-                        LastStatus = status
+                        LastStatus = status,
+                        AutoStartOnLoad = autoStart,
+                        StartAfterLoad = wasRunning
                     };
                 }
                 
@@ -2452,11 +2634,27 @@ namespace FTPSyncer.ui
                     var sourcePath = row.Cells["FolderPath"].Value?.ToString() ?? "";
                     var remotePath = row.Cells["RemotePath"].Value?.ToString() ?? "";
                     var intervalText = row.Cells["Interval"].Value?.ToString() ?? "30 Minutes";
+                    var status = row.Cells["Status"].Value?.ToString() ?? "Stopped";
+                    
+                    // Get auto-start setting from grid
+                    bool autoStart = false;
+                    if (row.Cells["AutoStart"].Value != null)
+                    {
+                        autoStart = Convert.ToBoolean(row.Cells["AutoStart"].Value);
+                    }
+                    
+                    // Determine if job was running when saved
+                    bool wasRunning = status.Contains("Running") || status.Contains("Uploading") || 
+                                     status.Contains("Downloading") || status.Contains("Transferring");
                     
                     // Parse interval
                     string intervalType = "Minutes";
                     int intervalValue = 30;
                     ParseIntervalText(intervalText, out intervalValue, out intervalType);
+                    
+                    // Job should be enabled by default when saving configuration
+                    // IsEnabled should represent if the job is available to run, not if it's currently running
+                    bool isEnabled = true;
                     
                     var job = new SyncJob
                     {
@@ -2469,8 +2667,10 @@ namespace FTPSyncer.ui
                         TransferMode = "Copy (Keep both files)",
                         IncludeSubFolders = true,
                         OverwriteExisting = true,
-                        IsEnabled = true,
+                        IsEnabled = isEnabled,
                         CreatedDate = DateTime.Now,
+                        AutoStartOnLoad = autoStart,
+                        StartAfterLoad = wasRunning,
                         
                         // Set connection settings for each individual job
                         SourceConnection = currentConnection,
@@ -2552,14 +2752,29 @@ namespace FTPSyncer.ui
         {
             try
             {
-                if (config == null) return;
+                if (config == null)
+                {
+                    ServiceLocator.LogService?.LogError("ApplyLoadedConfiguration called with null config", "UI");
+                    return;
+                }
+                
+                ServiceLocator.LogService?.LogInfo($"ApplyLoadedConfiguration started for config: {config.Name}, startAfterLoad: {startAfterLoad}", "UI");
                 
                 // Ensure backward compatibility migration
                 config.EnsureJobsCompatibility();
                 
                 var connectionService = ServiceLocator.ConnectionService;
                 var timerJobManager = ServiceLocator.TimerJobManager;
+                
+                if (timerJobManager == null)
+                {
+                    ServiceLocator.LogService?.LogError("TimerJobManager is null - cannot apply configuration", "UI");
+                    MessageBox.Show("Timer Job Manager is not available. Please restart the application.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                
                 int jobsStarted = 0;
+                int jobsRegistered = 0;
                 int totalJobs = 0;
 
                 // Determine which jobs to process
@@ -2570,17 +2785,20 @@ namespace FTPSyncer.ui
                     // Multi-job configuration
                     jobsToProcess.AddRange(config.Jobs);
                     totalJobs = config.Jobs.Count;
+                    ServiceLocator.LogService?.LogInfo($"Found {totalJobs} jobs in Jobs collection", "UI");
                 }
                 else if (config.JobSettings != null)
                 {
                     // Single job configuration (backward compatibility - should be rare after migration)
                     jobsToProcess.Add(config.JobSettings);
                     totalJobs = 1;
+                    ServiceLocator.LogService?.LogInfo("Found 1 job in JobSettings (backward compatibility)", "UI");
                 }
 
                 if (jobsToProcess.Count == 0)
                 {
                     ServiceLocator.LogService.LogWarning("No jobs found in configuration", "UI");
+                    MessageBox.Show("The configuration does not contain any jobs to load.", "No Jobs", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 
@@ -2611,88 +2829,119 @@ namespace FTPSyncer.ui
                     System.Threading.Thread.Sleep(100);
                 }
                 
-                // Process each job
-                if (startAfterLoad)
+                // Process each job - ALWAYS register jobs (whether starting or not)
+                // Prepare jobs for registration and optional starting
+                var jobsToStart = new List<long>();
+                var jobIdMapping = new Dictionary<long, SyncJob>();
+                
+                ServiceLocator.LogService?.LogInfo($"Starting to process {jobsToProcess.Count} jobs", "UI");
+                
+                foreach (var job in jobsToProcess)
                 {
-                    // Prepare jobs for parallel registration and starting
-                    var jobsToStart = new List<long>();
-                    var jobIdMapping = new Dictionary<long, SyncJob>();
-                    
-                    foreach (var job in jobsToProcess)
+                    try
                     {
-                        try
+                        ServiceLocator.LogService?.LogInfo($"Processing job: {job.Name}, IsEnabled: {job.IsEnabled}, SourcePath: {job.SourcePath}, DestinationPath: {job.DestinationPath}", "UI");
+                        
+                        // Skip disabled jobs
+                        if (!job.IsEnabled)
                         {
-                            // Skip disabled jobs
-                            if (!job.IsEnabled)
-                            {
-                                ServiceLocator.LogService.LogInfo($"Skipping disabled job: {job.Name}", "UI");
-                                continue;
-                            }
+                            ServiceLocator.LogService.LogInfo($"Skipping disabled job: {job.Name}", "UI");
+                            continue;
+                        }
 
-                            // Register the timer job first using centralized Job ID generator
-                            var intervalMs = GetIntervalInMilliseconds(job.IntervalValue, job.IntervalType);
-                            var jobId = JobIdGenerator.Instance.GenerateNumericJobId(); // Generate unique job ID in format MMDD-XXX
-                            var formattedJobId = JobIdGenerator.ToFormattedId(jobId);
+                        // Register the timer job first using centralized Job ID generator
+                        var intervalMs = GetIntervalInMilliseconds(job.IntervalValue, job.IntervalType);
+                        var jobId = JobIdGenerator.Instance.GenerateNumericJobId(); // Generate unique job ID in format MMDD-XXX
+                        var formattedJobId = JobIdGenerator.ToFormattedId(jobId);
+                        
+                        ServiceLocator.LogService?.LogInfo($"Attempting to register job '{job.Name}' with ID: {formattedJobId}, Interval: {intervalMs}ms", "UI");
+                        
+                        if (timerJobManager.RegisterTimerJob(
+                            jobId,
+                            job.Name ?? $"Job from {config.Name}",
+                            job.SourcePath,
+                            job.DestinationPath,
+                            intervalMs,
+                            job.IncludeSubFolders,
+                            job.DeleteSourceAfterTransfer))
+                        {
+                            jobsRegistered++;
+                            jobIdMapping[jobId] = job;
                             
-                            if (timerJobManager.RegisterTimerJob(
-                                jobId,
-                                job.Name ?? $"Job from {config.Name}",
-                                job.SourcePath,
-                                job.DestinationPath,
-                                intervalMs,
-                                job.IncludeSubFolders,
-                                job.DeleteSourceAfterTransfer))
+                            ServiceLocator.LogService?.LogInfo($"Successfully registered job '{job.Name}' (ID: {formattedJobId})", "UI");
+                            
+                            // Set the auto-start flag for the job based on the loaded configuration
+                            if (job.AutoStartOnLoad)
+                            {
+                                timerJobManager.SetTimerJobRunOnStartup(jobId, true);
+                                ServiceLocator.LogService.LogInfo($"Auto-start enabled for job '{job.Name}' (ID: {formattedJobId})", "UI");
+                            }
+                            
+                            // Check if job should be started based on saved status or explicit startAfterLoad parameter
+                            bool shouldStartJob = startAfterLoad || job.StartAfterLoad;
+                            
+                            if (shouldStartJob)
                             {
                                 jobsToStart.Add(jobId);
-                                jobIdMapping[jobId] = job;
-                                ServiceLocator.LogService.LogInfo($"Registered job '{job.Name}' (ID: {formattedJobId}) for parallel start", "UI");
+                                ServiceLocator.LogService.LogInfo($"Registered job '{job.Name}' (ID: {formattedJobId}) for parallel start (StartAfterLoad: {job.StartAfterLoad}, startAfterLoad param: {startAfterLoad})", "UI");
                             }
                             else
                             {
-                                ServiceLocator.LogService.LogError($"Failed to register job '{job.Name}'", "UI");
+                                ServiceLocator.LogService.LogInfo($"Registered job '{job.Name}' (ID: {formattedJobId}) without starting", "UI");
                             }
                         }
-                        catch (Exception jobEx)
+                        else
                         {
-                            ServiceLocator.LogService.LogError($"Error processing job '{job.Name}': {jobEx.Message}", "UI");
+                            ServiceLocator.LogService.LogError($"Failed to register job '{job.Name}'", "UI");
                         }
                     }
-                    
-                    // Start all registered jobs in parallel
-                    if (jobsToStart.Count > 0)
+                    catch (Exception jobEx)
                     {
-                        ServiceLocator.LogService.LogInfo($"Starting {jobsToStart.Count} jobs in parallel from configuration '{config.Name}'", "UI");
+                        ServiceLocator.LogService.LogError($"Error processing job '{job.Name}': {jobEx.Message}", "UI");
+                    }
+                }
+                
+                // Start all registered jobs in parallel if requested
+                if (startAfterLoad && jobsToStart.Count > 0)
+                {
+                    ServiceLocator.LogService.LogInfo($"Starting {jobsToStart.Count} jobs in parallel from configuration '{config.Name}'", "UI");
+                    
+                    var startResults = timerJobManager.StartMultipleTimerJobs(jobsToStart);
+                    
+                    // Log results for each job
+                    foreach (var result in startResults)
+                    {
+                        var jobId = result.Key;
+                        var success = result.Value;
                         
-                        var startResults = timerJobManager.StartMultipleTimerJobs(jobsToStart);
-                        
-                        // Log results for each job
-                        foreach (var result in startResults)
+                        if (jobIdMapping.ContainsKey(jobId))
                         {
-                            var jobId = result.Key;
-                            var success = result.Value;
-                            
-                            if (jobIdMapping.ContainsKey(jobId))
+                            var job = jobIdMapping[jobId];
+                            if (success)
                             {
-                                var job = jobIdMapping[jobId];
-                                if (success)
-                                {
-                                    jobsStarted++;
-                                    ServiceLocator.LogService.LogInfo($"Auto-started job '{job.Name}' from loaded configuration (parallel)", "UI");
-                                }
-                                else
-                                {
-                                    ServiceLocator.LogService.LogError($"Failed to start job '{job.Name}' (parallel)", "UI");
-                                }
+                                jobsStarted++;
+                                ServiceLocator.LogService.LogInfo($"Auto-started job '{job.Name}' from loaded configuration (parallel)", "UI");
+                            }
+                            else
+                            {
+                                ServiceLocator.LogService.LogError($"Failed to start job '{job.Name}' (parallel)", "UI");
                             }
                         }
                     }
                     
                     ServiceLocator.LogService.LogInfo($"Parallel job start completed: {jobsStarted} out of {totalJobs} jobs from configuration '{config.Name}'", "UI");
                 }
+                else if (!startAfterLoad)
+                {
+                    ServiceLocator.LogService.LogInfo($"Jobs registered without starting: {jobsRegistered} jobs from configuration '{config.Name}' are ready to start manually", "UI");
+                }
                 
                 // Update usage statistics
                 var configService = ServiceLocator.SavedJobConfigurationService;
-                configService.UpdateUsageStatistics(config.Id);
+                if (configService != null && !string.IsNullOrEmpty(config.Id))
+                {
+                    configService.UpdateUsageStatistics(config.Id);
+                }
                 
                 // Show notification if enabled
                 if (config.ShowNotificationOnStart && _notificationService != null)
@@ -2700,7 +2949,14 @@ namespace FTPSyncer.ui
                     string notificationMessage;
                     if (totalJobs > 1)
                     {
-                        notificationMessage = $"Configuration '{config.DisplayName}' loaded with {jobsStarted} of {totalJobs} jobs started.";
+                        if (startAfterLoad)
+                        {
+                            notificationMessage = $"Configuration '{config.DisplayName}' loaded with {jobsStarted} of {totalJobs} jobs started.";
+                        }
+                        else
+                        {
+                            notificationMessage = $"Configuration '{config.DisplayName}' loaded with {jobsRegistered} jobs ready to start.";
+                        }
                     }
                     else
                     {
@@ -2714,18 +2970,21 @@ namespace FTPSyncer.ui
                 }
                 
                 // Refresh the UI and update status displays
+                ServiceLocator.LogService?.LogInfo($"Refreshing UI grid. Jobs registered: {jobsRegistered}, Jobs started: {jobsStarted}", "UI");
                 RefreshTimerJobsGrid();
                 UpdateConnectionStatus(); // Update connection status display
                 UpdateServiceStatus(); // Update service status display
                 
                 // Force UI refresh for .NET 3.5 compatibility
                 Application.DoEvents();
+                
+                ServiceLocator.LogService?.LogInfo("ApplyLoadedConfiguration completed successfully", "UI");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error applying configuration: {ex.Message}", "Apply Configuration Error", 
+                MessageBox.Show($"Error applying configuration: {ex.Message}\n\nStack Trace:\n{ex.StackTrace}", "Apply Configuration Error", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService.LogError($"Error applying configuration: {ex.Message}", "UI");
+                ServiceLocator.LogService.LogError($"Error applying configuration: {ex.Message}\n{ex.StackTrace}", "UI");
             }
         }
 

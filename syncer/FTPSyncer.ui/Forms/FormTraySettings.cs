@@ -36,8 +36,19 @@ namespace FTPSyncer.ui.Forms
             
             try
             {
-                // Load notification settings
-                checkBoxNotificationsEnabled.Checked = _configService.GetSetting("NotificationsEnabled", true);
+                // Load notification settings from NotificationService
+                var notificationService = ServiceLocator.NotificationService;
+                if (notificationService != null)
+                {
+                    var notificationSettings = notificationService.GetSettings();
+                    checkBoxNotificationsEnabled.Checked = notificationSettings.EnableNotifications;
+                }
+                else
+                {
+                    // Fallback to old method
+                    checkBoxNotificationsEnabled.Checked = _configService.GetSetting("NotificationsEnabled", true);
+                }
+                
                 checkBoxStartupNotification.Checked = _configService.GetSetting("ShowStartupNotification", true);
                 numericUpDownDelay.Value = _configService.GetSetting("NotificationDelay", 3000);
                 
@@ -66,8 +77,20 @@ namespace FTPSyncer.ui.Forms
             
             try
             {
-                // Save notification settings
-                _configService.SaveSetting("NotificationsEnabled", checkBoxNotificationsEnabled.Checked);
+                // Save notification settings to NotificationService
+                var notificationService = ServiceLocator.NotificationService;
+                if (notificationService != null)
+                {
+                    var notificationSettings = notificationService.GetSettings();
+                    notificationSettings.EnableNotifications = checkBoxNotificationsEnabled.Checked;
+                    notificationService.SaveSettings(notificationSettings);
+                }
+                else
+                {
+                    // Fallback to old method
+                    _configService.SaveSetting("NotificationsEnabled", checkBoxNotificationsEnabled.Checked);
+                }
+                
                 _configService.SaveSetting("ShowStartupNotification", checkBoxStartupNotification.Checked);
                 _configService.SaveSetting("NotificationDelay", (int)numericUpDownDelay.Value);
                 
@@ -132,6 +155,13 @@ namespace FTPSyncer.ui.Forms
             try
             {
                 SaveSettings();
+                
+                // Update SystemTrayManager if notification service is available
+                var notificationService = ServiceLocator.NotificationService;
+                if (notificationService != null)
+                {
+                    notificationService.NotificationsEnabled = checkBoxNotificationsEnabled.Checked;
+                }
                 
                 // Show confirmation
                 MessageBox.Show("Settings saved successfully. Some changes may require restarting the application to take effect.", 

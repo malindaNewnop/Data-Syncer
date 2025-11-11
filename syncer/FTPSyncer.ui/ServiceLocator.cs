@@ -18,6 +18,7 @@ namespace FTPSyncer.ui
         private static IConfigurationService _configurationService;
         private static ITimerJobManager _timerJobManager; // New service for managing timer jobs
         private static ISavedJobConfigurationService _savedJobConfigService; // New service for saved configurations
+        private static Services.NotificationService _notificationService; // Notification service
 
         // New field for log rotation
         private static bool _logRotationEnabled = true;
@@ -588,6 +589,12 @@ namespace FTPSyncer.ui
         public static ISavedJobConfigurationService SavedJobConfigurationService
         {
             get { return _savedJobConfigService ?? (_savedJobConfigService = new Services.SavedJobConfigurationService()); }
+        }
+
+        public static Services.NotificationService NotificationService
+        {
+            get { return _notificationService; }
+            set { _notificationService = value; }
         }
 
         public static void SetSyncJobService(ISyncJobService service) { _syncJobService = service; }

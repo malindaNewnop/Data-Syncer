@@ -184,6 +184,7 @@ namespace FTPSyncer.ui.Forms
             this.groupBoxOptions.TabIndex = 1;
             this.groupBoxOptions.TabStop = false;
             this.groupBoxOptions.Text = "Options";
+            this.groupBoxOptions.Visible = false;
             
             // 
             // checkBoxSetAsDefault
@@ -240,9 +241,9 @@ namespace FTPSyncer.ui.Forms
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.groupBoxPreview.Controls.Add(this.listViewPreview);
-            this.groupBoxPreview.Location = new System.Drawing.Point(12, 290);
+            this.groupBoxPreview.Location = new System.Drawing.Point(12, 180);
             this.groupBoxPreview.Name = "groupBoxPreview";
-            this.groupBoxPreview.Size = new System.Drawing.Size(560, 180);
+            this.groupBoxPreview.Size = new System.Drawing.Size(560, 290);
             this.groupBoxPreview.TabIndex = 2;
             this.groupBoxPreview.TabStop = false;
             this.groupBoxPreview.Text = "Configuration Preview";
@@ -257,7 +258,7 @@ namespace FTPSyncer.ui.Forms
             this.listViewPreview.GridLines = true;
             this.listViewPreview.Location = new System.Drawing.Point(15, 25);
             this.listViewPreview.Name = "listViewPreview";
-            this.listViewPreview.Size = new System.Drawing.Size(525, 140);
+            this.listViewPreview.Size = new System.Drawing.Size(525, 250);
             this.listViewPreview.TabIndex = 0;
             this.listViewPreview.UseCompatibleStateImageBehavior = false;
             this.listViewPreview.View = System.Windows.Forms.View.Details;

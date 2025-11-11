@@ -83,6 +83,12 @@ namespace FTPSyncer.ui
         public string IncludeFileTypes { get; set; } // Comma-separated file extensions like "pdf,jpg,png"
         public string ExcludeFileTypes { get; set; } // Comma-separated file extensions like "tmp,bak"
 
+        // Auto-start on load property
+        public bool AutoStartOnLoad { get; set; }
+        
+        // Start after load property (job was running when saved)
+        public bool StartAfterLoad { get; set; }
+
         public SyncJob()
         {
             CreatedDate = DateTime.Now;
@@ -117,6 +123,10 @@ namespace FTPSyncer.ui
             EnableFilters = false;
             IncludeFileTypes = "";
             ExcludeFileTypes = "";
+            
+            // Initialize auto-start setting
+            AutoStartOnLoad = false;
+            StartAfterLoad = false;
         }
 
         public string GetNextRunTime()
@@ -844,6 +854,33 @@ namespace FTPSyncer.ui
         public override string ToString()
         {
             return DisplayName ?? "Unnamed Configuration";
+        }
+    }
+
+    /// <summary>
+    /// Notification settings for the application
+    /// </summary>
+    [Serializable]
+    public class NotificationSettings
+    {
+        public bool EnableNotifications { get; set; }
+        public bool ShowConnectionNotifications { get; set; }
+        public bool ShowJobStartNotifications { get; set; }
+        public bool ShowJobCompleteNotifications { get; set; }
+        public bool ShowErrorNotifications { get; set; }
+        public bool ShowWarningNotifications { get; set; }
+        public bool PlaySound { get; set; }
+
+        public NotificationSettings()
+        {
+            // Default values
+            EnableNotifications = true;
+            ShowConnectionNotifications = true;
+            ShowJobStartNotifications = true;
+            ShowJobCompleteNotifications = true;
+            ShowErrorNotifications = true;
+            ShowWarningNotifications = true;
+            PlaySound = false;
         }
     }
 }

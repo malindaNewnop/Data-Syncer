@@ -9,6 +9,7 @@ namespace FTPSyncer.ui
         private System.Windows.Forms.ToolStripMenuItem viewToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem helpToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem connectionSettingsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem notificationsToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
         private System.Windows.Forms.ToolStripMenuItem viewLogsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
@@ -92,6 +93,7 @@ namespace FTPSyncer.ui
             this.exitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.settingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.connectionSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.notificationsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.newConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.saveConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.saveAsConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -215,6 +217,7 @@ namespace FTPSyncer.ui
             // settingsToolStripMenuItem
             this.settingsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.connectionSettingsToolStripMenuItem,
+            this.notificationsToolStripMenuItem,
             this.sshKeyGenerationToolStripMenuItem,
             this.viewLogsToolStripMenuItem});
             this.settingsToolStripMenuItem.Name = "settingsToolStripMenuItem";
@@ -226,6 +229,12 @@ namespace FTPSyncer.ui
             this.connectionSettingsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
             this.connectionSettingsToolStripMenuItem.Text = "Connection Settings";
             this.connectionSettingsToolStripMenuItem.Click += new System.EventHandler(this.connectionSettingsToolStripMenuItem_Click);
+            
+            // notificationsToolStripMenuItem
+            this.notificationsToolStripMenuItem.Name = "notificationsToolStripMenuItem";
+            this.notificationsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
+            this.notificationsToolStripMenuItem.Text = "Notifications";
+            this.notificationsToolStripMenuItem.Click += new System.EventHandler(this.notificationsToolStripMenuItem_Click);
             
             // sshKeyGenerationToolStripMenuItem
             this.sshKeyGenerationToolStripMenuItem.Name = "sshKeyGenerationToolStripMenuItem";

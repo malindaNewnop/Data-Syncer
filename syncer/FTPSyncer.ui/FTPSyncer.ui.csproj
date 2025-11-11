@@ -126,6 +126,12 @@
     <Compile Include="Forms\FormSaveJobConfiguration.Designer.cs">
       <DependentUpon>FormSaveJobConfiguration.cs</DependentUpon>
     </Compile>
+    <Compile Include="Forms\FormNotificationSettings.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FormNotificationSettings.Designer.cs">
+      <DependentUpon>FormNotificationSettings.cs</DependentUpon>
+    </Compile>
     <Compile Include="Forms\FormSimpleLoadConfiguration.cs">
       <SubType>Form</SubType>
     </Compile>

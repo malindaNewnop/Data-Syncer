@@ -48,12 +48,28 @@ namespace FTPSyncer.ui.Services
                 var coreLogService = new FTPSyncer.core.FileLogService();
                 _autoStartService = new FTPSyncer.core.Services.AutoStartService("FTPSyncer", coreLogService);
                 
-                // Load configuration settings
-                var configService = ServiceLocator.ConfigurationService;
-                if (configService != null)
+                // Load configuration settings from NotificationService
+                var notificationService = ServiceLocator.NotificationService;
+                if (notificationService != null)
                 {
-                    _notificationsEnabled = configService.GetSetting("NotificationsEnabled", true);
-                    _notificationDuration = configService.GetSetting("NotificationDelay", 3000);
+                    var settings = notificationService.GetSettings();
+                    _notificationsEnabled = settings.EnableNotifications;
+                }
+                else
+                {
+                    // Fallback to ConfigService
+                    var configService = ServiceLocator.ConfigurationService;
+                    if (configService != null)
+                    {
+                        _notificationsEnabled = configService.GetSetting("NotificationsEnabled", true);
+                    }
+                }
+                
+                // Load notification duration from ConfigService
+                var config = ServiceLocator.ConfigurationService;
+                if (config != null)
+                {
+                    _notificationDuration = config.GetSetting("NotificationDelay", 3000);
                 }
             }
             catch (Exception)
@@ -186,7 +202,44 @@ namespace FTPSyncer.ui.Services
         public bool NotificationsEnabled
         {
             get { return _notificationsEnabled; }
-            set { _notificationsEnabled = value; }
+            set 
+            { 
+                _notificationsEnabled = value;
+                RefreshNotificationMenuState();
+            }
+        }
+
+        /// <summary>
+        /// Refreshes the notification menu item checkbox state
+        /// </summary>
+        public void RefreshNotificationMenuState()
+        {
+            try
+            {
+                // Update the notification menu item checkbox state
+                if (_contextMenu != null)
+                {
+                    foreach (MenuItem item in _contextMenu.MenuItems)
+                    {
+                        if (item.Text == "Settings")
+                        {
+                            foreach (MenuItem subItem in item.MenuItems)
+                            {
+                                if (subItem.Text == "Notifications")
+                                {
+                                    subItem.Checked = _notificationsEnabled;
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore errors when updating menu state
+            }
         }
 
         /// <summary>
@@ -593,6 +646,23 @@ namespace FTPSyncer.ui.Services
                 _notificationsEnabled = !_notificationsEnabled;
                 menuItem.Checked = _notificationsEnabled;
                 
+                // Update NotificationService settings
+                try
+                {
+                    var notificationService = ServiceLocator.NotificationService;
+                    if (notificationService != null)
+                    {
+                        var settings = notificationService.GetSettings();
+                        settings.EnableNotifications = _notificationsEnabled;
+                        notificationService.SaveSettings(settings);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_logService != null)
+                        _logService.LogError("Error updating NotificationService settings: " + ex.Message, "SystemTrayManager");
+                }
+                
                 // Show feedback to the user
                 if (_notificationsEnabled)
                 {
@@ -606,7 +676,7 @@ namespace FTPSyncer.ui.Services
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 
-                // Save setting if possible
+                // Save setting to ConfigService for backward compatibility
                 try
                 {
                     var configService = ServiceLocator.ConfigurationService;
