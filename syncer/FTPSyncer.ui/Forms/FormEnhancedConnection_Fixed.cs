@@ -280,13 +280,17 @@ namespace FTPSyncer.ui.Forms
         {
             try
             {
-                using (var keyGenForm = new FormKeyGeneration())
+                using (var keyGenForm = new FormComprehensiveConnection())
                 {
+                    keyGenForm.Text = "SSH Key Generation & Connection Settings";
+                    keyGenForm.SetDefaultTab(1); // Tab index 1 is SSH Key Generation
+                    
                     if (keyGenForm.ShowDialog() == DialogResult.OK)
                     {
-                        if (!IsNullOrWhiteSpace(keyGenForm.PrivateKeyPath) && txtPrivateKeyPath != null)
+                        var settings = keyGenForm.ConnectionSettings;
+                        if (!IsNullOrWhiteSpace(settings?.SshKeyPath) && txtPrivateKeyPath != null)
                         {
-                            txtPrivateKeyPath.Text = keyGenForm.PrivateKeyPath;
+                            txtPrivateKeyPath.Text = settings.SshKeyPath;
                         }
                     }
                 }

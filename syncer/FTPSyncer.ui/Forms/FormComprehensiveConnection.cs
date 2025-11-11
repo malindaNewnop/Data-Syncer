@@ -424,25 +424,18 @@ namespace FTPSyncer.ui.Forms
                 }
 
                 var privateKeyPath = Path.Combine(saveLocation, keyName);
-                var publicKeyPath = privateKeyPath + ".pub";
 
-                // Generate RSA key pair (simplified version for .NET 3.5)
-                var keyPair = GenerateRSAKeyPair(keySize, passphrase);
-                
-                // Save private key
-                File.WriteAllText(privateKeyPath, keyPair.PrivateKey);
-                
-                // Save public key
-                File.WriteAllText(publicKeyPath, keyPair.PublicKey);
+                // Use SftpUtilities to generate the key pair
+                var publicKey = SftpUtilities.GenerateKeyPair(privateKeyPath, passphrase, keySize);
 
                 // Display public key
-                txtPublicKey.Text = keyPair.PublicKey;
+                txtPublicKey.Text = publicKey;
 
                 // Auto-populate key path in connection tab
                 txtKeyPath.Text = privateKeyPath;
                 chkUseKeyAuth.Checked = true;
 
-                MessageBox.Show($"SSH key pair generated successfully!\n\nPrivate key: {privateKeyPath}\nPublic key: {publicKeyPath}", 
+                MessageBox.Show($"SSH key pair generated successfully!\n\nPrivate key: {privateKeyPath}\nPublic key: {privateKeyPath}.pub\n\nIMPORTANT: Keep your private key secure!", 
                     "Key Generation Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
@@ -501,49 +494,6 @@ namespace FTPSyncer.ui.Forms
                 case 2: return 4096;
                 default: return 2048;
             }
-        }
-
-        private KeyPairResult GenerateRSAKeyPair(int keySize, string passphrase)
-        {
-            // Simplified RSA key generation for .NET 3.5
-            // Note: This is a basic implementation. In production, consider using a proper SSH key library
-            
-            using (var rsa = new RSACryptoServiceProvider(keySize))
-            {
-                var privateKeyXml = rsa.ToXmlString(true);
-                var publicKeyXml = rsa.ToXmlString(false);
-                
-                // Convert to SSH format (simplified)
-                var publicKey = ConvertToSSHPublicKey(rsa);
-                var privateKey = ConvertToSSHPrivateKey(rsa, passphrase);
-
-                return new KeyPairResult
-                {
-                    PrivateKey = privateKey,
-                    PublicKey = publicKey
-                };
-            }
-        }
-
-        private string ConvertToSSHPublicKey(RSACryptoServiceProvider rsa)
-        {
-            // Simplified SSH public key format
-            var parameters = rsa.ExportParameters(false);
-            var keyComment = $"{Environment.UserName}@{Environment.MachineName}";
-            return $"ssh-rsa {Convert.ToBase64String(parameters.Modulus)} {keyComment}";
-        }
-
-        private string ConvertToSSHPrivateKey(RSACryptoServiceProvider rsa, string passphrase)
-        {
-            // Simplified SSH private key format (OpenSSH style)
-            var parameters = rsa.ExportParameters(true);
-            var keyData = Convert.ToBase64String(parameters.D ?? new byte[0]);
-            
-            var privateKey = "-----BEGIN RSA PRIVATE KEY-----\n";
-            privateKey += keyData + "\n";
-            privateKey += "-----END RSA PRIVATE KEY-----";
-            
-            return privateKey;
         }
 
         private void BtnCopyPublicKey_Click(object sender, EventArgs e)
@@ -654,12 +604,6 @@ namespace FTPSyncer.ui.Forms
             }
 
             UpdateSettingsFromForm();
-        }
-
-        private class KeyPairResult
-        {
-            public string PrivateKey { get; set; }
-            public string PublicKey { get; set; }
         }
     }
 }

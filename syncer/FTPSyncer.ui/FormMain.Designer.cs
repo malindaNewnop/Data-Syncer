@@ -18,7 +18,6 @@ namespace FTPSyncer.ui
         private System.Windows.Forms.ToolStripMenuItem saveConfigurationToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem saveAsConfigurationToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem loadConfigurationToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem sshKeyGenerationToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem fullScreenToolStripMenuItem;
         private System.Windows.Forms.Button btnAddJob;
         private System.Windows.Forms.Button btnStartStop;
@@ -98,7 +97,6 @@ namespace FTPSyncer.ui
             this.saveConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.saveAsConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.loadConfigurationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.sshKeyGenerationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.viewLogsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.viewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fullScreenToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -144,13 +142,6 @@ namespace FTPSyncer.ui
             this.gbTimerJobs.SuspendLayout();
             this.gbBandwidthControl.SuspendLayout();
             this.SuspendLayout();
-
-            // Initialize sshKeyGenerationToolStripMenuItem
-            this.sshKeyGenerationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.sshKeyGenerationToolStripMenuItem.Name = "sshKeyGenerationToolStripMenuItem";
-            this.sshKeyGenerationToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
-            this.sshKeyGenerationToolStripMenuItem.Text = "SSH Key Generation";
-            this.sshKeyGenerationToolStripMenuItem.Click += new System.EventHandler(this.sshKeyGenerationToolStripMenuItem_Click);
 
             // menuStrip1
             this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -218,7 +209,6 @@ namespace FTPSyncer.ui
             this.settingsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.connectionSettingsToolStripMenuItem,
             this.notificationsToolStripMenuItem,
-            this.sshKeyGenerationToolStripMenuItem,
             this.viewLogsToolStripMenuItem});
             this.settingsToolStripMenuItem.Name = "settingsToolStripMenuItem";
             this.settingsToolStripMenuItem.Size = new System.Drawing.Size(61, 20);
@@ -235,12 +225,6 @@ namespace FTPSyncer.ui
             this.notificationsToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
             this.notificationsToolStripMenuItem.Text = "Notifications";
             this.notificationsToolStripMenuItem.Click += new System.EventHandler(this.notificationsToolStripMenuItem_Click);
-            
-            // sshKeyGenerationToolStripMenuItem
-            this.sshKeyGenerationToolStripMenuItem.Name = "sshKeyGenerationToolStripMenuItem";
-            this.sshKeyGenerationToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
-            this.sshKeyGenerationToolStripMenuItem.Text = "SSH Key Generation";
-            this.sshKeyGenerationToolStripMenuItem.Click += new System.EventHandler(this.sshKeyGenerationToolStripMenuItem_Click);
             
             // viewLogsToolStripMenuItem
             this.viewLogsToolStripMenuItem.Name = "viewLogsToolStripMenuItem";

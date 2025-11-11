@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 using FTPSyncer.core;
 using FTPSyncer.core.Transfers;
@@ -11,6 +12,12 @@ namespace FTPSyncer.ui
     {
         private IConnectionService _connectionService;
         private ConnectionSettings _currentSettings;
+
+        // .NET 3.5 compatibility helper
+        private static bool IsNullOrWhiteSpace(string value)
+        {
+            return string.IsNullOrEmpty(value) || value.Trim().Length == 0;
+        }
 
         // Override to prevent unwanted resizing
         protected override void SetBoundsCore(int x, int y, int width, int height, BoundsSpecified specified)
@@ -89,15 +96,16 @@ namespace FTPSyncer.ui
                     }
                 }
                 
-                // SSH Key Generation tab
-                if (txtKeyPath != null) txtKeyPath.Text = _currentSettings.SshKeyPath ?? string.Empty;
-                if (numTimeout != null) numTimeout.Value = _currentSettings.Timeout > 0 ? _currentSettings.Timeout : 30;
+                // Initialize SSH Key Generation tab with defaults
+                if (txtKeyName != null) txtKeyName.Text = "id_rsa_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                if (txtSaveTo != null) txtSaveTo.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".ssh");
             }
             else
             {
                 if (cmbProtocol != null) cmbProtocol.SelectedIndex = 0; // Default to LOCAL
                 if (txtPort != null) txtPort.Text = "21"; // Default FTP port
-                if (numTimeout != null) numTimeout.Value = 30; // Default timeout
+                if (txtKeyName != null) txtKeyName.Text = "id_rsa_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                if (txtSaveTo != null) txtSaveTo.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".ssh");
             }
         }
 
@@ -136,20 +144,16 @@ namespace FTPSyncer.ui
             _currentSettings.Username = txtUsername != null ? txtUsername.Text.Trim() : string.Empty;
             _currentSettings.Password = txtPassword != null ? txtPassword.Text : string.Empty;
             
-            // SSH Key Authentication - use the path from either the main tab or SSH key tab
+            // SSH Key Authentication - use the path from the Connection Settings tab
             string sshKeyPath = string.Empty;
             if (chkUseSSHKey != null && chkUseSSHKey.Checked && txtSSHKeyPath != null)
             {
                 sshKeyPath = txtSSHKeyPath.Text.Trim();
             }
-            else if (txtKeyPath != null)
-            {
-                sshKeyPath = txtKeyPath.Text.Trim();
-            }
             _currentSettings.SshKeyPath = sshKeyPath;
             
-            // SSH Key Generation tab
-            if (numTimeout != null) _currentSettings.Timeout = (int)numTimeout.Value;
+            // Use default timeout
+            _currentSettings.Timeout = 30;
             
             _connectionService.SaveConnectionSettings(_currentSettings);
             ServiceLocator.LogService.LogInfo("Connection settings saved");
@@ -197,8 +201,8 @@ namespace FTPSyncer.ui
                     testSettings.Port = p;
                     testSettings.Username = txtUsername != null ? txtUsername.Text.Trim() : string.Empty;
                     testSettings.Password = txtPassword != null ? txtPassword.Text : string.Empty;
-                    testSettings.SshKeyPath = txtKeyPath != null ? txtKeyPath.Text.Trim() : string.Empty;
-                    testSettings.Timeout = numTimeout != null ? (int)numTimeout.Value : 30;
+                    testSettings.SshKeyPath = (chkUseSSHKey != null && chkUseSSHKey.Checked && txtSSHKeyPath != null) ? txtSSHKeyPath.Text.Trim() : string.Empty;
+                    testSettings.Timeout = 30;
 
                     // Use the actual transfer engines for REAL credential validation like FileZilla
                     ServiceLocator.LogService.LogInfo(string.Format("Starting connection test for {0}://{1}:{2}", testSettings.Protocol, testSettings.Host, testSettings.Port));
@@ -234,9 +238,6 @@ namespace FTPSyncer.ui
                         MessageBox.Show(successMessage, "Connection Test Successful", 
                                       MessageBoxButtons.OK, MessageBoxIcon.Information);
                         ServiceLocator.LogService.LogInfo("Connection test completed successfully");
-                        
-                        // Enable Save Connection button after successful test
-                        EnableSaveConnection();
                     }
                     else
                     {
@@ -714,14 +715,6 @@ namespace FTPSyncer.ui
             if (txtSSHKeyPath != null) txtSSHKeyPath.Visible = enabled && isSFTP;
             if (btnBrowseSSHKey != null) btnBrowseSSHKey.Visible = enabled && isSFTP;
             
-            // Disable Save Connection button when changing protocols - user needs to test first
-            if (btnSaveConnection != null)
-            {
-                btnSaveConnection.Enabled = false;
-                btnSaveConnection.Text = "Save Connection";
-                btnSaveConnection.BackColor = System.Drawing.Color.LightGray;
-            }
-            
             // Update SSH key controls based on checkbox state
             if (enabled && isSFTP)
             {
@@ -737,21 +730,175 @@ namespace FTPSyncer.ui
             }
         }
 
-        private void btnBrowseKey_Click(object sender, EventArgs e)
+        private void btnBrowseSaveTo_Click(object sender, EventArgs e)
         {
-            using (OpenFileDialog openFileDialog = new OpenFileDialog())
+            using (FolderBrowserDialog folderDialog = new FolderBrowserDialog())
             {
-                openFileDialog.Title = "Select SSH Private Key File";
-                openFileDialog.Filter = "SSH Key Files (*.pem;*.ppk;*.key)|*.pem;*.ppk;*.key|All Files (*.*)|*.*";
-                openFileDialog.Multiselect = false;
+                folderDialog.Description = "Select directory to save SSH keys";
+                folderDialog.SelectedPath = string.IsNullOrEmpty(txtSaveTo.Text) 
+                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), ".ssh")
+                    : txtSaveTo.Text;
                 
-                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                if (folderDialog.ShowDialog() == DialogResult.OK)
                 {
-                    if (txtKeyPath != null)
+                    txtSaveTo.Text = folderDialog.SelectedPath;
+                }
+            }
+        }
+
+        private void chkProtectWithPassphrase_CheckedChanged(object sender, EventArgs e)
+        {
+            bool isChecked = chkProtectWithPassphrase.Checked;
+            txtPassphrase.Enabled = isChecked;
+            txtConfirmPassphrase.Enabled = isChecked;
+            lblPassphrase.Enabled = isChecked;
+            lblConfirmPassphrase.Enabled = isChecked;
+            
+            if (!isChecked)
+            {
+                txtPassphrase.Clear();
+                txtConfirmPassphrase.Clear();
+            }
+        }
+
+        private void btnGenerateSSHKey_Click(object sender, EventArgs e)
+        {
+            // Validate inputs
+            if (IsNullOrWhiteSpace(txtKeyName.Text))
+            {
+                MessageBox.Show("Please enter a key name.", "Validation Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtKeyName.Focus();
+                return;
+            }
+
+            if (IsNullOrWhiteSpace(txtSaveTo.Text))
+            {
+                MessageBox.Show("Please select a save location.", "Validation Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (chkProtectWithPassphrase.Checked)
+            {
+                if (IsNullOrWhiteSpace(txtPassphrase.Text))
+                {
+                    MessageBox.Show("Please enter a passphrase.", "Validation Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    txtPassphrase.Focus();
+                    return;
+                }
+
+                if (txtPassphrase.Text != txtConfirmPassphrase.Text)
+                {
+                    MessageBox.Show("Passphrases do not match.", "Validation Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    txtConfirmPassphrase.Focus();
+                    return;
+                }
+
+                if (txtPassphrase.Text.Length < 8)
+                {
+                    MessageBox.Show("Passphrase must be at least 8 characters long.", "Validation Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    txtPassphrase.Focus();
+                    return;
+                }
+            }
+
+            try
+            {
+                btnGenerateSSHKey.Enabled = false;
+                btnGenerateSSHKey.Text = "Generating...";
+                
+                var keyName = txtKeyName.Text.Trim();
+                var saveLocation = txtSaveTo.Text.Trim();
+                var keySize = GetSelectedKeySize();
+                var passphrase = chkProtectWithPassphrase.Checked ? txtPassphrase.Text : null;
+
+                // Ensure save directory exists
+                if (!Directory.Exists(saveLocation))
+                {
+                    Directory.CreateDirectory(saveLocation);
+                }
+
+                var privateKeyPath = Path.Combine(saveLocation, keyName);
+
+                // Check if file already exists
+                if (File.Exists(privateKeyPath))
+                {
+                    var result = MessageBox.Show($"A key file already exists at:\n{privateKeyPath}\n\nDo you want to overwrite it?", 
+                        "File Exists", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    
+                    if (result != DialogResult.Yes)
                     {
-                        txtKeyPath.Text = openFileDialog.FileName;
+                        btnGenerateSSHKey.Enabled = true;
+                        btnGenerateSSHKey.Text = "Generate SSH Key";
+                        return;
                     }
                 }
+
+                // Use SftpUtilities to generate the key pair
+                var publicKey = SftpUtilities.GenerateKeyPair(privateKeyPath, passphrase, keySize);
+
+                // Display public key
+                txtGeneratedPublicKey.Text = publicKey;
+
+                // Auto-populate key path in connection tab if SFTP is selected
+                if (cmbProtocol.SelectedIndex == 2 && txtSSHKeyPath != null)
+                {
+                    txtSSHKeyPath.Text = privateKeyPath;
+                    chkUseSSHKey.Checked = true;
+                }
+
+                MessageBox.Show($"SSH key pair generated successfully!\n\nPrivate key: {privateKeyPath}\nPublic key: {privateKeyPath}.pub\n\nIMPORTANT: Keep your private key secure and never share it!", 
+                    "Key Generation Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                ServiceLocator.LogService?.LogInfo($"SSH key pair generated: {privateKeyPath}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to generate SSH key pair:\n{ex.Message}", 
+                    "Key Generation Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ServiceLocator.LogService?.LogError($"SSH key generation failed: {ex.Message}");
+            }
+            finally
+            {
+                btnGenerateSSHKey.Enabled = true;
+                btnGenerateSSHKey.Text = "Generate SSH Key";
+            }
+        }
+
+        private int GetSelectedKeySize()
+        {
+            if (cmbKeySize.SelectedIndex == 0)
+                return 1024;
+            else if (cmbKeySize.SelectedIndex == 2)
+                return 4096;
+            else
+                return 2048; // Default
+        }
+
+        private void btnCopyToClipboard_Click(object sender, EventArgs e)
+        {
+            if (!IsNullOrWhiteSpace(txtGeneratedPublicKey.Text))
+            {
+                try
+                {
+                    Clipboard.SetText(txtGeneratedPublicKey.Text);
+                    MessageBox.Show("Public key copied to clipboard!", "Copy Complete", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error copying to clipboard: {ex.Message}", "Copy Error", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            else
+            {
+                MessageBox.Show("No public key to copy. Please generate an SSH key first.", "No Key Available", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -800,57 +947,6 @@ namespace FTPSyncer.ui
         }
 
         #region Connection Management
-
-        private void btnSaveConnection_Click(object sender, EventArgs e)
-        {
-            if (!ValidateConnectionForSave()) return;
-
-            try
-            {
-                // Create connection settings from form
-                ConnectionSettings connectionToSave = CreateConnectionSettingsFromForm();
-                
-                // Get connection name
-                string connectionName = txtConnectionName != null ? txtConnectionName.Text.Trim() : "";
-                if (string.IsNullOrEmpty(connectionName))
-                {
-                    connectionName = GenerateConnectionName(connectionToSave);
-                    if (txtConnectionName != null) txtConnectionName.Text = connectionName;
-                }
-
-                // Save the connection
-                bool saved = SaveConnectionToStorage(connectionName, connectionToSave);
-                
-                if (saved)
-                {
-                    string successMessage = string.Format("Connection '{0}' saved successfully!\n\n" +
-                                                         "You can now use this connection for upload/download operations.",
-                                                         connectionName);
-                    MessageBox.Show(successMessage, "Connection Saved", 
-                                  MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    
-                    ServiceLocator.LogService.LogInfo(string.Format("Connection '{0}' saved successfully", connectionName));
-                    
-                    // Disable save button after successful save
-                    if (btnSaveConnection != null)
-                    {
-                        btnSaveConnection.Enabled = false;
-                        btnSaveConnection.Text = "Saved";
-                    }
-                }
-                else
-                {
-                    MessageBox.Show("Failed to save connection. Please try again.", "Save Failed", 
-                                  MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(string.Format("Error saving connection: {0}", ex.Message), "Save Error", 
-                              MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ServiceLocator.LogService.LogError(string.Format("Error saving connection: {0}", ex.Message));
-            }
-        }
 
         private bool ValidateConnectionForSave()
         {
@@ -921,7 +1017,7 @@ namespace FTPSyncer.ui
             settings.Username = txtUsername != null ? txtUsername.Text.Trim() : "";
             settings.Password = txtPassword != null ? txtPassword.Text : "";
             settings.SshKeyPath = txtSSHKeyPath != null ? txtSSHKeyPath.Text.Trim() : "";
-            settings.Timeout = numTimeout != null ? (int)numTimeout.Value : 30;
+            settings.Timeout = 30;
             
             return settings;
         }
@@ -998,20 +1094,6 @@ namespace FTPSyncer.ui
                 // Non-fatal error, don't throw
             }
         }
-
-        /// <summary>
-        /// Enable the Save Connection button when a successful test is completed
-        /// </summary>
-        private void EnableSaveConnection()
-        {
-            if (btnSaveConnection != null)
-            {
-                btnSaveConnection.Enabled = true;
-                btnSaveConnection.Text = "Save Connection";
-                btnSaveConnection.BackColor = System.Drawing.Color.LightGreen;
-            }
-        }
-
         #endregion
 
         #region Connection Management

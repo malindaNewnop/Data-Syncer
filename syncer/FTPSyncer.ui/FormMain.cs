@@ -1120,25 +1120,6 @@ namespace FTPSyncer.ui
             }
         }
 
-        private void sshKeyGenerationToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                using (var keyGenForm = new Forms.FormComprehensiveConnection())
-                {
-                    // Set the form to open directly to the SSH Key Generation tab
-                    keyGenForm.Text = "SSH Key Generation & Connection Settings";
-                    keyGenForm.SetDefaultTab(1); // Tab index 1 is SSH Key Generation
-                    keyGenForm.ShowDialog();
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error opening SSH key generation: " + ex.Message, 
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
         private void viewLogsToolStripMenuItem_Click(object sender, EventArgs e)
         {
             using (FormLogs logsForm = new FormLogs())

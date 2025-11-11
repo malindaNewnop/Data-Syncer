@@ -158,13 +158,17 @@ namespace FTPSyncer.ui.Forms
         {
             try
             {
-                using (var keyGenForm = new FormKeyGeneration())
+                using (var keyGenForm = new FormComprehensiveConnection())
                 {
+                    keyGenForm.Text = "SSH Key Generation & Connection Settings";
+                    keyGenForm.SetDefaultTab(1); // Tab index 1 is SSH Key Generation
+                    
                     if (keyGenForm.ShowDialog() == DialogResult.OK)
                     {
-                        if (!string.IsNullOrEmpty(keyGenForm.GeneratedKeyPath))
+                        var settings = keyGenForm.ConnectionSettings;
+                        if (!string.IsNullOrEmpty(settings?.SshKeyPath))
                         {
-                            txtSshKeyPath.Text = keyGenForm.GeneratedKeyPath;
+                            txtSshKeyPath.Text = settings.SshKeyPath;
                             chkUseKeyAuth.Checked = true;
                         }
                     }

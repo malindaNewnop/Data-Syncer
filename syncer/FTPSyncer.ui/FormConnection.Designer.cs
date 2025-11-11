@@ -18,7 +18,6 @@ namespace FTPSyncer.ui
         private System.Windows.Forms.TextBox txtPassword;
         private System.Windows.Forms.CheckBox chkShowPassword;
         private System.Windows.Forms.Button btnTestConnection;
-        private System.Windows.Forms.Button btnSaveConnection;
         private System.Windows.Forms.Button btnSave;
         private System.Windows.Forms.Button btnCancel;
         
@@ -33,11 +32,22 @@ namespace FTPSyncer.ui
         private System.Windows.Forms.Button btnBrowseSSHKey;
         
         // SSH Key Generation tab controls
-        private System.Windows.Forms.Label lblKeyPath;
-        private System.Windows.Forms.TextBox txtKeyPath;
-        private System.Windows.Forms.Button btnBrowseKey;
-        private System.Windows.Forms.Label lblTimeout;
-        private System.Windows.Forms.NumericUpDown numTimeout;
+        private System.Windows.Forms.Label lblKeyName;
+        private System.Windows.Forms.TextBox txtKeyName;
+        private System.Windows.Forms.Label lblSaveTo;
+        private System.Windows.Forms.TextBox txtSaveTo;
+        private System.Windows.Forms.Button btnBrowseSaveTo;
+        private System.Windows.Forms.Label lblKeySize;
+        private System.Windows.Forms.ComboBox cmbKeySize;
+        private System.Windows.Forms.CheckBox chkProtectWithPassphrase;
+        private System.Windows.Forms.Label lblPassphrase;
+        private System.Windows.Forms.TextBox txtPassphrase;
+        private System.Windows.Forms.Label lblConfirmPassphrase;
+        private System.Windows.Forms.TextBox txtConfirmPassphrase;
+        private System.Windows.Forms.Button btnGenerateSSHKey;
+        private System.Windows.Forms.Label lblGeneratedPublicKey;
+        private System.Windows.Forms.TextBox txtGeneratedPublicKey;
+        private System.Windows.Forms.Button btnCopyToClipboard;
 
         protected override void Dispose(bool disposing)
         {
@@ -70,19 +80,28 @@ namespace FTPSyncer.ui
             this.txtSSHKeyPath = new System.Windows.Forms.TextBox();
             this.btnBrowseSSHKey = new System.Windows.Forms.Button();
             this.btnTestConnection = new System.Windows.Forms.Button();
-            this.btnSaveConnection = new System.Windows.Forms.Button();
             this.tabSSHKeyGeneration = new System.Windows.Forms.TabPage();
-            this.lblKeyPath = new System.Windows.Forms.Label();
-            this.txtKeyPath = new System.Windows.Forms.TextBox();
-            this.btnBrowseKey = new System.Windows.Forms.Button();
-            this.lblTimeout = new System.Windows.Forms.Label();
-            this.numTimeout = new System.Windows.Forms.NumericUpDown();
+            this.lblKeyName = new System.Windows.Forms.Label();
+            this.txtKeyName = new System.Windows.Forms.TextBox();
+            this.lblSaveTo = new System.Windows.Forms.Label();
+            this.txtSaveTo = new System.Windows.Forms.TextBox();
+            this.btnBrowseSaveTo = new System.Windows.Forms.Button();
+            this.lblKeySize = new System.Windows.Forms.Label();
+            this.cmbKeySize = new System.Windows.Forms.ComboBox();
+            this.chkProtectWithPassphrase = new System.Windows.Forms.CheckBox();
+            this.lblPassphrase = new System.Windows.Forms.Label();
+            this.txtPassphrase = new System.Windows.Forms.TextBox();
+            this.lblConfirmPassphrase = new System.Windows.Forms.Label();
+            this.txtConfirmPassphrase = new System.Windows.Forms.TextBox();
+            this.btnGenerateSSHKey = new System.Windows.Forms.Button();
+            this.lblGeneratedPublicKey = new System.Windows.Forms.Label();
+            this.txtGeneratedPublicKey = new System.Windows.Forms.TextBox();
+            this.btnCopyToClipboard = new System.Windows.Forms.Button();
             this.btnSave = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
             this.tabControl.SuspendLayout();
             this.tabConnectionSettings.SuspendLayout();
             this.tabSSHKeyGeneration.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.numTimeout)).BeginInit();
             this.SuspendLayout();
             // 
             // tabControl
@@ -117,7 +136,6 @@ namespace FTPSyncer.ui
             this.tabConnectionSettings.Controls.Add(this.txtSSHKeyPath);
             this.tabConnectionSettings.Controls.Add(this.btnBrowseSSHKey);
             this.tabConnectionSettings.Controls.Add(this.btnTestConnection);
-            this.tabConnectionSettings.Controls.Add(this.btnSaveConnection);
             this.tabConnectionSettings.Location = new System.Drawing.Point(4, 27);
             this.tabConnectionSettings.Name = "tabConnectionSettings";
             this.tabConnectionSettings.Padding = new System.Windows.Forms.Padding(20);
@@ -306,25 +324,24 @@ namespace FTPSyncer.ui
             this.btnTestConnection.UseVisualStyleBackColor = true;
             this.btnTestConnection.Click += new System.EventHandler(this.btnTestConnection_Click);
             // 
-            // btnSaveConnection
-            //            this.btnSaveConnection.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnSaveConnection.Location = new System.Drawing.Point(200, 330);
-            this.btnSaveConnection.Name = "btnSaveConnection";
-            this.btnSaveConnection.Size = new System.Drawing.Size(100, 35);
-            this.btnSaveConnection.TabIndex = 18;
-            this.btnSaveConnection.Text = "Save";
-            this.btnSaveConnection.UseVisualStyleBackColor = true;
-            this.btnSaveConnection.Click += new System.EventHandler(this.btnSaveConnection_Click);
-            // 
-
-            // 
             // tabSSHKeyGeneration
             // 
-            this.tabSSHKeyGeneration.Controls.Add(this.lblKeyPath);
-            this.tabSSHKeyGeneration.Controls.Add(this.txtKeyPath);
-            this.tabSSHKeyGeneration.Controls.Add(this.btnBrowseKey);
-            this.tabSSHKeyGeneration.Controls.Add(this.lblTimeout);
-            this.tabSSHKeyGeneration.Controls.Add(this.numTimeout);
+            this.tabSSHKeyGeneration.Controls.Add(this.lblKeyName);
+            this.tabSSHKeyGeneration.Controls.Add(this.txtKeyName);
+            this.tabSSHKeyGeneration.Controls.Add(this.lblSaveTo);
+            this.tabSSHKeyGeneration.Controls.Add(this.txtSaveTo);
+            this.tabSSHKeyGeneration.Controls.Add(this.btnBrowseSaveTo);
+            this.tabSSHKeyGeneration.Controls.Add(this.lblKeySize);
+            this.tabSSHKeyGeneration.Controls.Add(this.cmbKeySize);
+            this.tabSSHKeyGeneration.Controls.Add(this.chkProtectWithPassphrase);
+            this.tabSSHKeyGeneration.Controls.Add(this.lblPassphrase);
+            this.tabSSHKeyGeneration.Controls.Add(this.txtPassphrase);
+            this.tabSSHKeyGeneration.Controls.Add(this.lblConfirmPassphrase);
+            this.tabSSHKeyGeneration.Controls.Add(this.txtConfirmPassphrase);
+            this.tabSSHKeyGeneration.Controls.Add(this.btnGenerateSSHKey);
+            this.tabSSHKeyGeneration.Controls.Add(this.lblGeneratedPublicKey);
+            this.tabSSHKeyGeneration.Controls.Add(this.txtGeneratedPublicKey);
+            this.tabSSHKeyGeneration.Controls.Add(this.btnCopyToClipboard);
             this.tabSSHKeyGeneration.Location = new System.Drawing.Point(4, 27);
             this.tabSSHKeyGeneration.Name = "tabSSHKeyGeneration";
             this.tabSSHKeyGeneration.Padding = new System.Windows.Forms.Padding(3);
@@ -333,67 +350,173 @@ namespace FTPSyncer.ui
             this.tabSSHKeyGeneration.Text = "SSH Key Generation";
             this.tabSSHKeyGeneration.UseVisualStyleBackColor = true;
             // 
-            // lblKeyPath
+            // lblKeyName
             // 
-            this.lblKeyPath.AutoSize = true;
-            this.lblKeyPath.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.lblKeyPath.Location = new System.Drawing.Point(15, 30);
-            this.lblKeyPath.Name = "lblKeyPath";
-            this.lblKeyPath.Size = new System.Drawing.Size(71, 18);
-            this.lblKeyPath.TabIndex = 0;
-            this.lblKeyPath.Text = "Key Path:";
+            this.lblKeyName.AutoSize = true;
+            this.lblKeyName.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblKeyName.Location = new System.Drawing.Point(20, 30);
+            this.lblKeyName.Name = "lblKeyName";
+            this.lblKeyName.Size = new System.Drawing.Size(80, 18);
+            this.lblKeyName.TabIndex = 0;
+            this.lblKeyName.Text = "Key Name:";
             // 
-            // txtKeyPath
+            // txtKeyName
             // 
-            this.txtKeyPath.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.txtKeyPath.Location = new System.Drawing.Point(100, 27);
-            this.txtKeyPath.Name = "txtKeyPath";
-            this.txtKeyPath.Size = new System.Drawing.Size(250, 24);
-            this.txtKeyPath.TabIndex = 1;
+            this.txtKeyName.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.txtKeyName.Location = new System.Drawing.Point(105, 27);
+            this.txtKeyName.Name = "txtKeyName";
+            this.txtKeyName.Size = new System.Drawing.Size(300, 24);
+            this.txtKeyName.TabIndex = 1;
+            this.txtKeyName.Text = "id_rsa_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
             // 
-            // btnBrowseKey
+            // lblSaveTo
             // 
-            this.btnBrowseKey.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.btnBrowseKey.Location = new System.Drawing.Point(360, 25);
-            this.btnBrowseKey.Name = "btnBrowseKey";
-            this.btnBrowseKey.Size = new System.Drawing.Size(60, 25);
-            this.btnBrowseKey.TabIndex = 2;
-            this.btnBrowseKey.Text = "Browse";
-            this.btnBrowseKey.UseVisualStyleBackColor = true;
-            this.btnBrowseKey.Click += new System.EventHandler(this.btnBrowseKey_Click);
+            this.lblSaveTo.AutoSize = true;
+            this.lblSaveTo.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblSaveTo.Location = new System.Drawing.Point(20, 70);
+            this.lblSaveTo.Name = "lblSaveTo";
+            this.lblSaveTo.Size = new System.Drawing.Size(68, 18);
+            this.lblSaveTo.TabIndex = 2;
+            this.lblSaveTo.Text = "Save To:";
             // 
-            // lblTimeout
+            // txtSaveTo
             // 
-            this.lblTimeout.AutoSize = true;
-            this.lblTimeout.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.lblTimeout.Location = new System.Drawing.Point(15, 70);
-            this.lblTimeout.Name = "lblTimeout";
-            this.lblTimeout.Size = new System.Drawing.Size(104, 18);
-            this.lblTimeout.TabIndex = 3;
-            this.lblTimeout.Text = "Timeout (sec):";
+            this.txtSaveTo.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.txtSaveTo.Location = new System.Drawing.Point(105, 67);
+            this.txtSaveTo.Name = "txtSaveTo";
+            this.txtSaveTo.Size = new System.Drawing.Size(450, 24);
+            this.txtSaveTo.TabIndex = 3;
             // 
-            // numTimeout
+            // btnBrowseSaveTo
             // 
-            this.numTimeout.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.numTimeout.Location = new System.Drawing.Point(100, 68);
-            this.numTimeout.Maximum = new decimal(new int[] {
-            300,
-            0,
-            0,
-            0});
-            this.numTimeout.Minimum = new decimal(new int[] {
-            5,
-            0,
-            0,
-            0});
-            this.numTimeout.Name = "numTimeout";
-            this.numTimeout.Size = new System.Drawing.Size(60, 24);
-            this.numTimeout.TabIndex = 4;
-            this.numTimeout.Value = new decimal(new int[] {
-            30,
-            0,
-            0,
-            0});
+            this.btnBrowseSaveTo.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnBrowseSaveTo.Location = new System.Drawing.Point(565, 65);
+            this.btnBrowseSaveTo.Name = "btnBrowseSaveTo";
+            this.btnBrowseSaveTo.Size = new System.Drawing.Size(80, 28);
+            this.btnBrowseSaveTo.TabIndex = 4;
+            this.btnBrowseSaveTo.Text = "Browse";
+            this.btnBrowseSaveTo.UseVisualStyleBackColor = true;
+            this.btnBrowseSaveTo.Click += new System.EventHandler(this.btnBrowseSaveTo_Click);
+            // 
+            // lblKeySize
+            // 
+            this.lblKeySize.AutoSize = true;
+            this.lblKeySize.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblKeySize.Location = new System.Drawing.Point(20, 110);
+            this.lblKeySize.Name = "lblKeySize";
+            this.lblKeySize.Size = new System.Drawing.Size(70, 18);
+            this.lblKeySize.TabIndex = 5;
+            this.lblKeySize.Text = "Key Size:";
+            // 
+            // cmbKeySize
+            // 
+            this.cmbKeySize.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbKeySize.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.cmbKeySize.FormattingEnabled = true;
+            this.cmbKeySize.Items.AddRange(new object[] {
+            "1024 bits",
+            "2048 bits",
+            "4096 bits"});
+            this.cmbKeySize.Location = new System.Drawing.Point(105, 107);
+            this.cmbKeySize.Name = "cmbKeySize";
+            this.cmbKeySize.Size = new System.Drawing.Size(120, 26);
+            this.cmbKeySize.TabIndex = 6;
+            this.cmbKeySize.SelectedIndex = 1;
+            // 
+            // chkProtectWithPassphrase
+            // 
+            this.chkProtectWithPassphrase.AutoSize = true;
+            this.chkProtectWithPassphrase.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.chkProtectWithPassphrase.Location = new System.Drawing.Point(23, 155);
+            this.chkProtectWithPassphrase.Name = "chkProtectWithPassphrase";
+            this.chkProtectWithPassphrase.Size = new System.Drawing.Size(200, 22);
+            this.chkProtectWithPassphrase.TabIndex = 7;
+            this.chkProtectWithPassphrase.Text = "Protect key with passphrase";
+            this.chkProtectWithPassphrase.UseVisualStyleBackColor = true;
+            this.chkProtectWithPassphrase.CheckedChanged += new System.EventHandler(this.chkProtectWithPassphrase_CheckedChanged);
+            // 
+            // lblPassphrase
+            // 
+            this.lblPassphrase.AutoSize = true;
+            this.lblPassphrase.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblPassphrase.Location = new System.Drawing.Point(20, 195);
+            this.lblPassphrase.Name = "lblPassphrase";
+            this.lblPassphrase.Size = new System.Drawing.Size(88, 18);
+            this.lblPassphrase.TabIndex = 8;
+            this.lblPassphrase.Text = "Passphrase:";
+            // 
+            // txtPassphrase
+            // 
+            this.txtPassphrase.Enabled = false;
+            this.txtPassphrase.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.txtPassphrase.Location = new System.Drawing.Point(115, 192);
+            this.txtPassphrase.Name = "txtPassphrase";
+            this.txtPassphrase.PasswordChar = '*';
+            this.txtPassphrase.Size = new System.Drawing.Size(200, 24);
+            this.txtPassphrase.TabIndex = 9;
+            // 
+            // lblConfirmPassphrase
+            // 
+            this.lblConfirmPassphrase.AutoSize = true;
+            this.lblConfirmPassphrase.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblConfirmPassphrase.Location = new System.Drawing.Point(335, 195);
+            this.lblConfirmPassphrase.Name = "lblConfirmPassphrase";
+            this.lblConfirmPassphrase.Size = new System.Drawing.Size(65, 18);
+            this.lblConfirmPassphrase.TabIndex = 10;
+            this.lblConfirmPassphrase.Text = "Confirm:";
+            // 
+            // txtConfirmPassphrase
+            // 
+            this.txtConfirmPassphrase.Enabled = false;
+            this.txtConfirmPassphrase.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.txtConfirmPassphrase.Location = new System.Drawing.Point(405, 192);
+            this.txtConfirmPassphrase.Name = "txtConfirmPassphrase";
+            this.txtConfirmPassphrase.PasswordChar = '*';
+            this.txtConfirmPassphrase.Size = new System.Drawing.Size(200, 24);
+            this.txtConfirmPassphrase.TabIndex = 11;
+            // 
+            // btnGenerateSSHKey
+            // 
+            this.btnGenerateSSHKey.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            this.btnGenerateSSHKey.Location = new System.Drawing.Point(23, 240);
+            this.btnGenerateSSHKey.Name = "btnGenerateSSHKey";
+            this.btnGenerateSSHKey.Size = new System.Drawing.Size(160, 35);
+            this.btnGenerateSSHKey.TabIndex = 12;
+            this.btnGenerateSSHKey.Text = "Generate SSH Key";
+            this.btnGenerateSSHKey.UseVisualStyleBackColor = true;
+            this.btnGenerateSSHKey.Click += new System.EventHandler(this.btnGenerateSSHKey_Click);
+            // 
+            // lblGeneratedPublicKey
+            // 
+            this.lblGeneratedPublicKey.AutoSize = true;
+            this.lblGeneratedPublicKey.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold);
+            this.lblGeneratedPublicKey.Location = new System.Drawing.Point(20, 295);
+            this.lblGeneratedPublicKey.Name = "lblGeneratedPublicKey";
+            this.lblGeneratedPublicKey.Size = new System.Drawing.Size(176, 18);
+            this.lblGeneratedPublicKey.TabIndex = 13;
+            this.lblGeneratedPublicKey.Text = "Generated Public Key:";
+            // 
+            // txtGeneratedPublicKey
+            // 
+            this.txtGeneratedPublicKey.Font = new System.Drawing.Font("Consolas", 8F);
+            this.txtGeneratedPublicKey.Location = new System.Drawing.Point(23, 320);
+            this.txtGeneratedPublicKey.Multiline = true;
+            this.txtGeneratedPublicKey.Name = "txtGeneratedPublicKey";
+            this.txtGeneratedPublicKey.ReadOnly = true;
+            this.txtGeneratedPublicKey.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this.txtGeneratedPublicKey.Size = new System.Drawing.Size(770, 80);
+            this.txtGeneratedPublicKey.TabIndex = 14;
+            // 
+            // btnCopyToClipboard
+            // 
+            this.btnCopyToClipboard.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.btnCopyToClipboard.Location = new System.Drawing.Point(23, 410);
+            this.btnCopyToClipboard.Name = "btnCopyToClipboard";
+            this.btnCopyToClipboard.Size = new System.Drawing.Size(150, 30);
+            this.btnCopyToClipboard.TabIndex = 15;
+            this.btnCopyToClipboard.Text = "Copy to Clipboard";
+            this.btnCopyToClipboard.UseVisualStyleBackColor = true;
+            this.btnCopyToClipboard.Click += new System.EventHandler(this.btnCopyToClipboard_Click);
             // 
             // btnSave
             //            this.btnSave.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold);
@@ -434,7 +557,6 @@ namespace FTPSyncer.ui
             this.tabConnectionSettings.PerformLayout();
             this.tabSSHKeyGeneration.ResumeLayout(false);
             this.tabSSHKeyGeneration.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.numTimeout)).EndInit();
             this.ResumeLayout(false);
 
         }
